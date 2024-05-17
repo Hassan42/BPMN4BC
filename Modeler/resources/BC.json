@@ -21,6 +21,11 @@
             "name": "bctype",
             "isAttr": true,
             "type": "String"
+          },
+          {
+            "name": "bcevent",
+            "isAttr": true,
+            "type": "String"
           }
         ]
       }

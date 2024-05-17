@@ -5,6 +5,8 @@ import BEO from '../assets/BEO-icon.svg';
 import BC from '../assets/BC-icon.svg';
 import BCCATCH from '../assets/BC-CATCH-EVENT-ICON.svg';
 import BCTHROW from '../assets/BC-THROW-EVENT-ICON.svg';
+import BCREVTHROW from '../assets/THROW-REV-ICON.svg';
+import BCREVCATCH from '../assets/CATCH-REV-ICON.svg';
 
 export default class CustomPalette {
   constructor(bpmnFactory, create, elementFactory, palette, translate) {
@@ -24,13 +26,14 @@ export default class CustomPalette {
       translate
     } = this;
 
-    function createTask(bcNode, bcType) {
+    function createTask(bcNode, bcType, bcEvent) {
       return function(event) {
 
         const businessObject = bpmnFactory.create(`bpmn:${bcType}`);
 
         businessObject.bc = bcNode;
         businessObject.bctype = bcType;
+        businessObject.bcevent = bcEvent;
 
         const shape = elementFactory.createShape({
           type: `bpmn:${bcType}`,
@@ -83,8 +86,8 @@ export default class CustomPalette {
         imageUrl: BCTHROW,
         title: translate('Create BC throw event'),
         action: {
-          dragstart: createTask("true", "IntermediateThrowEvent"),
-          click: createTask("true", "IntermediateThrowEvent")
+          dragstart: createTask("true", "IntermediateThrowEvent", "throwEvent"),
+          click: createTask("true", "IntermediateThrowEvent", "throwEvent")
         }
       },
       'BCCatchEvent': {
@@ -92,8 +95,26 @@ export default class CustomPalette {
         imageUrl: BCCATCH,
         title: translate('Create BC throw event'),
         action: {
-          dragstart: createTask("true", "IntermediateCatchEvent"),
-          click: createTask("true", "IntermediateCatchEvent")
+          dragstart: createTask("true", "IntermediateCatchEvent", "catchEvent"),
+          click: createTask("true", "IntermediateCatchEvent", "catchEvent")
+        }
+      },
+      'BCThrowRevertEvent': {
+        group: 'BC',
+        imageUrl: BCREVTHROW,
+        title: translate('Create BC throw event'),
+        action: {
+          dragstart: createTask("true", "IntermediateThrowEvent", "throwRevertEvent"),
+          click: createTask("true", "IntermediateThrowEvent", "throwRevertEvent")
+        }
+      },
+      'BCCatchRevertEvent': {
+        group: 'BC',
+        imageUrl: BCREVCATCH,
+        title: translate('Create BC throw event'),
+        action: {
+          dragstart: createTask("true", "IntermediateCatchEvent", "catchRevertEvent"),
+          click: createTask("true", "IntermediateCatchEvent", "catchRevertEvent")
         }
       }
     };

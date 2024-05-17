@@ -23,6 +23,8 @@ import RECEIVE from '../assets/RECEIVE.svg';
 import BEO from '../assets/BEO.svg';
 import BCGroup from '../assets/BC.svg';
 import BCRECEIVE from '../assets/BC-RECEIVE.svg';
+import BCREVTHROW from '../assets/THROW-REV.svg';
+import BCREVCATCH from '../assets/CATCH-REV.svg';
 
 const HIGH_PRIORITY = 1500;
 
@@ -48,7 +50,7 @@ export default class CustomRenderer extends BaseRenderer {
 
     const businessObject = getBusinessObject(element);
 
-    const { bc, bctype } = businessObject;
+    const { bc, bctype, bcevent } = businessObject;
 
     if(bc == "true"){
 
@@ -93,21 +95,25 @@ export default class CustomRenderer extends BaseRenderer {
           }); break;
           case "IntermediateThrowEvent":
             this.bpmnRenderer.drawShape(parentNode, element);
+            var href = BCGroup;
+            if(bcevent=="throwRevertEvent") {href=BCREVTHROW;}
             bcSvg = svgCreate("image", {
               x: 9,
               y: 8.5,
               width: element.width/2,
               height: element.height/2,
-              href: BCGroup
+              href: href
           }); break;
           case "IntermediateCatchEvent":
             this.bpmnRenderer.drawShape(parentNode, element);
+            var href = BCRECEIVE;
+            if(bcevent=="catchRevertEvent") {href=BCREVCATCH;}
             bcSvg = svgCreate("image", {
               x: 9,
               y: 8.5,
               width: element.width/2,
               height: element.height/2,
-              href: BCRECEIVE
+              href: href
           }); break;
           default: throw("Unkown BC type.")
         }
