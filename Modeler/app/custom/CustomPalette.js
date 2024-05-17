@@ -3,6 +3,8 @@ import RECEIVE from '../assets/RECEIVE-icon.svg';
 import BEO from '../assets/BEO-icon.svg';
 // import BC from '../assets/BC.svg';
 import BC from '../assets/BC-icon.svg';
+import BCCATCH from '../assets/BC-CATCH-EVENT-ICON.svg';
+import BCTHROW from '../assets/BC-THROW-EVENT-ICON.svg';
 
 export default class CustomPalette {
   constructor(bpmnFactory, create, elementFactory, palette, translate) {
@@ -41,7 +43,7 @@ export default class CustomPalette {
 
     return {
       'SEND': {
-        group: 'activity',
+        group: 'BC',
         imageUrl: SEND,
         title: translate('Create send transaction activity'),
         action: {
@@ -50,7 +52,7 @@ export default class CustomPalette {
         }
       },
       'RECEIVE': {
-        group: 'activity',
+        group: 'BC',
         imageUrl: RECEIVE,
         title: translate('Create receive transaction activity'),
         action: {
@@ -59,7 +61,7 @@ export default class CustomPalette {
         }
       },
       'BEOGateway': {
-        group: 'gateway',
+        group: 'BC',
         imageUrl: BEO,
         title: translate('Create BEO gateway'),
         action: {
@@ -68,12 +70,30 @@ export default class CustomPalette {
         }
       },
       'BCGroup': {
-        group: 'group',
+        group: 'BC',
         imageUrl: BC,
         title: translate('Create BC group'),
         action: {
           dragstart: createTask("true", "Participant"),
           click: createTask("true", "Participant")
+        }
+      },
+      'BCThrowEvent': {
+        group: 'BC',
+        imageUrl: BCTHROW,
+        title: translate('Create BC throw event'),
+        action: {
+          dragstart: createTask("true", "IntermediateThrowEvent"),
+          click: createTask("true", "IntermediateThrowEvent")
+        }
+      },
+      'BCCatchEvent': {
+        group: 'BC',
+        imageUrl: BCCATCH,
+        title: translate('Create BC throw event'),
+        action: {
+          dragstart: createTask("true", "IntermediateCatchEvent"),
+          click: createTask("true", "IntermediateCatchEvent")
         }
       }
     };

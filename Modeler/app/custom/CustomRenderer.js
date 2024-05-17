@@ -22,6 +22,7 @@ import SEND from '../assets/SEND.svg';
 import RECEIVE from '../assets/RECEIVE.svg';
 import BEO from '../assets/BEO.svg';
 import BCGroup from '../assets/BC.svg';
+import BCRECEIVE from '../assets/BC-RECEIVE.svg';
 
 const HIGH_PRIORITY = 1500;
 
@@ -89,6 +90,24 @@ export default class CustomRenderer extends BaseRenderer {
               width: 35,
               height: 35,
               href: BCGroup
+          }); break;
+          case "IntermediateThrowEvent":
+            this.bpmnRenderer.drawShape(parentNode, element);
+            bcSvg = svgCreate("image", {
+              x: 9,
+              y: 8.5,
+              width: element.width/2,
+              height: element.height/2,
+              href: BCGroup
+          }); break;
+          case "IntermediateCatchEvent":
+            this.bpmnRenderer.drawShape(parentNode, element);
+            bcSvg = svgCreate("image", {
+              x: 9,
+              y: 8.5,
+              width: element.width/2,
+              height: element.height/2,
+              href: BCRECEIVE
           }); break;
           default: throw("Unkown BC type.")
         }
