@@ -1,7 +1,6 @@
 {
-  "name": "bpmn-js-example-custom-elements",
+  "name": "bpmn4bc",
   "version": "0.0.0",
-  "description": "An example of how to support custom elements in bpmn-js while ensuring BPMN 2.0 compatibility.",
   "scripts": {
     "all": "run-s lint build",
     "build": "webpack --mode production",
@@ -11,24 +10,6 @@
     "lint": "eslint .",
     "start": "run-s build serve"
   },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/bpmn-io/bpmn-js-example-custom-elements"
-  },
-  "keywords": [
-    "bpmnjs-example"
-  ],
-  "author": {
-    "name": "Nico Rehwaldt",
-    "url": "https://github.com/nikku"
-  },
-  "contributors": [
-    {
-      "name": "bpmn.io contributors",
-      "url": "https://github.com/bpmn-io"
-    }
-  ],
-  "license": "MIT",
   "devDependencies": {
     "copy-webpack-plugin": "^8.1.0",
     "eslint": "^7.22.0",
