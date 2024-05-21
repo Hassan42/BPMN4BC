@@ -82,6 +82,23 @@ html, body, #container {
   font-size: 16px;
 }
 
+#js-properties-panel {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: 260px;
+  z-index: 10;
+  border-left: 1px solid #ccc;
+  overflow: auto;
+  &:empty {
+    display: none;
+  }
+> .djs-properties-panel {
+  padding-bottom: 70px;
+  min-height:100%;
+}
+
 
 #quality-assurance {
   color: #111;

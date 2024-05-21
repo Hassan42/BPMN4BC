@@ -7,52 +7,56 @@
 
   <link rel="stylesheet" href="vendor/bpmn-js/assets/diagram-js.css" />
   <link rel="stylesheet" href="vendor/bpmn-js/assets/bpmn-font/css/bpmn-embedded.css" />
+  <link rel="stylesheet" href="https://unpkg.com/@bpmn-io/properties-panel/dist/assets/properties-panel.css">
   <link rel="stylesheet" href="css/app.css" />
 </head>
 <body>
-  <div id="container"></div>
+  <!-- <div class="modeler"> -->
+    <div id="container"></div>
+    <div id="js-properties-panel"></div>
 
-  <div id="quality-assurance" class="panel hidden">
-    <form id="form">
-      <p>
-        <b>Suitability Score</b>
-      </p>
-      <br />
-      <input id="suitability-score" type="text" placeholder="100" autocomplete="off">
-      <br />
-      <br />
-      <p id="warning" class="hidden">
-        Suitability Score must be a number
-      </p>
-      <br />
-      <p>
-        <b>Last Checked</b>
-      </p>
-      <br />
-      <p id="last-checked">
-        -
-      </p>
-      <br />
-      <input id="okay" type="submit" value="Okay">
-    </form>
-  </div>
+    <div id="quality-assurance" class="panel hidden">
+      <form id="form">
+        <p>
+          <b>Suitability Score</b>
+        </p>
+        <br />
+        <input id="suitability-score" type="text" placeholder="100" autocomplete="off">
+        <br />
+        <br />
+        <p id="warning" class="hidden">
+          Suitability Score must be a number
+        </p>
+        <br />
+        <p>
+          <b>Last Checked</b>
+        </p>
+        <br />
+        <p id="last-checked">
+          -
+        </p>
+        <br />
+        <input id="okay" type="submit" value="Okay">
+      </form>
+    </div>
 
-  <ul class="buttons">
-    <li>
-      download
-    </li>
-    <li>
-      <a id="js-download-diagram" href title="download BPMN diagram">
-        BPMN diagram
-      </a>
-    </li>
-    <li>
-      <a id="js-download-svg" href title="download as SVG image">
-        SVG image
-      </a>
-    </li>
-  </ul>
-
+    <ul class="buttons">
+      <li>
+        download
+      </li>
+      <li>
+        <a id="js-download-diagram" href title="download BPMN diagram">
+          BPMN diagram
+        </a>
+      </li>
+      <li>
+        <a id="js-download-svg" href title="download as SVG image">
+          SVG image
+        </a>
+      </li>
+    </ul>
+  <!-- </div> -->
+</body>
   <!-- <div id="hint" class="panel">Click <b>right mouse button</b> to edit properties.</div> -->
 
   <script src="app.js"></script>

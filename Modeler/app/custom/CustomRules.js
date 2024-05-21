@@ -41,7 +41,7 @@ CustomRules.prototype.init = function() {
     //Which elements are allowed to be placed in blockchain env
     if(targetBo.bc == 'true'){
       if((shapeBo.bc == 'true' || is(shapeBo, "bpmn:ParallelGateway") || is(shapeBo, "bpmn:EventBasedGateway") || is(shapeBo, "bpmn:ExclusiveGateway") 
-        || is(shapeBo, "bpmn:ScriptTask") || is(shapeBo, "bpmn:StartEvent") || is(shapeBo, "bpmn:EndEvent") ) 
+        || is(shapeBo, "bpmn:Task") || is(shapeBo, "bpmn:StartEvent") || is(shapeBo, "bpmn:EndEvent") ) 
           && (!is(shapeBo, "bpmn:SendTask")) && (!is(shapeBo, "bpmn:IntermediateCatchEvent")) && (!is(shapeBo, "bpmn:Participant"))){
           return true;
       }

@@ -1,0 +1,36 @@
+{
+    "name": "BPMNBC",
+    "uri": "http://some-company/schema/bpmn/qa",
+    "prefix": "bpmnbc",
+    "xml": {
+      "tagAlias": "lowerCase"
+    },
+    "types": [
+      {
+        "name": "BcNode",
+        "extends": [
+          "bpmn:FlowNode"
+        ],
+        "properties": [
+          {
+            "name": "bc",
+            "isAttr": true,
+            "type": "String"
+          },
+          {
+            "name": "bctype",
+            "isAttr": true,
+            "type": "String"
+          },
+          {
+            "name": "bcevent",
+            "isAttr": true,
+            "type": "String"
+          }
+        ]
+      }
+    ],
+    "emumerations": [],
+    "associations": []
+  }
+  

@@ -1,0 +1,16 @@
+{
+  "name": "bpmn4bc-compiler",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "bpmn-moddle": "^9.0.1"
+  }
+}

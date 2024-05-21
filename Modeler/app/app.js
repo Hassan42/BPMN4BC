@@ -1,5 +1,11 @@
 import BpmnModeler from 'bpmn-js/lib/Modeler';
 
+import {
+  BpmnPropertiesPanelModule,
+  BpmnPropertiesProviderModule,
+} from 'bpmn-js-properties-panel';
+
+
 import { getBusinessObject } from 'bpmn-js/lib/util/ModelUtil';
 
 import diagramXML from '../resources/diagram.bpmn';
@@ -10,9 +16,13 @@ import bcExtension from '../resources/BC';
 
 import $ from 'jquery';
 
+import CustomPropertiesProvider from "./properties";
+import bcPropertiesProvider from "./properties";
+
 import {
   debounce
 } from 'min-dash';
+
 
 const HIGH_PRIORITY = 1500;
 
@@ -38,11 +48,18 @@ window.addEventListener('click', (event) => {
 // create modeler
 const bpmnModeler = new BpmnModeler({
   container: containerEl,
+  propertiesPanel: {
+    parent: '#js-properties-panel'
+  },
   additionalModules: [
+    BpmnPropertiesPanelModule,
+    BpmnPropertiesProviderModule,
+    CustomPropertiesProvider,
+    bcPropertiesProvider,
     customElements,
   ],
   moddleExtensions: {
-    bc: bcExtension
+    bc: bcExtension,
   }
 });
 
