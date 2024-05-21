@@ -96,7 +96,7 @@ export default class CustomRenderer extends BaseRenderer {
           case "IntermediateThrowEvent":
             this.bpmnRenderer.drawShape(parentNode, element);
             var href = BCGroup;
-            if(bcevent=="throwRevertEvent") {href=BCREVTHROW;}
+            // if(bcevent=="throwRevertEvent") {href=BCREVTHROW;}
             bcSvg = svgCreate("image", {
               x: 9,
               y: 8.5,
@@ -107,7 +107,27 @@ export default class CustomRenderer extends BaseRenderer {
           case "IntermediateCatchEvent":
             this.bpmnRenderer.drawShape(parentNode, element);
             var href = BCRECEIVE;
-            if(bcevent=="catchRevertEvent") {href=BCREVCATCH;}
+            // if(bcevent=="catchRevertEvent") {href=BCREVCATCH;}
+            bcSvg = svgCreate("image", {
+              x: 9,
+              y: 8.5,
+              width: element.width/2,
+              height: element.height/2,
+              href: href
+          }); break;
+          case "BoundaryEvent":
+            this.bpmnRenderer.drawShape(parentNode, element);
+            var href = BCREVCATCH;
+            bcSvg = svgCreate("image", {
+              x: 9,
+              y: 8.5,
+              width: element.width/2,
+              height: element.height/2,
+              href: href
+          }); break;
+          case "EndEvent":
+            this.bpmnRenderer.drawShape(parentNode, element);
+            var href = BCREVTHROW;
             bcSvg = svgCreate("image", {
               x: 9,
               y: 8.5,

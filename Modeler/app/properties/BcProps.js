@@ -2,20 +2,43 @@ import { html } from 'htm/preact';
 
 import { TextFieldEntry, isTextFieldEntryEdited } from '@bpmn-io/properties-panel';
 import { useService } from 'bpmn-js-properties-panel';
+import { is } from 'bpmn-js/lib/util/ModelUtil';
 
 export default function(element) {
-
-  return [
-    {
-      id: 'spell',
-      element,
-      component: SpellI,
-      isEdited: isTextFieldEntryEdited
-    }
-  ];
+  if (is(element, 'bpmn:ReceiveTask') && element.businessObject.bc == "true") {
+    return [
+      {
+        id: 'sender',
+        element,
+        component: Sender,
+        isEdited: isTextFieldEntryEdited
+      },
+    ];
+  }
+  else if (is(element, 'bpmn:IntermediateThrowEvent') && element.businessObject.bcevent == "throwEvent") {
+    return [
+      {
+        id: 'event',
+        element,
+        component: Event,
+        isEdited: isTextFieldEntryEdited
+      },
+    ];
+  }
+  else if (is(element, 'bpmn:IntermediateCatchEvent') && element.businessObject.bcevent == "catchEvent") {
+    return [
+      {
+        id: 'sender',
+        element,
+        component: Event,
+        isEdited: isTextFieldEntryEdited
+      },
+    ];
+  }
 }
 
-function Spell(props) {
+
+function Sender(props) {
   const { element, id } = props;
 
   const modeling = useService('modeling');
@@ -23,28 +46,27 @@ function Spell(props) {
   const debounce = useService('debounceInput');
 
   const getValue = () => {
-    return element.businessObject.spell || '';
+    return element.businessObject.bcsenderaddress || '';
   };
 
   const setValue = value => {
     return modeling.updateProperties(element, {
-      spell: value
+      bcsenderaddress: value
     });
   };
 
   return html`<${TextFieldEntry}
     id=${ id }
     element=${ element }
-    description=${ translate('Apply a black magic spell') }
-    label=${ translate('Spell') }
+    description=${ translate('Transaction Sender Address') }
+    label=${ translate('Sender Address') }
     getValue=${ getValue }
     setValue=${ setValue }
     debounce=${ debounce }
-    tooltip=${ translate('Check available spells in the spellbook.') }
   />`;
 }
 
-function SpellI(props) {
+function Event(props) {
   const { element, id } = props;
 
   const modeling = useService('modeling');
@@ -52,23 +74,22 @@ function SpellI(props) {
   const debounce = useService('debounceInput');
 
   const getValue = () => {
-    return element.businessObject.spell || '';
+    return element.businessObject.bceventname || '';
   };
 
   const setValue = value => {
     return modeling.updateProperties(element, {
-      spell: value
+      bceventname: value
     });
   };
 
   return html`<${TextFieldEntry}
     id=${ id }
     element=${ element }
-    description=${ translate('Apply a black magic spell') }
-    label=${ translate('Spell') }
+    description=${ translate('Smart Contract Event Name') }
+    label=${ translate('Event Name')}
     getValue=${ getValue }
     setValue=${ setValue }
     debounce=${ debounce }
-    tooltip=${ translate('Check available spells in the spellbook.') }
   />`;
 }

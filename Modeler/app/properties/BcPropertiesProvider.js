@@ -1,7 +1,8 @@
+/* eslint-disable lines-around-comment */
 // Import your custom property entries.
 // The entry is a text input field with logic attached to create,
 // update and delete the "spell" property.
-import spellProps from './BcProps';
+import BcProps from './BcProps';
 
 import { is } from 'bpmn-js/lib/util/ModelUtil';
 
@@ -38,12 +39,11 @@ export default function BcPropertiesProvider(propertiesPanel, translate) {
      */
     return function(groups) {
 
-      // Add the "magic" group
-      if (is(element, 'bpmn:StartEvent')) {
-        groups.push(createMagicGroup(element, translate));
+      if(element.businessObject.bc == "true"){
+        groups.push(createBcGroup(element, translate));
       }
 
-      return groups;
+      return groups.filter((group) => group !== null);
     };
   };
 
@@ -59,15 +59,15 @@ export default function BcPropertiesProvider(propertiesPanel, translate) {
 BcPropertiesProvider.$inject = [ 'propertiesPanel', 'translate' ];
 
 // Create the custom magic group
-function createMagicGroup(element, translate) {
+function createBcGroup(element, translate) {
 
   // create a group called "Magic properties".
-  const magicGroup = {
-    id: 'magic',
-    label: translate('Magic properties'),
-    entries: spellProps(element),
-    tooltip: translate('Make sure you know what you are doing!')
+  const BcGroup = {
+    id: 'BC',
+    label: translate('Blockchain Properties'),
+    entries: BcProps(element),
+    // tooltip: translate('Make sure you know what you are doing!')
   };
 
-  return magicGroup;
+  return BcGroup;
 }

@@ -104,8 +104,8 @@ export default class CustomPalette {
         imageUrl: BCREVTHROW,
         title: translate('Create BC throw event'),
         action: {
-          dragstart: createTask("true", "IntermediateThrowEvent", "throwRevertEvent"),
-          click: createTask("true", "IntermediateThrowEvent", "throwRevertEvent")
+          dragstart: createTask("true", "EndEvent", "throwRevertEvent"),
+          click: createTask("true", "EndEvent", "throwRevertEvent")
         }
       },
       'BCCatchRevertEvent': {
@@ -113,8 +113,8 @@ export default class CustomPalette {
         imageUrl: BCREVCATCH,
         title: translate('Create BC throw event'),
         action: {
-          dragstart: createTask("true", "IntermediateCatchEvent", "catchRevertEvent"),
-          click: createTask("true", "IntermediateCatchEvent", "catchRevertEvent")
+          dragstart: createTask("true", "BoundaryEvent", "catchRevertEvent"),
+          click: createTask("true", "BoundaryEvent", "catchRevertEvent")
         }
       }
     };

@@ -26,6 +26,16 @@
             "name": "bcevent",
             "isAttr": true,
             "type": "String"
+          },
+          {
+            "name": "bceventname",
+            "isAttr": true,
+            "type": "String"
+          },
+          {
+            "name": "bcsenderaddress",
+            "isAttr": true,
+            "type": "String"
           }
         ]
       }
