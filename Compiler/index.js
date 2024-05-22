@@ -1,5 +1,6 @@
 import fs from 'fs';
 import BpmnModdle from 'bpmn-moddle';
+import generateFunction from './helper/generateFunction.js';
 import bpmnbcDescriptor from './resources/BC.json' assert { type: 'json' };
 
 const bpmnFilePath = './resources/example.bpmn';
@@ -13,20 +14,25 @@ const {
   } = await moddle.fromXML(bpmnXml);
 
 
-const printElementProperties = (element) => {
-    if (element.$type === 'bpmn:SequenceFlow') {
-      console.log(`Element Source : ${element.sourceRef.id}`);
-      console.log(`Element Target : ${element.targetRef.id}`);
-      console.log('----------------------');
-    }
-};
+// definitions.rootElements.forEach((rootElement) => {
+//   if (rootElement.$type === 'bpmn:Collaboration') {
+//     rootElement.messageFlows.forEach((messageFlow) => {
+//       console.log(messageFlow)
+//     });
+//   }
+// });
+
 
 definitions.rootElements.forEach((rootElement) => {
     if (rootElement.$type === 'bpmn:Process') {
-      rootElement.flowElements.forEach((flowElement) => {
-        if (flowElement.$type.startsWith('bpmn:')) {
-          printElementProperties(flowElement);
-        }
-      });
+      const isBcProcess = rootElement.flowElements.some(obj => obj.bc === 'true' && obj.$type == "bpmn:ReceiveTask");
+      if(isBcProcess){
+        rootElement.flowElements.forEach((flowElement) => {
+          // Translate receive task to function
+          if (flowElement.$type.startsWith('bpmn:ReceiveTask')) {
+            generateFunction(flowElement);
+          }
+        });
+      }
     }
 });

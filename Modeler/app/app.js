@@ -10,14 +10,20 @@ import { getBusinessObject } from 'bpmn-js/lib/util/ModelUtil';
 
 import diagramXML from '../resources/diagram.bpmn';
 
-import customElements from './custom';
 
+
+import { ZeebePropertiesProviderModule  } from 'bpmn-js-properties-panel';
+import ZeebeBehaviorsModule from 'camunda-bpmn-js-behaviors/lib/camunda-cloud';
+import zeebeModdle from 'zeebe-bpmn-moddle/resources/zeebe';
+
+import customElements from './custom';
+import bcPropertiesProvider from "./properties";
 import bcExtension from '../resources/BC';
+
 
 import $ from 'jquery';
 
-import CustomPropertiesProvider from "./properties";
-import bcPropertiesProvider from "./properties";
+
 
 import {
   debounce
@@ -54,12 +60,14 @@ const bpmnModeler = new BpmnModeler({
   additionalModules: [
     BpmnPropertiesPanelModule,
     BpmnPropertiesProviderModule,
-    CustomPropertiesProvider,
+    ZeebePropertiesProviderModule,
+    ZeebeBehaviorsModule,
     bcPropertiesProvider,
     customElements,
   ],
   moddleExtensions: {
     bc: bcExtension,
+    zeebe: zeebeModdle
   }
 });
 
