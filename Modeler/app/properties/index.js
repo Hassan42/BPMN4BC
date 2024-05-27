@@ -3,6 +3,7 @@ import BcPropertiesProvider from "./BcPropertiesProvider";
 
 
 export default {
-  __init__: ["bcPropertiesProvider"],
+  __init__: ["customPropertiesProvider", "bcPropertiesProvider"],
+  customPropertiesProvider: ["type", CustomPropertiesProvider],
   bcPropertiesProvider: ["type", BcPropertiesProvider]
 };

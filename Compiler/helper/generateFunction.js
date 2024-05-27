@@ -7,5 +7,9 @@ export default function generateFunction(receiveTask){
 
     let functionName = receiveTask.id;
     
+    let senderAddress = receiveTask.bcsenderaddress;
+
+    
+    
 
 }

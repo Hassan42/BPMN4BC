@@ -9,7 +9,7 @@
       {
         "name": "BcNode",
         "extends": [
-          "bpmn:FlowNode"
+          "bpmn:BaseElement"
         ],
         "properties": [
           {
@@ -34,6 +34,11 @@
           },
           {
             "name": "bcsenderaddress",
+            "isAttr": true,
+            "type": "String"
+          },
+          {
+            "name": "bcid",
             "isAttr": true,
             "type": "String"
           }
