@@ -85,12 +85,14 @@ export default class CustomRenderer extends BaseRenderer {
               href: BEO
           }); break;
           case "Participant":
-            const dottedRect = drawDottedRect(parentNode, element.width, element.height, 2, "#000000", 2);
+            // const dottedRect = drawDottedRect(parentNode, element.width, element.height, 2, "#000000", 2);
+            // const rect = drawRect(parentNode, element.width, element.height, 2, "#000000");
+            this.bpmnRenderer.drawShape(parentNode, element);
             bcSvg = svgCreate("image", {
-              x: 6,
+              x: 5,
               y: 3,
-              width: 35,
-              height: 35,
+              width: 21,
+              height: 21,
               href: BCGroup
           }); break;
           case "IntermediateThrowEvent":
@@ -161,7 +163,7 @@ function drawRect(parentNode, width, height, borderRadius, color) {
     ry: borderRadius,
     stroke: color,
     strokeWidth: 2,
-    fill: color
+    fill: 'none'
   });
 
   svgAppend(parentNode, rect);

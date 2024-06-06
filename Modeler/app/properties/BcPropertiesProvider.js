@@ -3,7 +3,10 @@
 // The entry is a text input field with logic attached to create,
 // update and delete the "spell" property.
 import BcProps from './BcProps';
+import OutputParametersProps from './BcOutputsProps';
+import InputParametersProps from './BcInputsProps';
 
+import { ListGroup } from '@bpmn-io/properties-panel';
 import { is } from 'bpmn-js/lib/util/ModelUtil';
 
 const LOW_PRIORITY = 500;
@@ -16,7 +19,7 @@ const LOW_PRIORITY = 500;
  * @param {PropertiesPanel} propertiesPanel
  * @param {Function} translate
  */
-export default function BcPropertiesProvider(propertiesPanel, translate) {
+export default function BcPropertiesProvider(propertiesPanel, injector, translate) {
 
   // API ////////
 
@@ -41,6 +44,8 @@ export default function BcPropertiesProvider(propertiesPanel, translate) {
 
       if(element.businessObject.bc == "true"){
         groups.push(createBcGroup(element, translate));
+        if(is(element.businessObject, "bpmn:ReceiveTask")){groups.push(createBcOutputGroup(element, injector, translate));}
+        if(is(element.businessObject, "bpmn:SendTask")){groups.push(createBcInputGroup(element, injector, translate));}
       }
 
       return groups.filter((group) => group !== null);
@@ -56,9 +61,9 @@ export default function BcPropertiesProvider(propertiesPanel, translate) {
   propertiesPanel.registerProvider(LOW_PRIORITY, this);
 }
 
-BcPropertiesProvider.$inject = [ 'propertiesPanel', 'translate' ];
+BcPropertiesProvider.$inject = [ 'propertiesPanel', 'injector', 'translate' ];
 
-// Create the custom magic group
+
 function createBcGroup(element, translate) {
 
   // create a group called "Magic properties".
@@ -70,4 +75,28 @@ function createBcGroup(element, translate) {
   };
 
   return BcGroup;
+}
+
+function createBcInputGroup(element, injector, translate) {
+
+  const BcInputGroup = {
+    id: 'BCInput',
+    label: translate('Inputs'),
+    component: ListGroup,
+    ...InputParametersProps({ element, injector })
+  };
+
+  return BcInputGroup;
+}
+
+function createBcOutputGroup(element, injector, translate) {
+
+  const BcOutputGroup = {
+    id: 'BCOutput',
+    label: translate('Outputs'),
+    component: ListGroup,
+    ...OutputParametersProps({ element, injector })
+  };
+
+  return BcOutputGroup;
 }

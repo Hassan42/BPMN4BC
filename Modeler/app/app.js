@@ -60,14 +60,14 @@ const bpmnModeler = new BpmnModeler({
   additionalModules: [
     BpmnPropertiesPanelModule,
     BpmnPropertiesProviderModule,
-    // ZeebePropertiesProviderModule,
-    // ZeebeBehaviorsModule,
+    ZeebePropertiesProviderModule,
+    ZeebeBehaviorsModule,
     bcPropertiesProvider,
     customElements,
   ],
   moddleExtensions: {
     bc: bcExtension,
-    // zeebe: zeebeModdle
+    zeebe: zeebeModdle
   }
 });
 
