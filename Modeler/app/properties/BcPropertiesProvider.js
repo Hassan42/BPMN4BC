@@ -42,13 +42,27 @@ export default function BcPropertiesProvider(propertiesPanel, injector, translat
      */
     return function(groups) {
 
-      if(element.businessObject.bc == "true"){
+      const businessObject = element.businessObject;
+      const isReceiveTask = is(businessObject, "bpmn:ReceiveTask");
+      const isSendTask = is(businessObject, "bpmn:SendTask");
+    
+      if (businessObject.bc === "true") {
         groups.push(createBcGroup(element, translate));
-        if(is(element.businessObject, "bpmn:ReceiveTask")){groups.push(createBcOutputGroup(element, injector, translate));}
-        if(is(element.businessObject, "bpmn:SendTask")){groups.push(createBcInputGroup(element, injector, translate));}
+    
+        if (isReceiveTask) {
+          groups.push(createBcOutputGroup(element, injector, translate));
+        }
+    
+        if (isSendTask) {
+          groups.push(createBcInputGroup(element, injector, translate));
+        }
+    
+        if (isReceiveTask || isSendTask) {
+          groups = groups.filter(group => group.id !== 'inputs' && group.id !== 'outputs');
+        }
       }
-
-      return groups.filter((group) => group !== null);
+    
+      return groups;
     };
   };
 
@@ -80,7 +94,7 @@ function createBcGroup(element, translate) {
 function createBcInputGroup(element, injector, translate) {
 
   const BcInputGroup = {
-    id: 'BCInput',
+    id: 'BCInputs',
     label: translate('Inputs'),
     component: ListGroup,
     ...InputParametersProps({ element, injector })

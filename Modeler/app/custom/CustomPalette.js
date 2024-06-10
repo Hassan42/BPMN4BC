@@ -31,19 +31,28 @@ export default class CustomPalette {
 
         const businessObject = bpmnFactory.create(`bpmn:${bcType}`);
 
+
+
         businessObject.bc = bcNode;
         businessObject.bctype = bcType;
         businessObject.bcevent = bcEvent;
+
+
 
         const shape = elementFactory.createShape({
           type: `bpmn:${bcType}`,
           businessObject: businessObject
         });
 
+        if(bcType === "Participant"){
+        const processElement = bpmnFactory.create('bpmn:Process');
+        shape.businessObject.processRef = processElement;
+        }
+
+
         create.start(event, shape);
       };
     }
-
     return {
       'SEND': {
         group: 'BC',

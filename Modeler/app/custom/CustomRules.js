@@ -70,30 +70,41 @@ CustomRules.prototype.init = function() {
   });
 
   this.addRule('connection.create', HIGH_PRIORITY, function(context) {
-    
     var target = context.target,
-      source = context.source;
-
+        source = context.source;
+  
+    if (!target || !source) {
+      return;
+    }
+  
     var targetBo = target.businessObject,
-      sourceBo = source.businessObject;
-
+        sourceBo = source.businessObject;
+  
+    if (!targetBo || !sourceBo) {
+      return;
+    }
+  
     const bcTarget = targetBo.bc;
     const bcSource = sourceBo.bc;
-    const bcParent = target.parent.businessObject.bc;
+  
 
+    // Assign role to the receive task
+    if (is(sourceBo, "bpmn:SendTask") && is(targetBo, "bpmn:ReceiveTask") && (bcSource === "true") && (bcTarget === "true")) {
+      let participantRole = source.parent && source.parent.businessObject.name;
+      if (participantRole) {
+        targetBo.bcsenderaddress = participantRole;
+        sourceBo.bcid = targetBo.bcid;
+      }
+    }
     
-
-    //Assign role to the receive task
-    if(is(sourceBo, "bpmn:SendTask") && is(targetBo, "bpmn:ReceiveTask") && (bcSource == "true") && (bcTarget == "true")){
-      let participantRole = source.parent.businessObject.name;
-      targetBo.bcsenderaddress = participantRole;
-      sourceBo.bcid = targetBo.bcid;
-    }
-
-    //SplitAND not allowed
-    if (is(sourceBo, "bpmn:ParallelGateway") && ((bcTarget == "true") || (bcParent == "true")) && (source.outgoing.length >= 1)){
-      return false;
-    }
+    // const targetParentBo = target.parent && target.parent.businessObject;
+    // const bcParent = targetParentBo && targetParentBo.bc;
+  
+    // SplitAND not allowed
+    // if (is(sourceBo, "bpmn:ParallelGateway") && ((bcTarget === "true") || (bcParent === "true")) && (source.outgoing.length >= 1)) {
+    //   return false;
+    // }
+  
     return;
   });
 };
