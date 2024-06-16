@@ -15,31 +15,6 @@
     <div id="container"></div>
     <div id="js-properties-panel"></div>
 
-    <div id="quality-assurance" class="panel hidden">
-      <form id="form">
-        <p>
-          <b>Suitability Score</b>
-        </p>
-        <br />
-        <input id="suitability-score" type="text" placeholder="100" autocomplete="off">
-        <br />
-        <br />
-        <p id="warning" class="hidden">
-          Suitability Score must be a number
-        </p>
-        <br />
-        <p>
-          <b>Last Checked</b>
-        </p>
-        <br />
-        <p id="last-checked">
-          -
-        </p>
-        <br />
-        <input id="okay" type="submit" value="Okay">
-      </form>
-    </div>
-
     <ul class="buttons">
       <li>
         download
@@ -53,6 +28,9 @@
         <a id="js-download-svg" href title="download as SVG image">
           SVG image
         </a>
+      </li>
+      <li>
+        <input type="file" id="js-upload-diagram" title="Upload BPMN diagram" accept=".bpmn"/>
       </li>
     </ul>
   <!-- </div> -->

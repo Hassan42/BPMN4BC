@@ -19,6 +19,7 @@ import {
 import { isNil } from 'min-dash';
 
 import SEND from '../assets/SEND.svg';
+import SCRIPT from '../assets/BC-SCRIPT.svg';
 import RECEIVE from '../assets/RECEIVE.svg';
 import BEO from '../assets/BEO.svg';
 import BCGroup from '../assets/BC.svg';
@@ -65,6 +66,16 @@ export default class CustomRenderer extends BaseRenderer {
               width: element.width/4.5,
               height: element.height/4.5,
               href: SEND
+          }); break;
+          case "ScriptTask":
+            this.bpmnRenderer.drawShape(parentNode, element);
+            // drawBpmnTaskShape(parentNode, 100, 80, 10, 'black');
+            bcSvg = svgCreate("image", {
+              x: 1.8,
+              y: 3,
+              width: element.width/3.5,
+              height: element.height/3.5,
+              href: SCRIPT
           }); break;
           case "ReceiveTask": 
             this.bpmnRenderer.drawShape(parentNode, element);
@@ -169,6 +180,28 @@ function drawRect(parentNode, width, height, borderRadius, color) {
   svgAppend(parentNode, rect);
 
   return rect;
+}
+
+function drawBpmnTaskShape(parentNode, width, height, borderRadius, strokeColor) {
+  const taskGroup = svgCreate('g');
+
+  // Draw the main task rectangle
+  const rect = svgCreate('rect');
+  svgAttr(rect, {
+    width: width,
+    height: height,
+    rx: borderRadius,
+    ry: borderRadius,
+    stroke: strokeColor,
+    strokeWidth: 2,
+    fill: 'transparent'
+  });
+  svgAppend(taskGroup, rect);
+
+  // Append the group to the parent node
+  svgAppend(parentNode, taskGroup);
+
+  return taskGroup;
 }
 
 function drawDottedRect(parentNode, width, height, borderRadius, color, dotSpacing) {

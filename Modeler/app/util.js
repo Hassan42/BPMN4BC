@@ -2,15 +2,27 @@ import Ids from 'ids';
 
 import { getBusinessObject } from 'bpmn-js/lib/util/ModelUtil';
 
-export function getParametersExtension(element) {
+export function getOutputParametersExtension(element) {
   const businessObject = getBusinessObject(element);
-  return getExtension(businessObject, 'bpmnbc:Parameters');
+  return getExtension(businessObject, 'bpmnbc:OutputParameters');
 }
 
-export function getParameters(element) {
-  const parameters = getParametersExtension(element);
+export function getInputParametersExtension(element) {
+  const businessObject = getBusinessObject(element);
+  return getExtension(businessObject, 'bpmnbc:InputParameters');
+}
+
+export function getOutputParameters(element) {
+  const parameters = getOutputParametersExtension(element);
   return parameters && parameters.get('values');
 }
+
+
+export function getInputParameters(element) {
+  const parameters = getInputParametersExtension(element);
+  return parameters && parameters.get('values');
+}
+
 
 export function getExtension(element, type) {
   if (!element.extensionElements) {
@@ -32,8 +44,12 @@ export function createElement(elementType, properties, parent, factory) {
   return element;
 }
 
-export function createParameters(properties, parent, bpmnFactory) {
-  return createElement('bpmnbc:Parameters', properties, parent, bpmnFactory);
+export function createOutputParameters(properties, parent, bpmnFactory) {
+  return createElement('bpmnbc:OutputParameters', properties, parent, bpmnFactory);
+}
+
+export function createInputParameters(properties, parent, bpmnFactory) {
+  return createElement('bpmnbc:InputParameters', properties, parent, bpmnFactory);
 }
 
 

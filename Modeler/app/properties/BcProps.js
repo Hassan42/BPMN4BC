@@ -1,6 +1,6 @@
 import { html } from 'htm/preact';
 
-import { TextFieldEntry, isTextFieldEntryEdited, ListGroup } from '@bpmn-io/properties-panel';
+import { TextFieldEntry, isTextFieldEntryEdited, CheckboxEntry } from '@bpmn-io/properties-panel';
 import { useService } from 'bpmn-js-properties-panel';
 import { is } from 'bpmn-js/lib/util/ModelUtil';
 
@@ -34,7 +34,24 @@ export default function(element) {
         isEdited: isTextFieldEntryEdited
       }
     );
-  }
+  } 
+  // else if (is(element, 'bpmn:Lane') || (is(element, 'bpmn:Participant') && (element.children.length == 0))){
+  //   props.push({
+  //     id: 'shared',
+  //     element,
+  //     component: Dynamic,
+  //   })
+  //   props.push({
+  //     id: 'address',
+  //     element,
+  //     component: ContractAddress,
+  //   })
+  //   props.push({
+  //     id: 'shared',
+  //     element,
+  //     component: Shared,
+  //   })
+  // }
   return props;
 }
 
@@ -117,6 +134,90 @@ function bcId(props){
     element=${ element }
     description=${ translate('Blockchain network ID') }
     label=${ translate('Blockchain ID')}
+    getValue=${ getValue }
+    setValue=${ setValue }
+    debounce=${ debounce }
+  />`;
+}
+
+function Shared(props){
+  const { element, id } = props;
+
+  const modeling = useService('modeling');
+  const translate = useService('translate');
+  const debounce = useService('debounceInput');
+
+  const getValue = () => {
+    return element.businessObject.shared || '';
+  };
+
+  const setValue = value => {
+    return modeling.updateProperties(element, {
+      shared: value
+    });
+  };
+
+  return html`<${CheckboxEntry}
+    id=${ id }
+    element=${ element }
+    description=${ translate('Shared state') }
+    label=${ translate('Shared')}
+    getValue=${ getValue }
+    setValue=${ setValue }
+    debounce=${ debounce }
+  />`;
+}
+
+function ContractAddress(props){
+  const { element, id } = props;
+
+  const modeling = useService('modeling');
+  const translate = useService('translate');
+  const debounce = useService('debounceInput');
+
+  const getValue = () => {
+    return element.businessObject.contractaddress || '';
+  };
+
+  const setValue = value => {
+    return modeling.updateProperties(element, {
+      contractaddress: value
+    });
+  };
+
+  return html`<${TextFieldEntry}
+    id=${ id }
+    element=${ element }
+    description=${ translate('Smart contract address in case is shared') }
+    label=${ translate('Address')}
+    getValue=${ getValue }
+    setValue=${ setValue }
+    debounce=${ debounce }
+  />`;
+}
+
+function Dynamic(props){
+  const { element, id } = props;
+
+  const modeling = useService('modeling');
+  const translate = useService('translate');
+  const debounce = useService('debounceInput');
+
+  const getValue = () => {
+    return element.businessObject.dynamic || '';
+  };
+
+  const setValue = value => {
+    return modeling.updateProperties(element, {
+      dynamic: value
+    });
+  };
+
+  return html`<${CheckboxEntry}
+    id=${ id }
+    element=${ element }
+    description=${ translate('Dynamic creation') }
+    label=${ translate('Dynamic')}
     getValue=${ getValue }
     setValue=${ setValue }
     debounce=${ debounce }

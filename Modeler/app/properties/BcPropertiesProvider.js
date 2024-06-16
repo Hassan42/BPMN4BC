@@ -44,34 +44,33 @@ export default function BcPropertiesProvider(propertiesPanel, injector, translat
 
       const businessObject = element.businessObject;
       const isReceiveTask = is(businessObject, "bpmn:ReceiveTask");
+      const isScriptTask = is(businessObject, "bpmn:ScriptTask");
       const isSendTask = is(businessObject, "bpmn:SendTask");
-    
-      if (businessObject.bc === "true") {
+      const elementParent = element.parent?.businessObject ?? undefined;
+
+      //if element is bc or lane in a bc pool
+      if (businessObject.bc === "true" || (is(businessObject, "bpmn:Lane") && (elementParent.bc === "true"))) {
         groups.push(createBcGroup(element, translate));
-    
-        if (isReceiveTask) {
-          groups.push(createBcOutputGroup(element, injector, translate));
-        }
-    
-        if (isSendTask) {
+        
+        if (isSendTask || isScriptTask) {
           groups.push(createBcInputGroup(element, injector, translate));
         }
-    
-        if (isReceiveTask || isSendTask) {
+
+        if (isReceiveTask || isScriptTask) {
+          groups.push(createBcOutputGroup(element, injector, translate));
+        }
+        
+        //filtering out zeebe properties 
+        if (isReceiveTask || isSendTask || isScriptTask) {
           groups = groups.filter(group => group.id !== 'inputs' && group.id !== 'outputs');
         }
       }
-    
+     
       return groups;
     };
   };
 
 
-  // registration ////////
-
-  // Register our custom magic properties provider.
-  // Use a lower priority to ensure it is loaded after
-  // the basic BPMN properties.
   propertiesPanel.registerProvider(LOW_PRIORITY, this);
 }
 
@@ -106,7 +105,7 @@ function createBcInputGroup(element, injector, translate) {
 function createBcOutputGroup(element, injector, translate) {
 
   const BcOutputGroup = {
-    id: 'BCOutput',
+    id: 'BCOutputs',
     label: translate('Outputs'),
     component: ListGroup,
     ...OutputParametersProps({ element, injector })

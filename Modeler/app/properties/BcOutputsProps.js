@@ -4,9 +4,9 @@ import {
   
   import {
     createElement,
-    createParameters,
-    getParameters,
-    getParametersExtension,
+    createOutputParameters,
+    getOutputParameters,
+    getOutputParametersExtension,
     nextId
   } from '../util';
   
@@ -17,7 +17,7 @@ import {
   
   export default function OutputParametersProps({ element, injector }) {
   
-    const parameters = getParameters(element) || [];
+    const parameters = getOutputParameters(element) || [];
   
     const bpmnFactory = injector.get('bpmnFactory'),
           commandStack = injector.get('commandStack');
@@ -48,7 +48,7 @@ import {
     return function(event) {
       event.stopPropagation();
   
-      const extension = getParametersExtension(element);
+      const extension = getOutputParametersExtension(element);
   
       if (!extension) {
         return;
@@ -96,10 +96,10 @@ import {
       }
   
       // (2) ensure parameters extension
-      let extension = getParametersExtension(element);
+      let extension = getOutputParametersExtension(element);
   
       if (!extension) {
-        extension = createParameters({
+        extension = createOutputParameters({
           values: []
         }, extensionElements, bpmnFactory);
   

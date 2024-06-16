@@ -1,14 +1,18 @@
 import { TextFieldEntry, CheckboxEntry, SelectEntry } from '@bpmn-io/properties-panel';
 
 import { useService } from 'bpmn-js-properties-panel';
+import { is } from 'bpmn-js/lib/util/ModelUtil';
 
 // import ExtensionList from './ExtensionList';
 
+//is output injected from external message
+let isExternal = false;
 
 export default function OutputParameterProps(props) {
 
   const {
     idPrefix,
+    element,
     parameter
   } = props;
 
@@ -16,12 +20,6 @@ export default function OutputParameterProps(props) {
     {
       id: idPrefix + '-name',
       component: Name,
-      idPrefix,
-      parameter
-    },
-    {
-      id: idPrefix + '-value',
-      component: Value,
       idPrefix,
       parameter
     },
@@ -37,13 +35,33 @@ export default function OutputParameterProps(props) {
       idPrefix,
       parameter
     },
-    // {
-    //   id: idPrefix + '-extensions',
-    //   component: ExtensionList,
-    //   idPrefix,
-    //   parameter
-    // }
   ];
+
+  if(is(element, "bpmn:ReceiveTask")){
+    entries.push(
+      {
+        id: idPrefix + '-external',
+        component: External,
+        idPrefix,
+        parameter
+      }
+    )
+  }
+
+  // Update isExternal based on the parameter
+  isExternal = parameter.external;
+  console.log(parameter);
+  //if external we dont have hardcoded value
+  if(!isExternal){
+      entries.push(
+        {
+          id: idPrefix + '-value',
+          component: Value,
+          idPrefix,
+          parameter
+        }
+      )
+    }
 
   return entries;
 }
@@ -194,5 +212,41 @@ function Scope(props) {
     getValue,
     setValue,
     debounce
+  });
+}
+
+function External(props) {
+  const {
+    idPrefix,
+    element,
+    parameter
+  } = props;
+
+  const commandStack = useService('commandStack');
+  const translate = useService('translate');
+  const debounce = useService('debounceInput');
+
+  const setValue = (value) => {
+    commandStack.execute('element.updateModdleProperties', {
+      element,
+      moddleElement: parameter,
+      properties: {
+        external: value
+      }
+    });
+  };
+
+  const getValue = (parameter) => {
+    return parameter.external;
+  };
+
+
+  return CheckboxEntry({
+    element: parameter,
+    id: idPrefix + '-external',
+    label: translate('External'),
+    getValue,
+    setValue,
+    debounce,
   });
 }

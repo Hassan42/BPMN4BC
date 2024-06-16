@@ -41,22 +41,78 @@
             "name": "bcid",
             "isAttr": true,
             "type": "String"
+          },
+          {
+            "name": "shared",
+            "isAttr": true,
+            "type": "Boolean"
+          },
+          {
+            "name": "dynamic",
+            "isAttr": true,
+            "type": "Boolean"
+          },
+          {
+            "name": "contractaddress",
+            "isAttr": true,
+            "type": "String"
           }
         ]
       },
       {
-        "name": "Parameters",
+        "name": "OutputParameters",
         "superClass": [ "Element" ],
         "properties": [
           {
             "name": "values",
             "isMany": true,
-            "type": "Parameter"
+            "type": "OutputParameter"
           }
         ]
       },
       {
-        "name": "Parameter",
+        "name": "InputParameters",
+        "superClass": [ "Element" ],
+        "properties": [
+          {
+            "name": "values",
+            "isMany": true,
+            "type": "InputParameter"
+          }
+        ]
+      },
+      {
+        "name": "OutputParameter",
+        "properties": [
+          {
+            "name": "name",
+            "isAttr": true,
+            "type": "String"
+          },
+          {
+            "name": "value",
+            "isAttr": true,
+            "type": "String"
+          },
+          {
+            "name": "type",
+            "isAttr": true,
+            "type": "String"
+          },
+          {
+            "name": "transactional",
+            "isAttr": true,
+            "type": "Boolean"
+          },
+          {
+            "name": "external",
+            "isAttr": true,
+            "type": "Boolean"
+          }
+        ]
+      },
+      {
+        "name": "InputParameter",
         "properties": [
           {
             "name": "name",
@@ -73,23 +129,6 @@
             "isAttr": true,
             "type": "String"
           }
-        ]
-      },
-      {
-        "name": "OutputParameter",
-        "superClass": [ "Parameter" ],
-        "properties": [
-          {
-            "name": "transactional",
-            "isAttr": true,
-            "type": "Boolean"
-          }
-        ]
-      },
-      {
-        "name": "InputParameter",
-        "superClass": [ "Parameter" ],
-        "properties": [
         ]
       }
     ],

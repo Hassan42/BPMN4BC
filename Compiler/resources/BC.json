@@ -1,36 +1,137 @@
 {
-    "name": "BPMNBC",
-    "uri": "http://some-company/schema/bpmn/qa",
-    "prefix": "bpmnbc",
-    "xml": {
-      "tagAlias": "lowerCase"
+  "name": "BPMNBC",
+  "uri": "http://some-company/schema/bpmn/qa",
+  "prefix": "bpmnbc",
+  "xml": {
+    "tagAlias": "lowerCase"
+  },
+  "types": [
+    {
+      "name": "BcNode",
+      "extends": [
+        "bpmn:BaseElement"
+      ],
+      "properties": [
+        {
+          "name": "bc",
+          "isAttr": true,
+          "type": "String"
+        },
+        {
+          "name": "bctype",
+          "isAttr": true,
+          "type": "String"
+        },
+        {
+          "name": "bcevent",
+          "isAttr": true,
+          "type": "String"
+        },
+        {
+          "name": "bceventname",
+          "isAttr": true,
+          "type": "String"
+        },
+        {
+          "name": "bcsenderaddress",
+          "isAttr": true,
+          "type": "String"
+        },
+        {
+          "name": "bcid",
+          "isAttr": true,
+          "type": "String"
+        },
+        {
+          "name": "shared",
+          "isAttr": true,
+          "type": "Boolean"
+        },
+        {
+          "name": "dynamic",
+          "isAttr": true,
+          "type": "Boolean"
+        },
+        {
+          "name": "contractaddress",
+          "isAttr": true,
+          "type": "String"
+        }
+      ]
     },
-    "types": [
-      {
-        "name": "BcNode",
-        "extends": [
-          "bpmn:FlowNode"
-        ],
-        "properties": [
-          {
-            "name": "bc",
-            "isAttr": true,
-            "type": "String"
-          },
-          {
-            "name": "bctype",
-            "isAttr": true,
-            "type": "String"
-          },
-          {
-            "name": "bcevent",
-            "isAttr": true,
-            "type": "String"
-          }
-        ]
-      }
-    ],
-    "emumerations": [],
-    "associations": []
-  }
-  
+    {
+      "name": "OutputParameters",
+      "superClass": [ "Element" ],
+      "properties": [
+        {
+          "name": "values",
+          "isMany": true,
+          "type": "OutputParameter"
+        }
+      ]
+    },
+    {
+      "name": "InputParameters",
+      "superClass": [ "Element" ],
+      "properties": [
+        {
+          "name": "values",
+          "isMany": true,
+          "type": "InputParameter"
+        }
+      ]
+    },
+    {
+      "name": "OutputParameter",
+      "properties": [
+        {
+          "name": "name",
+          "isAttr": true,
+          "type": "String"
+        },
+        {
+          "name": "value",
+          "isAttr": true,
+          "type": "String"
+        },
+        {
+          "name": "type",
+          "isAttr": true,
+          "type": "String"
+        },
+        {
+          "name": "transactional",
+          "isAttr": true,
+          "type": "Boolean"
+        },
+        {
+          "name": "external",
+          "isAttr": true,
+          "type": "Boolean"
+        }
+      ]
+    },
+    {
+      "name": "InputParameter",
+      "properties": [
+        {
+          "name": "name",
+          "isAttr": true,
+          "type": "String"
+        },
+        {
+          "name": "value",
+          "isAttr": true,
+          "type": "String"
+        },
+        {
+          "name": "type",
+          "isAttr": true,
+          "type": "String"
+        }
+      ]
+    }
+  ],
+  "emumerations": [],
+  "associations": []
+}

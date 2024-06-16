@@ -7,6 +7,7 @@ import BCCATCH from '../assets/BC-CATCH-EVENT-ICON.svg';
 import BCTHROW from '../assets/BC-THROW-EVENT-ICON.svg';
 import BCREVTHROW from '../assets/THROW-REV-ICON.svg';
 import BCREVCATCH from '../assets/CATCH-REV-ICON.svg';
+import BCSCRIPT from '../assets/BC-SCRIPT.svg';
 
 export default class CustomPalette {
   constructor(bpmnFactory, create, elementFactory, palette, translate) {
@@ -49,7 +50,6 @@ export default class CustomPalette {
         shape.businessObject.processRef = processElement;
         }
 
-
         create.start(event, shape);
       };
     }
@@ -72,15 +72,15 @@ export default class CustomPalette {
           click: createTask("true", "ReceiveTask")
         }
       },
-      'BEOGateway': {
-        group: 'BC',
-        imageUrl: BEO,
-        title: translate('Create BEO gateway'),
-        action: {
-          dragstart: createTask("true", "EventBasedGateway"),
-          click: createTask("true", "EventBasedGateway")
-        }
-      },
+      // 'BEOGateway': {
+      //   group: 'BC',
+      //   imageUrl: BEO,
+      //   title: translate('Create BEO gateway'),
+      //   action: {
+      //     dragstart: createTask("true", "EventBasedGateway"),
+      //     click: createTask("true", "EventBasedGateway")
+      //   }
+      // },
       'BCGroup': {
         group: 'BC',
         imageUrl: BC,
@@ -124,6 +124,15 @@ export default class CustomPalette {
         action: {
           dragstart: createTask("true", "BoundaryEvent", "catchRevertEvent"),
           click: createTask("true", "BoundaryEvent", "catchRevertEvent")
+        }
+      },
+      'BCScript': {
+        group: 'BC',
+        imageUrl: BCSCRIPT,
+        title: translate('Create BC script task'),
+        action: {
+          dragstart: createTask("true", "ScriptTask"),
+          click: createTask("true", "ScriptTask")
         }
       }
     };
