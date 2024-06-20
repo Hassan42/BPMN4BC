@@ -71,10 +71,10 @@ export default class CustomRenderer extends BaseRenderer {
             this.bpmnRenderer.drawShape(parentNode, element);
             // drawBpmnTaskShape(parentNode, 100, 80, 10, 'black');
             bcSvg = svgCreate("image", {
-              x: 1.8,
+              x: 2.4,
               y: 3,
-              width: element.width/3.5,
-              height: element.height/3.5,
+              width: element.width/4.5,
+              height: element.height/4.5,
               href: SCRIPT
           }); break;
           case "ReceiveTask": 

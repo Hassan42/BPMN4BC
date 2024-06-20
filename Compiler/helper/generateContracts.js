@@ -1,5 +1,6 @@
 import { findCollaboration, findProcessForParticipant, findLanesForProcess, findActivitiesForLane } from './utils.js';
-import { generateFunction } from './generateFunction.js';
+import { generateFunctions } from './generateFunctions.js';
+import { generateStorage } from './generateStorage.js';
 import fs from 'fs';
 import path from 'path';
 
@@ -7,15 +8,29 @@ import path from 'path';
  * Generates a Solidity contract with the given name and activities.
  * @param {string} contractName - The name of the contract.
  * @param {Array} activities - The activities to be included as functions in the contract.
+ * @param {Object} process - The process containing the activities.
  */
-function generateContract(contractName, activities) {
-  const functions = activities.map(activity => generateFunction(activity.id)).join('\n');
+function generateContract(contractName, activities, process) {
+  const storageStruct = generateStorage(activities);
+  const functions = generateFunctions(activities, process).join('\n');
+
+  const functionNames = activities.map(activity => activity.id.replace(/\s+/g, ''));
+  const stateMappings = functionNames.map(name => `state["${name}"] = State.Closed;`).join('\n');
 
   const solidityCode = `
   // SPDX-License-Identifier: MIT
   pragma solidity ^0.8.0;
 
   contract ${contractName} {
+      enum State { Closed, Open, Completed }
+      mapping(string => State) public state;
+
+      ${storageStruct}
+
+      constructor() {
+          ${stateMappings}
+      }
+
       ${functions}
   }
   `;
@@ -24,6 +39,7 @@ function generateContract(contractName, activities) {
   fs.writeFileSync(outputPath, solidityCode, 'utf8');
   console.log(`Generated Solidity contract: ${contractName}`);
 }
+
 
 /**
  * Generates the contracts by processing the BPMN XML.
@@ -49,7 +65,7 @@ export function generateContracts(definitions) {
         lanes.forEach(lane => {
             const contractName = lane.id.replace(/\s+/g, '') + 'Contract';
             const activities = findActivitiesForLane(lane);
-            generateContract(contractName, activities);
+            generateContract(contractName, activities, process);
         });
       }
     });
