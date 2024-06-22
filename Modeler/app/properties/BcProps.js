@@ -1,10 +1,10 @@
 import { html } from 'htm/preact';
 
-import { TextFieldEntry, isTextFieldEntryEdited, CheckboxEntry } from '@bpmn-io/properties-panel';
+import { TextFieldEntry, isTextFieldEntryEdited, CheckboxEntry, TextAreaEntry } from '@bpmn-io/properties-panel';
 import { useService } from 'bpmn-js-properties-panel';
 import { is } from 'bpmn-js/lib/util/ModelUtil';
 
-export default function(element) {
+export default function (element) {
 
   // Initialize props array with the bcId object
   let props = [
@@ -25,7 +25,7 @@ export default function(element) {
         isEdited: isTextFieldEntryEdited
       }
     );
-  } else if ((is(element, 'bpmn:IntermediateThrowEvent') || is(element, 'bpmn:IntermediateCatchEvent'))  && element.businessObject.bc == "true") {
+  } else if ((is(element, 'bpmn:IntermediateThrowEvent') || is(element, 'bpmn:IntermediateCatchEvent')) && element.businessObject.bc == "true") {
     props.push(
       {
         id: 'event',
@@ -34,25 +34,42 @@ export default function(element) {
         isEdited: isTextFieldEntryEdited
       }
     );
-  } 
-  // else if (is(element, 'bpmn:Lane') || (is(element, 'bpmn:Participant') && (element.children.length == 0))){
-  //   props.push({
-  //     id: 'shared',
-  //     element,
-  //     component: Dynamic,
-  //   })
-  //   props.push({
-  //     id: 'address',
-  //     element,
-  //     component: ContractAddress,
-  //   })
-  //   props.push({
-  //     id: 'shared',
-  //     element,
-  //     component: Shared,
-  //   })
-  // }
-  return props;
+  } else if (is(element, 'bpmn:ScriptTask') && element.businessObject.bc == "true") {
+  props.push(
+    {
+      id: 'script',
+      element,
+      component: Script,
+      isEdited: isTextFieldEntryEdited
+    }
+  );
+  props.push(
+    {
+      id: 'returns',
+      element,
+      component: Returns,
+      isEdited: isTextFieldEntryEdited
+    }
+  );
+  }
+// else if (is(element, 'bpmn:Lane') || (is(element, 'bpmn:Participant') && (element.children.length == 0))){
+//   props.push({
+//     id: 'shared',
+//     element,
+//     component: Dynamic,
+//   })
+//   props.push({
+//     id: 'address',
+//     element,
+//     component: ContractAddress,
+//   })
+//   props.push({
+//     id: 'shared',
+//     element,
+//     component: Shared,
+//   })
+// }
+return props;
 }
 
 
@@ -74,13 +91,13 @@ function Sender(props) {
   };
 
   return html`<${TextFieldEntry}
-    id=${ id }
-    element=${ element }
-    description=${ translate('Transaction Sender Role') }
-    label=${ translate('Sender Role') }
-    getValue=${ getValue }
-    setValue=${ setValue }
-    debounce=${ debounce }
+    id=${id}
+    element=${element}
+    description=${translate('Transaction Sender Role')}
+    label=${translate('Sender Role')}
+    getValue=${getValue}
+    setValue=${setValue}
+    debounce=${debounce}
   />`;
 }
 
@@ -102,17 +119,17 @@ function Event(props) {
   };
 
   return html`<${TextFieldEntry}
-    id=${ id }
-    element=${ element }
-    description=${ translate('Smart Contract Event Name') }
-    label=${ translate('Event Name')}
-    getValue=${ getValue }
-    setValue=${ setValue }
-    debounce=${ debounce }
+    id=${id}
+    element=${element}
+    description=${translate('Smart Contract Event Name')}
+    label=${translate('Event Name')}
+    getValue=${getValue}
+    setValue=${setValue}
+    debounce=${debounce}
   />`;
 }
 
-function bcId(props){
+function bcId(props) {
   const { element, id } = props;
 
   const modeling = useService('modeling');
@@ -130,17 +147,17 @@ function bcId(props){
   };
 
   return html`<${TextFieldEntry}
-    id=${ id }
-    element=${ element }
-    description=${ translate('Blockchain network ID') }
-    label=${ translate('Blockchain ID')}
-    getValue=${ getValue }
-    setValue=${ setValue }
-    debounce=${ debounce }
+    id=${id}
+    element=${element}
+    description=${translate('Blockchain network ID')}
+    label=${translate('Blockchain ID')}
+    getValue=${getValue}
+    setValue=${setValue}
+    debounce=${debounce}
   />`;
 }
 
-function Shared(props){
+function Shared(props) {
   const { element, id } = props;
 
   const modeling = useService('modeling');
@@ -158,17 +175,17 @@ function Shared(props){
   };
 
   return html`<${CheckboxEntry}
-    id=${ id }
-    element=${ element }
-    description=${ translate('Shared state') }
-    label=${ translate('Shared')}
-    getValue=${ getValue }
-    setValue=${ setValue }
-    debounce=${ debounce }
+    id=${id}
+    element=${element}
+    description=${translate('Shared state')}
+    label=${translate('Shared')}
+    getValue=${getValue}
+    setValue=${setValue}
+    debounce=${debounce}
   />`;
 }
 
-function ContractAddress(props){
+function ContractAddress(props) {
   const { element, id } = props;
 
   const modeling = useService('modeling');
@@ -186,17 +203,17 @@ function ContractAddress(props){
   };
 
   return html`<${TextFieldEntry}
-    id=${ id }
-    element=${ element }
-    description=${ translate('Smart contract address in case is shared') }
-    label=${ translate('Address')}
-    getValue=${ getValue }
-    setValue=${ setValue }
-    debounce=${ debounce }
+    id=${id}
+    element=${element}
+    description=${translate('Smart contract address in case is shared')}
+    label=${translate('Address')}
+    getValue=${getValue}
+    setValue=${setValue}
+    debounce=${debounce}
   />`;
 }
 
-function Dynamic(props){
+function Dynamic(props) {
   const { element, id } = props;
 
   const modeling = useService('modeling');
@@ -214,12 +231,68 @@ function Dynamic(props){
   };
 
   return html`<${CheckboxEntry}
-    id=${ id }
-    element=${ element }
-    description=${ translate('Dynamic creation') }
-    label=${ translate('Dynamic')}
-    getValue=${ getValue }
-    setValue=${ setValue }
-    debounce=${ debounce }
+    id=${id}
+    element=${element}
+    description=${translate('Dynamic creation')}
+    label=${translate('Dynamic')}
+    getValue=${getValue}
+    setValue=${setValue}
+    debounce=${debounce}
+  />`;
+}
+
+function Script(props) {
+  const { element, id } = props;
+
+  const modeling = useService('modeling');
+  const translate = useService('translate');
+  const debounce = useService('debounceInput');
+
+  const getValue = () => {
+    return element.businessObject.solidityscript || '';
+  };
+
+  const setValue = value => {
+    return modeling.updateProperties(element, {
+      solidityscript: value
+    });
+  };
+
+  return html`<${TextAreaEntry}
+    id=${id}
+    element=${element}
+    description=${translate('Solidity Script')}
+    label=${translate('Script')}
+    getValue=${getValue}
+    setValue=${setValue}
+    debounce=${debounce}
+  />`;
+}
+
+function Returns(props) {
+  const { element, id } = props;
+
+  const modeling = useService('modeling');
+  const translate = useService('translate');
+  const debounce = useService('debounceInput');
+
+  const getValue = () => {
+    return element.businessObject.returns || '';
+  };
+
+  const setValue = value => {
+    return modeling.updateProperties(element, {
+      returns: value
+    });
+  };
+
+  return html`<${TextFieldEntry}
+    id=${id}
+    element=${element}
+    description=${translate('return variables')}
+    label=${translate('Return')}
+    getValue=${getValue}
+    setValue=${setValue}
+    debounce=${debounce}
   />`;
 }

@@ -10,10 +10,11 @@ import BCREVCATCH from '../assets/CATCH-REV-ICON.svg';
 import BCSCRIPT from '../assets/BC-SCRIPT.svg';
 
 export default class CustomPalette {
-  constructor(bpmnFactory, create, elementFactory, palette, translate) {
+  constructor(bpmnFactory, create, elementFactory, modeling, palette, translate) {
     this.bpmnFactory = bpmnFactory;
     this.create = create;
     this.elementFactory = elementFactory;
+    this.modeling = modeling;
     this.translate = translate;
 
     palette.registerProvider(this);
@@ -24,35 +25,40 @@ export default class CustomPalette {
       bpmnFactory,
       create,
       elementFactory,
+      modeling,
       translate
     } = this;
 
     function createTask(bcNode, bcType, bcEvent) {
       return function(event) {
-
         const businessObject = bpmnFactory.create(`bpmn:${bcType}`);
-
-
-
         businessObject.bc = bcNode;
         businessObject.bctype = bcType;
         businessObject.bcevent = bcEvent;
-
-
 
         const shape = elementFactory.createShape({
           type: `bpmn:${bcType}`,
           businessObject: businessObject
         });
 
-        if(bcType === "Participant"){
-        const processElement = bpmnFactory.create('bpmn:Process');
-        shape.businessObject.processRef = processElement;
-        }
+        if (bcType === "Participant") {
+          const processElement = bpmnFactory.create('bpmn:Process');
+          shape.businessObject.processRef = processElement;
+          // const participantShape = canvas.getShape(shape.id);
 
+          // modeling.addLane(participantShape, 'bottom');
+          // Create a default lane
+          // const laneSet = bpmnFactory.create('bpmn:LaneSet');
+          // const lane = bpmnFactory.create('bpmn:Lane', { name: 'Default Lane' });
+          // laneSet.lanes = [lane];
+          // processElement.laneSets = [laneSet];
+
+        }
         create.start(event, shape);
+
       };
     }
+
     return {
       'SEND': {
         group: 'BC',
@@ -72,15 +78,6 @@ export default class CustomPalette {
           click: createTask("true", "ReceiveTask")
         }
       },
-      // 'BEOGateway': {
-      //   group: 'BC',
-      //   imageUrl: BEO,
-      //   title: translate('Create BEO gateway'),
-      //   action: {
-      //     dragstart: createTask("true", "EventBasedGateway"),
-      //     click: createTask("true", "EventBasedGateway")
-      //   }
-      // },
       'BCGroup': {
         group: 'BC',
         imageUrl: BC,
@@ -143,6 +140,7 @@ CustomPalette.$inject = [
   'bpmnFactory',
   'create',
   'elementFactory',
+  'modeling',
   'palette',
   'translate'
 ];

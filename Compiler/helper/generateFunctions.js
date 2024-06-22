@@ -1,4 +1,4 @@
-import { getProceedingElements, extractOutputParameters, isValueType } from './utils.js';
+import { getProceedingElements, extractOutputParameters, extractInputParameters, isValueType } from './utils.js';
 
 /**
  * Generates logic for a Solidity script function.
@@ -6,11 +6,40 @@ import { getProceedingElements, extractOutputParameters, isValueType } from './u
  * @returns {string} The logic for the script function.
  */
 export function generateScriptFunction(activity) {
+  const solidityScript = activity.solidityscript || '';
+  const returnParams = parseReturnValues(activity.returns || '');
+
+  const returnTypes = returnParams.map(param => {
+    const typeWithMemory = isValueType(param.type) ? param.type : `${param.type} memory`;
+    return typeWithMemory;
+  }).join(', ');
+
   return `
-  function ${activity.id.replace(/\s+/g, '')}() public {
-    // Entry task logic for ${activity.name || activity.id}
+    function ${activity.id.replace(/\s+/g, '')}() public returns (${returnTypes}) {
+        ${solidityScript}
     }
   `;
+}
+
+/**
+ * Parses the encoded return values string and extracts types and variable names.
+ * @param {string} encodedString - The encoded return values string.
+ * @returns {Array} The list of return values with types and names.
+ * @throws {Error} If the encoded string contains an invalid return value expression.
+ */
+function parseReturnValues(encodedString) {
+  if (!encodedString.trim()) {
+    return [];
+  }
+
+  return encodedString.split(',').map(item => {
+    const match = item.match(/^\(([^)]+)\):(.+)$/);
+    if (match) {
+      return { type: match[1], name: match[2] };
+    } else {
+      throw new Error(`Invalid return value expression: ${item}`);
+    }
+  });
 }
 
 /**
@@ -23,14 +52,43 @@ export function generateEntryFunction(activity, process) {
   const proceedingElements = getProceedingElements(activity, process);
   const outputParameters = extractOutputParameters(activity);
 
-  const externalParams = outputParameters
-    .filter(param => String(param.external).trim() === "true")
-    .map(param => `${param.type} ${param.name}`)
-    .join(', ');
+  const externalParams = generateExternalParams(outputParameters);
+  const storageAssignments = generateStorageAssignments(outputParameters);
+  const transactionalAssignments = generateTransactionalAssignments(outputParameters);
 
-  // Storage assignments: Assign values to localStorage for non-transactional output parameters
-  //TOOD: check if the localStorage.${varName}; exists in the local storage
-  const storageAssignments = outputParameters
+  const proceedingLogic = generateProceedingLogic(proceedingElements, activity.id);
+
+  return `
+  function ${activity.id.replace(/\s+/g, '')}(${externalParams}) public {
+      ${storageAssignments}
+      ${transactionalAssignments}
+      ${proceedingLogic}
+  }
+`;
+}
+
+/**
+* Generates the external parameters for the Solidity function.
+* @param {Array} outputParameters - The list of output parameters.
+* @returns {string} The external parameters as a string.
+*/
+function generateExternalParams(outputParameters) {
+  return outputParameters
+    .filter(param => String(param.external).trim() === "true")
+    .map(param => {
+      const memoryKeyword = isValueType(param.type) ? '' : 'memory ';
+      return `${param.type} ${memoryKeyword}${param.name}`;
+    })
+    .join(', ');
+}
+
+/**
+* Generates storage assignments for non-transactional output parameters.
+* @param {Array} outputParameters - The list of output parameters.
+* @returns {string} The storage assignments as a string.
+*/
+function generateStorageAssignments(outputParameters) {
+  return outputParameters
     .filter(param => String(param.transactional).trim().toLowerCase() !== "true")
     .map(param => {
       const { name, value, external } = param;
@@ -44,68 +102,108 @@ export function generateEntryFunction(activity, process) {
       return `localStorage.${name} = ${value};`;
     })
     .join('\n');
-  // Transactional assignments: Declare variables for transactional output parameters
-  const transactionalAssignments = outputParameters
+}
+
+/**
+* Generates transactional assignments for transactional output parameters.
+* @param {Array} outputParameters - The list of output parameters.
+* @returns {string} The transactional assignments as a string.
+*/
+function generateTransactionalAssignments(outputParameters) {
+  return outputParameters
     .filter(param => String(param.transactional).trim().toLowerCase() === "true" && String(param.external).trim().toLowerCase() !== "true")
     .map(param => {
       const { type, name, value } = param;
+      const memoryKeyword = isValueType(type) ? '' : 'memory ';
       if (value.startsWith('${') && value.endsWith('}')) {
         const varName = value.slice(2, -1);
-        return `${type} memory ${name} = localStorage.${varName};`;
+        return `${type} ${memoryKeyword}${name} = localStorage.${varName};`;
       } else {
-        return `${type} memory ${name} = ${value};`;
+        return `${type} ${memoryKeyword}${name} = ${value};`;
       }
     })
     .join('\n');
+}
 
-
+/**
+* Generates the proceeding logic for the Solidity function.
+* @param {Array} proceedingElements - The list of proceeding elements.
+* @param {string} activityId - The ID of the current activity.
+* @returns {string} The proceeding logic as a string.
+*/
+function generateProceedingLogic(proceedingElements, activityId) {
   let proceedingLogic = '';
   const definedVariables = new Set(outputParameters.map(param => param.name));
 
   proceedingElements.forEach(element => {
-    if (element.$type === 'bpmn:ScriptTask') {
-
-      const elementOutputParameters = extractOutputParameters(element);
-
-      const scriptOutputDeclarations = elementOutputParameters
-        .filter(param => String(param.transactional).trim().toLowerCase() === "true")
-        .map(param => {
-          if (!definedVariables.has(param.name)) {
-            definedVariables.add(param.name);
-            const declaration = isValueType(param.type) ? `${param.type} ${param.name}` : `${param.type} memory ${param.name}`;
-            return declaration;
-          }
-          return '';
-        })
-        .filter(Boolean)
-        .join('\n');
-
-      const scriptOutputAssignments = elementOutputParameters
-        .filter(param => String(param.transactional).trim().toLowerCase() === "true")
-        .map(param => param.name)
-        .join(', ');
-
-      proceedingLogic += `${scriptOutputDeclarations}\n`;
-      if (scriptOutputAssignments) {
-        proceedingLogic += `(${scriptOutputAssignments}) = ${element.id}();\n`;
-      } else {
-        proceedingLogic += `${element.id}();\n`;
-      }
-    } else {
-      proceedingLogic += `// Logic for ${element.name || element.id}\n`;
+    switch (element.$type) {
+      case 'bpmn:ScriptTask':
+        proceedingLogic += generateScriptTaskLogic(element, definedVariables);
+        break;
+      case 'bpmn:ParallelGateway':
+        if (element.incoming.length > 1) {
+          const gatewayFunctionName = `checkGateway_${element.id}`;
+          proceedingLogic += `
+                      if (!${gatewayFunctionName}()) {
+                          state["${activityId.replace(/\s+/g, '')}"] = State.Completed;
+                          return;
+                      }\n`;
+        }
+        break;
+      default:
+        proceedingLogic += `// Logic for ${element.name || element.id}\n`;
     }
   });
 
-
-  return `
-    function ${activity.id.replace(/\s+/g, '')}(${externalParams}) public {
-        ${storageAssignments}
-        ${transactionalAssignments}
-        ${proceedingLogic}
-    }
-  `;
+  return proceedingLogic;
 }
 
+/**
+* Generates the logic for a script task.
+* @param {Object} element - The script task element.
+* @param {Set} definedVariables - The set of defined variables.
+* @returns {string} The script task logic as a string.
+*/
+function generateScriptTaskLogic(element, definedVariables) {
+  const inputParameters = extractInputParameters(element);
+  const inputs = inputParameters.map(param => {
+    if (param.value.startsWith('${') && param.value.endsWith('}')) {
+      const varName = param.value.slice(2, -1);
+      return definedVariables.has(varName) ? varName : `localStorage.${varName}`;
+    } else {
+      return param.value;
+    }
+  }).join(', ');
+
+  const elementOutputParameters = extractOutputParameters(element);
+
+  const scriptOutputDeclarations = elementOutputParameters
+    .filter(param => String(param.transactional).trim().toLowerCase() === "true")
+    .map(param => {
+      if (!definedVariables.has(param.name)) {
+        definedVariables.add(param.name);
+        const declaration = isValueType(param.type) ? `${param.type} ${param.name};` : `${param.type} memory ${param.name};`;
+        return declaration;
+      }
+      return '';
+    })
+    .filter(Boolean)
+    .join('\n');
+
+  const scriptOutputAssignments = elementOutputParameters
+    .filter(param => String(param.transactional).trim().toLowerCase() === "true")
+    .map(param => param.name)
+    .join(', ');
+
+  let scriptLogic = `${scriptOutputDeclarations}\n`;
+  if (scriptOutputAssignments) {
+    scriptLogic += `(${scriptOutputAssignments}) = ${element.id}(${inputs});\n`;
+  } else {
+    scriptLogic += `${element.id}(${inputs});\n`;
+  }
+
+  return scriptLogic;
+}
 /**
  * Generates Solidity functions for a list of activities.
  * @param {Array} activities - The list of activities.

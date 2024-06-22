@@ -35,6 +35,7 @@ export function findLanesForProcess(process) {
             lanes.push(lane);
         });
     });
+
     return lanes;
 }
 
@@ -51,6 +52,55 @@ export function findActivitiesForLane(lane) {
     ];
     return lane.flowNodeRef.filter(node => activityTypes.includes(node.$type));
 }
+
+/**
+ * Finds the gateways within a given lane.
+ * @param {Object} lane - The lane whose gateways are to be found.
+ * @returns {Array} The gateways within the lane.
+ */
+export function findGatewaysForLane(lane) {
+    // Supported gateway types
+    const gatewayTypes = [
+        'bpmn:ParallelGateway',
+        'bpmn:ExclusiveGateway',
+        'bpmn:InclusiveGateway',
+        'bpmn:EventBasedGateway'
+    ];
+    return lane.flowNodeRef.filter(node => gatewayTypes.includes(node.$type));
+}
+
+/**
+ * Finds all activities for a given process.
+ * @param {Object} process - The process object.
+ * @returns {Array} - An array of activities within the process.
+ */
+export function findActivitiesForProcess(process) {
+    // Implement this function to find and return all activities for a given process
+    const activityTypes = [
+      'bpmn:ReceiveTask',
+      'bpmn:ScriptTask',
+    ];
+    return process.flowElements.filter(element => activityTypes.includes(element.$type));
+}
+
+/**
+ * Finds the gateways within a given process.
+ * @param process - The process whose gateways are to be found.
+ * @returns {Array} The gateways within the process.
+ */
+export function findGatewaysForProcess(process) {
+    // Supported gateway types
+    const gatewayTypes = [
+        'bpmn:ParallelGateway',
+        'bpmn:ExclusiveGateway',
+        'bpmn:InclusiveGateway',
+        'bpmn:EventBasedGateway'
+    ];
+    return process.flowElements.filter(element => gatewayTypes.includes(element.$type));
+}
+
+
+
 
 /**
  * Finds the incoming and outgoing flows for a given activity.
@@ -91,9 +141,14 @@ export function getProceedingElements(activity, process) {
         for (const flow of outgoing) {
             const targetElement = process.flowElements.find(element => element.id === flow.targetRef.id);
 
-            //Transaction Ends in case of: Receive task (including itself) || End event || Disabled AND gateway
-            if (!targetElement || targetElement.$type === 'bpmn:ReceiveTask' ||
-                targetElement.$type === 'bpmn:EndEvent') {
+            // Push and stop if it's a ReceiveTask
+            if (targetElement && targetElement.$type === 'bpmn:ReceiveTask') {
+                proceedingElements.push(targetElement);
+                continue;
+            }
+
+            // Skip if it's an EndEvent or if there's no targetElement
+            if (!targetElement || targetElement.$type === 'bpmn:EndEvent') {
                 continue;
             }
 
@@ -130,6 +185,28 @@ export function extractOutputParameters(activity) {
     return outputParameters;
 }
 
+/**
+ * Extracts input parameters from a given activity.
+ * @param {Object} activity - The activity object.
+ * @returns {Array} The list of input parameters.
+ */
+export function extractInputParameters(activity) {
+    const inputParameters = [];
+
+    if (activity.extensionElements && activity.extensionElements.values) {
+        activity.extensionElements.values.forEach(extension => {
+            if (extension.$type === 'bpmnbc:InputParameters' && extension.values) {
+                extension.values.forEach(param => {
+                    if (param.$type === 'bpmnbc:InputParameter') {
+                        inputParameters.push(param);
+                    }
+                });
+            }
+        });
+    }
+
+    return inputParameters;
+}
 
 /**
  * Determines whether the type is a value type (not requiring `memory`).

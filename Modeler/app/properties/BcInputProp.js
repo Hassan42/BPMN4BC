@@ -146,8 +146,8 @@ function Type(props) {
   
   const getOptions = () => {
     return [
-      { value: 'String', label: 'String' },
-      { value: 'Integer', label: 'Integer' }
+      { value: 'string', label: 'string' },
+      { value: 'uint', label: 'uint' }
     ];
   };
 

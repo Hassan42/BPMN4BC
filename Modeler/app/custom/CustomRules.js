@@ -1,11 +1,6 @@
 import inherits from 'inherits-browser';
-
 import RuleProvider from 'diagram-js/lib/features/rules/RuleProvider';
-
-import {
-  is
-} from 'bpmn-js/lib/util/ModelUtil';
-
+import { is } from 'bpmn-js/lib/util/ModelUtil';
 
 const HIGH_PRIORITY = 2500;
 
@@ -24,35 +19,34 @@ export default function CustomRules(eventBus) {
 
 inherits(CustomRules, RuleProvider);
 
-CustomRules.$inject = [ 'eventBus' ];
-
+CustomRules.$inject = ['eventBus'];
 
 CustomRules.prototype.init = function() {
 
-  this.addRule('shape.create', HIGH_PRIORITY, function(context) {
-    var shape = context.shape,
-        target = context.target;
-    var shapeBo = shape.businessObject,
-        targetBo = target.businessObject;
-  
+  // Using the preserved modeling variable directly in the addRule callback
+  this.addRule('shape.create', HIGH_PRIORITY, (context) => {
+    const { shape, target } = context;
+    const shapeBo = shape.businessObject;
+    const targetBo = target.businessObject;
+
     // Helper function to check if an element is allowed in the blockchain environment
     function isAllowedInBlockchain(shapeBo) {
-      return (shapeBo.bc == 'true' || 
-              is(shapeBo, "bpmn:ParallelGateway") || 
-              is(shapeBo, "bpmn:EventBasedGateway") || 
-              is(shapeBo, "bpmn:ExclusiveGateway") || 
-              is(shapeBo, "bpmn:Task") || 
-              is(shapeBo, "bpmn:StartEvent") || 
-              is(shapeBo, "bpmn:EndEvent")) && 
-             (!is(shapeBo, "bpmn:SendTask")) && 
-             (!is(shapeBo, "bpmn:IntermediateCatchEvent")) && 
-             (!is(shapeBo, "bpmn:Participant"));
+      return (shapeBo.bc === 'true' ||
+        is(shapeBo, "bpmn:ParallelGateway") ||
+        is(shapeBo, "bpmn:EventBasedGateway") ||
+        is(shapeBo, "bpmn:ExclusiveGateway") ||
+        is(shapeBo, "bpmn:Task") ||
+        is(shapeBo, "bpmn:StartEvent") ||
+        is(shapeBo, "bpmn:EndEvent")) &&
+        (!is(shapeBo, "bpmn:SendTask")) &&
+        (!is(shapeBo, "bpmn:IntermediateCatchEvent")) &&
+        (!is(shapeBo, "bpmn:Participant"));
     }
-  
+
     // Check if the target is in a blockchain environment
-    if (targetBo.bc == 'true') {
+    if (targetBo.bc === 'true') {
       // Assign bcid to shape if both are in blockchain
-      if (shapeBo.bc == 'true') {
+      if (shapeBo.bc === 'true') {
         shapeBo.bcid = targetBo.bcid;
       }
       // Determine if the shape is allowed to be created in the blockchain environment
@@ -62,31 +56,32 @@ CustomRules.prototype.init = function() {
         return false;
       }
     }
-  
+
     // Prevent ReceiveTask with bc == "true" from being created outside of blockchain environment
-    if (is(shapeBo, "bpmn:ReceiveTask") && shapeBo.bc == "true" && !targetBo.bc) {
+    if (is(shapeBo, "bpmn:ReceiveTask") && shapeBo.bc === "true" && !targetBo.bc) {
       return false;
     }
+
+    // Allow the creation of the shape if none of the above rules apply
+    return true;
   });
 
-  this.addRule('connection.create', HIGH_PRIORITY, function(context) {
-    var target = context.target,
-        source = context.source;
-  
+  this.addRule('connection.create', HIGH_PRIORITY, (context) => {
+    const { target, source } = context;
+
     if (!target || !source) {
       return;
     }
-  
-    var targetBo = target.businessObject,
-        sourceBo = source.businessObject;
-  
+
+    const targetBo = target.businessObject;
+    const sourceBo = source.businessObject;
+
     if (!targetBo || !sourceBo) {
       return;
     }
-  
+
     const bcTarget = targetBo.bc;
     const bcSource = sourceBo.bc;
-  
 
     // Assign role to the receive task
     if (is(sourceBo, "bpmn:SendTask") && is(targetBo, "bpmn:ReceiveTask") && (bcSource === "true") && (bcTarget === "true")) {
@@ -96,15 +91,7 @@ CustomRules.prototype.init = function() {
         sourceBo.bcid = targetBo.bcid;
       }
     }
-    
-    // const targetParentBo = target.parent && target.parent.businessObject;
-    // const bcParent = targetParentBo && targetParentBo.bc;
-  
-    // SplitAND not allowed
-    // if (is(sourceBo, "bpmn:ParallelGateway") && ((bcTarget === "true") || (bcParent === "true")) && (source.outgoing.length >= 1)) {
-    //   return false;
-    // }
-  
+
     return;
   });
 };
