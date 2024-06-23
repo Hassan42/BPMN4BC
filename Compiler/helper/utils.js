@@ -103,64 +103,52 @@ export function findGatewaysForProcess(process) {
 
 
 /**
- * Finds the incoming and outgoing flows for a given activity.
- * @param process - The process containing the activity.
- * @param activity - The activity to find flows for.
+ * Finds the incoming and outgoing flows for a given element.
+ * @param {Object} element - The element to find flows for.
  * @returns {Object} An object containing the incoming and outgoing flows.
  */
-export function findFlowsForActivity(process, activity) {
-    const incoming = [];
-    const outgoing = [];
-
-    process.flowElements.forEach(element => {
-        if (element.$type === 'bpmn:SequenceFlow') {
-            if (element.targetRef.id === activity.id) {
-                incoming.push(element);
-            }
-            if (element.sourceRef.id === activity.id) {
-                outgoing.push(element);
-            }
-        }
-    });
+export function findFlowsForElement(element) {
+    const incoming = element.incoming || [];
+    const outgoing = element.outgoing || [];
 
     return { incoming, outgoing };
 }
 
 /**
- * Gets the proceeding elements (activities and gateways) connected to the given activity until another ReceiveTask is encountered.
- * @param {Object} activity - The current activity object.
+ * Gets the proceeding elements (activities and gateways) connected to the given flow until another ReceiveTask is encountered.
+ * @param {Object} flow - The current flow object.
  * @param {Object} process - The process object containing flow elements.
  * @returns {Array} The list of proceeding elements.
  */
-export function getProceedingElements(activity, process) {
+export function getProceedingElementsFromFlow(flow, process) {
     const proceedingElements = [];
 
-    function traverse(currentElement) {
-        const { outgoing } = findFlowsForActivity(process, currentElement);
+    function traverse(currentFlow) {
+        const targetElement = process.flowElements.find(element => element.id === currentFlow.targetRef.id);
 
-        for (const flow of outgoing) {
-            const targetElement = process.flowElements.find(element => element.id === flow.targetRef.id);
+        // Skip if it's an EndEvent or if there's no targetElement
+        if (!targetElement || targetElement.$type === 'bpmn:EndEvent') {
+            return;
+        }
 
-            // Push and stop if it's a ReceiveTask
-            if (targetElement && targetElement.$type === 'bpmn:ReceiveTask') {
-                proceedingElements.push(targetElement);
-                continue;
-            }
-
-            // Skip if it's an EndEvent or if there's no targetElement
-            if (!targetElement || targetElement.$type === 'bpmn:EndEvent') {
-                continue;
-            }
-
+        // Push and stop if it's a ReceiveTask or XOR gateway
+        if (targetElement.$type === 'bpmn:ReceiveTask' || targetElement.$type === 'bpmn:ExclusiveGateway') {
             proceedingElements.push(targetElement);
-            traverse(targetElement);
+            return;
+        }
+        
+        proceedingElements.push(targetElement);
+
+        const { outgoing } = findFlowsForElement(targetElement);
+
+        for (const nextFlow of outgoing) {
+            traverse(nextFlow);
         }
     }
 
-    traverse(activity);
+    traverse(flow);
     return proceedingElements;
 }
-
 
 /**
  * Extracts output parameters from a given activity.

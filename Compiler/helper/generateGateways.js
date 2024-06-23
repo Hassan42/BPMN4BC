@@ -18,6 +18,7 @@ export function generateGateways(gateways) {
                 ${functionName}Count += 1;
 
                 if (${functionName}Count == ${incomingCount}) {
+                    ${functionName}Count = 0;
                     return true;
                 }
 

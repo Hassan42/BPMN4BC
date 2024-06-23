@@ -75,7 +75,7 @@ export function generateContracts(definitions) {
           lanes.forEach(lane => {
             const contractName = lane.id.replace(/\s+/g, '') + '_Contract';
             const activities = findActivitiesForLane(lane);
-            const gateways = findGatewaysForLane(process);
+            const gateways = findGatewaysForLane(lane);
             generateContract(contractName, activities, gateways, process);
           });
         }
