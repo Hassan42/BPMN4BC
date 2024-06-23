@@ -1,8 +1,8 @@
-import fs from 'fs';
-import path from 'path';
-import BpmnModdle from 'bpmn-moddle';
-import bpmnbcDescriptor from './resources/BC.json' assert { type: 'json' };
-import { generateContracts } from './helper/generateContracts.js';
+const fs = require('fs');
+const path = require('path');
+const BpmnModdle = require('bpmn-moddle');
+const bpmnbcDescriptor = require('./resources/BC.json');
+const { generateContracts } = require('./helper/generateContracts.js');
 
 const bpmnFilePath = path.resolve('./resources/example.bpmn');
 const bpmnXml = fs.readFileSync(bpmnFilePath, 'utf8');

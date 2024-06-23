@@ -1,9 +1,9 @@
-import { findCollaboration, findProcessForParticipant, findLanesForProcess, findActivitiesForLane, findActivitiesForProcess, findGatewaysForProcess, findGatewaysForLane } from './utils.js';
-import { generateFunctions } from './generateFunctions.js';
-import { generateStorage } from './generateStorage.js';
-import { generateGateways } from './generateGateways.js';
-import fs from 'fs';
-import path from 'path';
+const { findCollaboration, findProcessForParticipant, findLanesForProcess, findActivitiesForLane, findActivitiesForProcess, findGatewaysForProcess, findGatewaysForLane, formatSolidityCode } = require('./utils.js');
+const { generateFunctions } = require('./generateFunctions.js');
+const { generateStorage } = require('./generateStorage.js');
+const { generateGateways } = require('./generateGateways.js');
+const fs = require('fs');
+const path = require('path');
 
 /**
  * Generates a Solidity contract with the given name and activities.
@@ -11,13 +11,23 @@ import path from 'path';
  * @param {Array} activities - The activities to be included as functions in the contract.
  * @param {Object} process - The process containing the activities.
  */
-function generateContract(contractName, activities, gateways, process) {
+async function generateContract(contractName, activities, gateways, process) {
   const storageStruct = generateStorage(activities);
   const functions = generateFunctions(activities, process).join('\n');
-  const gatewayFunctions  = generateGateways(gateways);
+  const gatewayFunctions = generateGateways(gateways);
 
   const functionNames = activities.map(activity => activity.id.replace(/\s+/g, ''));
-  const stateMappings = functionNames.map(name => `state["${name}"] = State.Closed;`).join('\n');
+
+  // Identify activities connected to a start event
+  const startEventIds = process.flowElements
+    .filter(element => element.$type === 'bpmn:StartEvent')
+    .map(startEvent => startEvent.outgoing.map(flow => flow.targetRef.id))
+    .flat();
+
+  const stateMappings = functionNames.map(name => {
+    return startEventIds.includes(name) ? `state["${name}"] = State.Open;` : `state["${name}"] = State.Closed;`;
+  }).join('\n');
+
 
   const solidityCode = `
   // SPDX-License-Identifier: MIT
@@ -26,6 +36,11 @@ function generateContract(contractName, activities, gateways, process) {
   contract ${contractName} {
       enum State { Closed, Open, Completed }
       mapping(string => State) public state;
+
+      modifier isOpen(string memory _activity) {
+        require(state[_activity] == State.Open, "Activity is not open");
+          _;
+      }
 
       ${storageStruct}
 
@@ -39,18 +54,23 @@ function generateContract(contractName, activities, gateways, process) {
   }
   `;
 
-  const outputPath = path.resolve('./output/contracts', `${contractName}.sol`);
-  fs.writeFileSync(outputPath, solidityCode, 'utf8');
-  console.log(`Generated Solidity contract: ${contractName}`);
-}
 
+  try {
+    const formattedSolidityCode = await formatSolidityCode(solidityCode);
+    const outputPath = path.resolve('./output/contracts', `${contractName}.sol`);
+    fs.writeFileSync(outputPath, formattedSolidityCode, 'utf8');
+    console.log(`Generated Solidity contract: ${contractName}`);
+  } catch (error) {
+    console.error('Error formatting or writing Solidity code:', error);
+  }
+}
 
 /**
  * Generates the contracts by processing the BPMN XML.
  * @param definitions - The root definitions element from the BPMN XML.
  * @throws {Error} If no collaboration element is found in the BPMN XML.
  */
-export function generateContracts(definitions) {
+function generateContracts(definitions) {
   const collaboration = findCollaboration(definitions);
 
   // Filter blockchain pools/participants
@@ -83,3 +103,5 @@ export function generateContracts(definitions) {
     });
   }
 }
+
+module.exports = { generateContracts };

@@ -4,7 +4,7 @@
  * @param {Array} gateways - The array of gateway objects.
  * @returns {string} The Solidity functions as a string.
  */
-export function generateGateways(gateways) {
+function generateGateways(gateways) {
     return gateways.map(gateway => {
         // Check if the gateway is a join AND gateway (more than one incoming edge)
         if (gateway.$type === 'bpmn:ParallelGateway' && gateway.incoming.length > 1) {
@@ -29,3 +29,5 @@ export function generateGateways(gateways) {
         return '';
     }).join('\n');
 }
+
+module.exports = {generateGateways};

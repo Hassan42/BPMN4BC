@@ -23,7 +23,7 @@
     <bpmn2:sequenceFlow id="Flow_0wdbkoo" sourceRef="Event_18d60yu" targetRef="Activity_169lwvb" />
     <bpmn2:sequenceFlow id="Flow_01n192n" sourceRef="Activity_169lwvb" targetRef="Gateway_1l6od9q" />
     <bpmn2:sequenceFlow id="Flow_0xstraw" sourceRef="Gateway_1l6od9q" targetRef="Activity_0laks1l">
-      <bpmn2:conditionExpression xsi:type="bpmn2:tFormalExpression">=${X}&gt;3</bpmn2:conditionExpression>
+      <bpmn2:conditionExpression xsi:type="bpmn2:tFormalExpression">${X}&gt;3</bpmn2:conditionExpression>
     </bpmn2:sequenceFlow>
     <bpmn2:scriptTask id="Activity_040hfnb" bpmnbc:bc="true" bpmnbc:bctype="ScriptTask">
       <bpmn2:incoming>Flow_07c3roo</bpmn2:incoming>
@@ -47,7 +47,7 @@
     <bpmn2:sequenceFlow id="Flow_06qi26y" sourceRef="Activity_0laks1l" targetRef="Gateway_009dfc1" />
     <bpmn2:sequenceFlow id="Flow_07c3roo" sourceRef="Gateway_009dfc1" targetRef="Activity_040hfnb" />
     <bpmn2:sequenceFlow id="Flow_1at26ou" sourceRef="Gateway_0hkigxd" targetRef="Activity_19quton">
-      <bpmn2:conditionExpression xsi:type="bpmn2:tFormalExpression">=${X}&gt;4</bpmn2:conditionExpression>
+      <bpmn2:conditionExpression xsi:type="bpmn2:tFormalExpression">${X}&gt;4</bpmn2:conditionExpression>
     </bpmn2:sequenceFlow>
     <bpmn2:receiveTask id="Activity_19quton" bpmnbc:bc="true" bpmnbc:bctype="ReceiveTask">
       <bpmn2:incoming>Flow_1at26ou</bpmn2:incoming>

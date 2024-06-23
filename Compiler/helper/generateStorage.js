@@ -1,11 +1,11 @@
-import { extractOutputParameters } from './utils.js';
+const { extractOutputParameters } = require('./utils.js');
 
 /**
  * Generates the Solidity struct for local storage based on the output parameters of activities in a specific lane.
  * @param {Array} activities - The list of activities in the lane.
  * @returns {string} The Solidity code for the LocalStorage struct, or an empty string if there are no non-transactional output parameters.
  */
-export function generateStorage(activities) {
+function generateStorage(activities) {
     const outputParamsSet = new Set();
 
     activities.forEach(activity => {
@@ -31,3 +31,6 @@ export function generateStorage(activities) {
 
     return storageStruct;
 }
+
+
+module.exports = {generateStorage};

@@ -1,11 +1,16 @@
-import { getProceedingElementsFromFlow, extractOutputParameters, extractInputParameters, isValueType } from './utils.js';
+const { 
+  getProceedingElementsFromFlow, 
+  extractOutputParameters, 
+  extractInputParameters, 
+  isValueType 
+} = require('./utils.js');
 
 /**
  * Generates logic for a Solidity script function.
  * @param {Object} activity - The activity object.
  * @returns {string} The logic for the script function.
  */
-export function generateScriptFunction(activity) {
+function generateScriptFunction(activity) {
   const solidityScript = activity.solidityscript || '';
   const returnParams = parseReturnValues(activity.returns || '');
 
@@ -50,7 +55,7 @@ function parseReturnValues(encodedString) {
  * @param {Object} process - The process object containing flow elements.
  * @returns {string} The logic for the entry function.
  */
-export function generateEntryFunction(activity, process) {
+function generateEntryFunction(activity, process) {
   const proceedingElements = activity.outgoing.flatMap(flow => getProceedingElementsFromFlow(flow, process));
   const outputParameters = extractOutputParameters(activity);
 
@@ -98,6 +103,10 @@ export function generateEntryFunction(activity, process) {
 
   function processElement(element) {
     switch (element.$type) {
+      case 'bpmn:ReceiveTask': {
+        proceedingLogic += `state["${element.id.replace(/\s+/g, '')}"] = State.Open;\n`;
+        break;
+      }
       case 'bpmn:ScriptTask': {
         const inputParameters = extractInputParameters(element);
         const inputs = inputParameters.map(param => {
@@ -181,10 +190,11 @@ export function generateEntryFunction(activity, process) {
   });
 
   return `
-    function ${activity.id.replace(/\s+/g, '')}(${externalParams}) public {
+    function ${activity.id.replace(/\s+/g, '')}(${externalParams}) public isOpen("${activity.id.replace(/\s+/g, '')}") {
         ${storageAssignments}
         ${transactionalAssignments}
         ${proceedingLogic}
+        state["${activity.id.replace(/\s+/g, '')}"] = State.Completed;
     }
   `;
 }
@@ -194,7 +204,7 @@ export function generateEntryFunction(activity, process) {
  * @param {Array} activities - The list of activities.
  * @returns {Array} The list of generated Solidity functions.
  */
-export function generateFunctions(activities, process) {
+function generateFunctions(activities, process) {
   let functions = [];
 
   activities.forEach(activity => {
@@ -216,3 +226,5 @@ export function generateFunctions(activities, process) {
 
   return functions;
 }
+
+module.exports = {generateScriptFunction, generateEntryFunction, generateFunctions};
