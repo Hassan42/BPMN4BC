@@ -1,9 +1,38 @@
-const { 
-  getProceedingElementsFromFlow, 
-  extractOutputParameters, 
-  extractInputParameters, 
-  isValueType 
+const {
+  getProceedingElementsFromFlow,
+  extractOutputParameters,
+  extractInputParameters,
+  isValueType,
+  getContractNameForElement
 } = require('./utils.js');
+
+/**
+ * Extracts function signatures from the Solidity code.
+ * @param {string} solidityCode - The Solidity code of the contract.
+ * @returns {string} The Solidity interface as a string.
+ */
+function generateFunctionSignatures(solidityCode) {
+  const functionSignatures = [];
+  const functionRegex = /function\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(([^)]*)\)\s*(public|external|internal|private)?\s*([a-zA-Z0-9_()"]+)?\s*(returns\s*\([^)]*\))?\s*{/g;
+  let match;
+
+  while ((match = functionRegex.exec(solidityCode)) !== null) {
+    const functionName = match[1];
+    const functionParams = match[2].trim();
+    const visibility = match[3] || 'public';
+    // const modifiers = match[4] || '';
+    const returnType = match[5] || '';
+    
+    // Exclude private functions
+    if (visibility !== 'private') {
+      const signature = `function ${functionName}(${functionParams}) external ${returnType};`;
+      functionSignatures.push(signature);
+    }
+  }
+
+  return functionSignatures.join('\n');
+}
+
 
 /**
  * Generates logic for a Solidity script function.
@@ -13,20 +42,67 @@ const {
 function generateScriptFunction(activity) {
   const solidityScript = activity.solidityscript || '';
   const returnParams = parseReturnValues(activity.returns || '');
+  const inputParams = extractInputParameters(activity);
+  const outputParams = extractOutputParameters(activity).filter(param => String(param.transactional).trim().toLowerCase() === "true");
 
-  const returnTypes = returnParams.map(param => {
+  const inputTypes = inputParams.map(param => {
+    const memoryKeyword = isValueType(param.type) ? '' : 'memory ';
+    return `${param.type} ${memoryKeyword}${param.name}`;
+  }).join(', ');
+
+  const combinedReturnParams = [...returnParams, ...outputParams];
+  const returnTypes = combinedReturnParams.map(param => {
     const typeWithMemory = isValueType(param.type) ? param.type : `${param.type} memory`;
     return typeWithMemory;
   }).join(', ');
 
   const returnClause = returnTypes ? `returns (${returnTypes})` : '';
 
+  const definedVariables = new Set(inputParams.map(param => param.name));
+
+  // Storage assignments: Assign values to localStorage for non-transactional output parameters
+  const storageAssignments = outputParams
+    .filter(param => String(param.transactional).trim().toLowerCase() !== "true")
+    .map(param => {
+      const { name, value } = param;
+      if (value.startsWith('${') && value.endsWith('}')) {
+        const varName = value.slice(2, -1);
+        return `localStorage.${name} = ${definedVariables.has(varName) ? varName : `localStorage.${varName}`};`;
+      }
+      return `localStorage.${name} = ${value};`;
+    })
+    .join('\n');
+
+  // Transactional assignments: Declare variables for transactional output parameters
+  const transactionalAssignments = outputParams
+    .filter(param => String(param.transactional).trim().toLowerCase() === "true")
+    .map(param => {
+      const { type, name, value } = param;
+      const memoryKeyword = isValueType(type) ? '' : 'memory ';
+      if (value.startsWith('${') && value.endsWith('}')) {
+        const varName = value.slice(2, -1);
+        return `${type} ${memoryKeyword}${name} = ${definedVariables.has(varName) ? varName : `localStorage.${varName}`};`;
+      } else {
+        return `${type} ${memoryKeyword}${name} = ${value};`;
+      }
+    })
+    .join('\n');
+
+  const scriptWithoutReturn = solidityScript.replace(/return\s+.*?;/g, '').trim();
+  const returnStatement = combinedReturnParams.length > 0
+    ? `return (${combinedReturnParams.map(param => param.name).join(', ')});`
+    : '';
+
   return `
-    function ${activity.id.replace(/\s+/g, '')}() public ${returnClause} {
-        ${solidityScript}
+    function ${activity.id.replace(/\s+/g, '')}(${inputTypes}) public ${returnClause} {
+        ${storageAssignments}
+        ${transactionalAssignments}
+        ${scriptWithoutReturn}
+        ${returnStatement}
     }
   `;
 }
+
 
 /**
  * Parses the encoded return values string and extracts types and variable names.
@@ -56,6 +132,7 @@ function parseReturnValues(encodedString) {
  * @returns {string} The logic for the entry function.
  */
 function generateEntryFunction(activity, process) {
+  const contractName = getContractNameForElement(activity, process);
   const proceedingElements = activity.outgoing.flatMap(flow => getProceedingElementsFromFlow(flow, process));
   const outputParameters = extractOutputParameters(activity);
 
@@ -102,13 +179,21 @@ function generateEntryFunction(activity, process) {
   const definedVariables = new Set(outputParameters.map(param => param.name));
 
   function processElement(element) {
+    const elementContractName = getContractNameForElement(element, process);
+
     switch (element.$type) {
       case 'bpmn:ReceiveTask': {
-        proceedingLogic += `state["${element.id.replace(/\s+/g, '')}"] = State.Open;\n`;
+        if (elementContractName !== contractName) {
+          proceedingLogic += `I${elementContractName}(contracts["${elementContractName}"]).setState("${element.id.replace(/\s+/g, '')}", 1);\n`;
+        } else {
+          proceedingLogic += `state["${element.id.replace(/\s+/g, '')}"] = State.Open;\n`;
+        }
         break;
       }
       case 'bpmn:ScriptTask': {
         const inputParameters = extractInputParameters(element);
+        const returnParams = parseReturnValues(element.returns || '');
+
         const inputs = inputParameters.map(param => {
           if (param.value.startsWith('${') && param.value.endsWith('}')) {
             const varName = param.value.slice(2, -1);
@@ -119,8 +204,12 @@ function generateEntryFunction(activity, process) {
         }).join(', ');
 
         const elementOutputParameters = extractOutputParameters(element);
+        const combinedElementOutputParams = [
+          ...returnParams.map(param => ({ ...param, transactional: 'true' })),
+          ...elementOutputParameters
+        ];
 
-        const scriptOutputDeclarations = elementOutputParameters
+        const scriptOutputDeclarations = combinedElementOutputParams
           .filter(param => String(param.transactional).trim().toLowerCase() === "true")
           .map(param => {
             if (!definedVariables.has(param.name)) {
@@ -133,23 +222,36 @@ function generateEntryFunction(activity, process) {
           .filter(Boolean)
           .join('\n');
 
-        const scriptOutputAssignments = elementOutputParameters
+        const scriptOutputAssignments = combinedElementOutputParams
           .filter(param => String(param.transactional).trim().toLowerCase() === "true")
           .map(param => param.name)
           .join(', ');
 
         proceedingLogic += `${scriptOutputDeclarations}\n`;
-        if (scriptOutputAssignments) {
-          proceedingLogic += `(${scriptOutputAssignments}) = ${element.id}(${inputs});\n`;
+
+        if (elementContractName !== contractName) {
+          if (scriptOutputAssignments) {
+          proceedingLogic += `(${scriptOutputAssignments}) = I${elementContractName}(contracts["${elementContractName}"]).${element.id}(${inputs});\n`;
+          } else{
+            proceedingLogic += `I${elementContractName}(contracts["${elementContractName}"]).${element.id}(${inputs});\n`;
+          }
         } else {
-          proceedingLogic += `${element.id}(${inputs});\n`;
+          if (scriptOutputAssignments) {
+            proceedingLogic += `(${scriptOutputAssignments}) = ${element.id}(${inputs});\n`;
+          } else {
+            proceedingLogic += `${element.id}(${inputs});\n`;
+          }
         }
         break;
       }
       case 'bpmn:ParallelGateway': {
         //if join AND gateway
         if (element.incoming.length > 1) {
-          const gatewayFunctionName = `checkGateway_${element.id}`;
+          const elementContractName = getContractNameForElement(element, process);
+          const gatewayFunctionName = elementContractName !== contractName 
+            ? `I${elementContractName}(contracts["${elementContractName}"]).checkGateway_${element.id}`
+            : `checkGateway_${element.id}`;
+
           proceedingLogic += `
                     if (!${gatewayFunctionName}()) {
                         state["${activity.id.replace(/\s+/g, '')}"] = State.Completed;
@@ -165,19 +267,29 @@ function generateEntryFunction(activity, process) {
           branchProceedingElements.forEach(branchElement => processElement(branchElement));
         } else {
           outgoingFlows.forEach((flow, index) => {
-            const condition = flow.conditionExpression ? flow.conditionExpression.body : null;
+            const condition = flow.conditionExpression ? flow.conditionExpression.body : null; // Conditions for each branch
             const branchProceedingElements = getProceedingElementsFromFlow(flow, process);
             if (condition) {
-              const varName = condition.match(/\$\{(.+?)\}/)[1];
-              const conditionExpression = definedVariables.has(varName) ? condition : condition.replace(/\$\{(.+?)\}/g, 'localStorage.$1');
+              let conditionExpression = condition.replace(/^\s*=\s*/, '').replace(/\$\{(.+?)\}/g, (match, varName) => {
+                return definedVariables.has(varName) ? varName : `localStorage.${varName}`;
+              });
               proceedingLogic += index === 0 ? `if (${conditionExpression}) {\n` : `else if (${conditionExpression}) {\n`;
             } else {
               proceedingLogic += `else {\n`;
             }
-            branchProceedingElements.forEach(branchElement => processElement(branchElement));
+            branchProceedingElements.forEach(branchElement => processElement(branchElement)); // We process the elements in each branch of the XOR recursively 
             proceedingLogic += `}\n`;
           });
         }
+        break;
+      }
+      case 'bpmn:IntermediateThrowEvent': {
+        const eventName = element.bceventname || element.id.replace(/\s+/g, '');
+        proceedingLogic += `emit ${eventName}();\n`;
+        break;
+      }
+      case 'bpmn:EndEvent': {
+        proceedingLogic += `revert("End Event reached: ${element.id.replace(/\s+/g, '')}");\n`;
         break;
       }
       default:
@@ -227,4 +339,4 @@ function generateFunctions(activities, process) {
   return functions;
 }
 
-module.exports = {generateScriptFunction, generateEntryFunction, generateFunctions};
+module.exports = { generateScriptFunction, generateEntryFunction, generateFunctions, generateFunctionSignatures };

@@ -14,7 +14,7 @@ function generateGateways(gateways) {
             return `
             uint256 private ${functionName}Count = 0;
 
-            function ${functionName}() private returns (bool) {
+            function ${functionName}() public returns (bool) {
                 ${functionName}Count += 1;
 
                 if (${functionName}Count == ${incomingCount}) {

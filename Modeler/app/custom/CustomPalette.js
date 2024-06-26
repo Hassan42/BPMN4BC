@@ -2,7 +2,7 @@ import SEND from '../assets/SEND-icon.svg';
 import RECEIVE from '../assets/RECEIVE-icon.svg';
 import BEO from '../assets/BEO-icon.svg';
 // import BC from '../assets/BC.svg';
-import BC from '../assets/BC-icon.svg';
+import BC from '../assets/BC-ICON.svg';
 import BCCATCH from '../assets/BC-CATCH-EVENT-ICON.svg';
 import BCTHROW from '../assets/BC-THROW-EVENT-ICON.svg';
 import BCREVTHROW from '../assets/THROW-REV-ICON.svg';

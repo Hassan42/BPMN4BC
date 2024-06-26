@@ -2,40 +2,31 @@
 <html>
 <head>
   <title>bpmn-js-example-model-extension</title>
-
   <meta charset="utf-8"/>
-
   <link rel="stylesheet" href="vendor/bpmn-js/assets/diagram-js.css" />
   <link rel="stylesheet" href="vendor/bpmn-js/assets/bpmn-font/css/bpmn-embedded.css" />
   <link rel="stylesheet" href="https://unpkg.com/@bpmn-io/properties-panel/dist/assets/properties-panel.css">
   <link rel="stylesheet" href="css/app.css" />
 </head>
 <body>
-  <!-- <div class="modeler"> -->
-    <div id="container"></div>
-    <div id="js-properties-panel"></div>
-
-    <ul class="buttons">
-      <li>
-        download
-      </li>
-      <li>
-        <a id="js-download-diagram" href title="download BPMN diagram">
-          BPMN diagram
-        </a>
-      </li>
-      <li>
-        <a id="js-download-svg" href title="download as SVG image">
-          SVG image
-        </a>
-      </li>
-      <li>
-        <input type="file" id="js-upload-diagram" title="Upload BPMN diagram" accept=".bpmn"/>
-      </li>
-    </ul>
-  <!-- </div> -->
-</body>
-  <!-- <div id="hint" class="panel">Click <b>right mouse button</b> to edit properties.</div> -->
-
+  <div id="container"></div>
+  <div id="js-properties-panel"></div>
+  <ul class="buttons">
+    <li>
+      <a id="js-download-diagram" href title="download BPMN diagram">
+        BPMN diagram
+      </a>
+    </li>
+    <li>
+      <a id="js-download-svg" href title="download as SVG image">
+        SVG image
+      </a>
+    </li>
+    <li>
+      <label for="js-upload-diagram">Upload</label>
+      <input type="file" id="js-upload-diagram" title="Upload BPMN diagram" accept=".bpmn"/>
+    </li>
+  </ul>
   <script src="app.js"></script>
+</body>
 </html>

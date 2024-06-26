@@ -21,7 +21,7 @@ inherits(CustomRules, RuleProvider);
 
 CustomRules.$inject = ['eventBus'];
 
-CustomRules.prototype.init = function() {
+CustomRules.prototype.init = function () {
 
   // Using the preserved modeling variable directly in the addRule callback
   this.addRule('shape.create', HIGH_PRIORITY, (context) => {
@@ -35,7 +35,6 @@ CustomRules.prototype.init = function() {
         is(shapeBo, "bpmn:ParallelGateway") ||
         is(shapeBo, "bpmn:EventBasedGateway") ||
         is(shapeBo, "bpmn:ExclusiveGateway") ||
-        is(shapeBo, "bpmn:Task") ||
         is(shapeBo, "bpmn:StartEvent") ||
         is(shapeBo, "bpmn:EndEvent")) &&
         (!is(shapeBo, "bpmn:SendTask")) &&
@@ -83,6 +82,12 @@ CustomRules.prototype.init = function() {
     const bcTarget = targetBo.bc;
     const bcSource = sourceBo.bc;
 
+    // Allow outgoing connection from ScriptTask to AND gateway but not incoming
+    if (is(targetBo, "bpmn:ScriptTask") && (bcTarget === "true") && is(sourceBo, "bpmn:ParallelGateway")) {
+      return false; 
+    }
+
+
     // Assign role to the receive task
     if (is(sourceBo, "bpmn:SendTask") && is(targetBo, "bpmn:ReceiveTask") && (bcSource === "true") && (bcTarget === "true")) {
       let participantRole = source.parent && source.parent.businessObject.name;
@@ -91,6 +96,8 @@ CustomRules.prototype.init = function() {
         sourceBo.bcid = targetBo.bcid;
       }
     }
+
+
 
     return;
   });

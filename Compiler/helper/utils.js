@@ -87,6 +87,39 @@ function findActivitiesForProcess(process) {
 }
 
 /**
+ * Finds the events within a given process.
+ * @param {Object} process - The process whose events are to be found.
+ * @returns {Array} The events within the process.
+ */
+function findEventsForProcess(process) {
+    const eventTypes = [
+        'bpmn:StartEvent',
+        'bpmn:EndEvent',
+        'bpmn:IntermediateThrowEvent',
+        'bpmn:IntermediateCatchEvent',
+        'bpmn:BoundaryEvent'
+    ];
+    return process.flowElements.filter(element => eventTypes.includes(element.$type));
+}
+
+/**
+ * Finds the events within a given lane.
+ * @param {Object} lane - The lane whose events are to be found.
+ * @returns {Array} The events within the lane.
+ */
+function findEventsForLane(lane) {
+    const eventTypes = [
+        'bpmn:StartEvent',
+        'bpmn:EndEvent',
+        'bpmn:IntermediateThrowEvent',
+        'bpmn:IntermediateCatchEvent',
+        'bpmn:BoundaryEvent'
+    ];
+    return lane.flowNodeRef.filter(node => eventTypes.includes(node.$type));
+}
+
+
+/**
  * Finds the gateways within a given process.
  * @param process - The process whose gateways are to be found.
  * @returns {Array} The gateways within the process.
@@ -128,6 +161,9 @@ function getProceedingElementsFromFlow(flow, process) {
 
         // Skip if it's an EndEvent or if there's no targetElement
         if (!targetElement || targetElement.$type === 'bpmn:EndEvent') {
+            if(targetElement.$type === 'bpmn:EndEvent' && targetElement.bc === "true"){
+                proceedingElements.push(targetElement);
+            }
             return;
         }
 
@@ -216,8 +252,24 @@ async function formatSolidityCode(code) {
       parser: "solidity-parse",
       plugins: [solidityPlugin],
     });
-  }
-  
+}
+
+/**
+ * Determines the contract name for a given element based on the lane it is in.
+ * @param {Object} element - The element whose contract name is to be determined.
+ * @param {Object} process - The process containing the lanes.
+ * @returns {string} The contract name for the given element.
+ */
+function getContractNameForElement(element, process) {
+    for (const laneSet of process.laneSets || []) {
+      for (const lane of laneSet.lanes || []) {
+        if (lane.flowNodeRef.some(node => node.id === element.id)) {
+          return lane.id.replace(/\s+/g, '') + '_Contract';
+        }
+      }
+    }
+    return `${process.id.replace(/\s+/g, '')}_DefaultContract`;
+}
 
 module.exports = {
     findCollaboration,
@@ -232,5 +284,8 @@ module.exports = {
     extractOutputParameters,
     extractInputParameters,
     isValueType,
-    formatSolidityCode
+    formatSolidityCode,
+    getContractNameForElement,
+    findEventsForProcess,
+    findEventsForLane
 };
