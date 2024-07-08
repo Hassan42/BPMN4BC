@@ -118,7 +118,6 @@ function findEventsForLane(lane) {
     return lane.flowNodeRef.filter(node => eventTypes.includes(node.$type));
 }
 
-
 /**
  * Finds the gateways within a given process.
  * @param process - The process whose gateways are to be found.
@@ -161,7 +160,7 @@ function getProceedingElementsFromFlow(flow, process) {
 
         // Skip if it's an EndEvent or if there's no targetElement
         if (!targetElement || targetElement.$type === 'bpmn:EndEvent') {
-            if(targetElement.$type === 'bpmn:EndEvent' && targetElement.bc === "true"){
+            if (targetElement.$type === 'bpmn:EndEvent' && targetElement.bc === "true") {
                 proceedingElements.push(targetElement);
             }
             return;
@@ -249,8 +248,8 @@ function isValueType(type) {
  */
 async function formatSolidityCode(code) {
     return prettier.format(code, {
-      parser: "solidity-parse",
-      plugins: [solidityPlugin],
+        parser: "solidity-parse",
+        plugins: [solidityPlugin],
     });
 }
 
@@ -262,11 +261,11 @@ async function formatSolidityCode(code) {
  */
 function getContractNameForElement(element, process) {
     for (const laneSet of process.laneSets || []) {
-      for (const lane of laneSet.lanes || []) {
-        if (lane.flowNodeRef.some(node => node.id === element.id)) {
-          return lane.id.replace(/\s+/g, '') + '_Contract';
+        for (const lane of laneSet.lanes || []) {
+            if (lane.flowNodeRef.some(node => node.id === element.id)) {
+                return lane.id.replace(/\s+/g, '') + '_Contract';
+            }
         }
-      }
     }
     return `${process.id.replace(/\s+/g, '')}_DefaultContract`;
 }

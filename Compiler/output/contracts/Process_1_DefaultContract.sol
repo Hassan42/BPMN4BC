@@ -15,14 +15,12 @@ contract Process_1_DefaultContract {
         require(state[_activity] == State.Open, "Activity is not open");
         _;
     }
-    // Logic for Event_1dds2x5
 
-    event Event_06ev6l6();
-
-    // Logic for Event_0i7t51l
+    event Event_1u7oaso();
 
     constructor(address[] memory addresses) {
-        state["Activity_1wps2m8"] = State.Open;
+        state["Activity_09vj509"] = State.Open;
+        state["Activity_12fgwl3"] = State.Open;
     }
 
     function setState(string memory _activity, uint8 _state) public {
@@ -30,10 +28,16 @@ contract Process_1_DefaultContract {
         state[_activity] = State(_state);
     }
 
-    function Activity_1wps2m8() public isOpen("Activity_1wps2m8") {
-        emit Event_06ev6l6();
-        revert("End Event reached: Event_0i7t51l");
+    function Activity_09vj509() public isOpen("Activity_09vj509") {
+        Activity_0dgknha();
+        emit Event_1u7oaso();
 
-        state["Activity_1wps2m8"] = State.Completed;
+        state["Activity_09vj509"] = State.Completed;
+    }
+
+    function Activity_0dgknha() public {}
+
+    function Activity_12fgwl3() public isOpen("Activity_12fgwl3") {
+        state["Activity_12fgwl3"] = State.Completed;
     }
 }

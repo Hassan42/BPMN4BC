@@ -8,5 +8,7 @@ interface IProcess_1_DefaultContract {
         Completed
     }
     function setState(string memory _activity, uint8 _state) external;
-    function Activity_1wps2m8() external;
+    function Activity_09vj509() external;
+    function Activity_0dgknha() external;
+    function Activity_12fgwl3() external;
 }

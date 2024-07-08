@@ -33,4 +33,4 @@ function generateStorage(activities) {
 }
 
 
-module.exports = {generateStorage};
+module.exports = { generateStorage };

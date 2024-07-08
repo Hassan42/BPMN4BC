@@ -4,17 +4,17 @@
  * @returns {string} The Solidity code for the events.
  */
 function generateEvents(events) {
-    return events.map(event => {
-      switch (event.$type) {
-        case 'bpmn:IntermediateThrowEvent':
+  return events.map(event => {
+    switch (event.$type) {
+      case 'bpmn:IntermediateThrowEvent':
         const eventName = event.bceventname || event.id.replace(/\s+/g, '');
-          return `event ${eventName}();\n`;
-        default:
-          return `// Logic for ${event.name || event.id}\n`;
-      }
-    }).join('\n');
-  }
-  
+        return `event ${eventName}();\n`;
+      default:
+        return ``;
+    }
+  }).join('\n');
+}
+
 module.exports = {
-    generateEvents
-  };
+  generateEvents
+};

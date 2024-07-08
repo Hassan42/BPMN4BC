@@ -18,15 +18,14 @@ async function generateContract(contractName, activities, gateways, lanes, event
   const gatewayFunctions = generateGateways(gateways);
   const solidityEvents = generateEvents(events);
 
-  const functionNames = activities.map(activity => activity.id.replace(/\s+/g, ''));
-
   // Identify activities connected to a start event
   const startEventIds = process.flowElements
     .filter(element => element.$type === 'bpmn:StartEvent')
     .map(startEvent => startEvent.outgoing.map(flow => flow.targetRef.id))
     .flat();
 
-  const stateMappings = functionNames.map(name => {
+  const receiveFunctionNames = activities.filter(activity => activity.$type === 'bpmn:ReceiveTask').map(activity => activity.id.replace(/\s+/g, ''));
+  const stateMappings = receiveFunctionNames.map(name => {
     return startEventIds.includes(name) ? `state["${name}"] = State.Open;` : `state["${name}"] = State.Closed;`;
   }).join('\n');
 

@@ -30,4 +30,4 @@ function generateGateways(gateways) {
     }).join('\n');
 }
 
-module.exports = {generateGateways};
+module.exports = { generateGateways };
