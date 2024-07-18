@@ -1,18 +1,52 @@
+const express = require('express');
+const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
 const BpmnModdle = require('bpmn-moddle');
 const bpmnbcDescriptor = require('./resources/BC.json');
-const { generateContracts } = require('./helper/generateContracts.js');
+const { generateContracts } = require('./helper/generateContracts');
 
-const bpmnFilePath = path.resolve('./resources/example.bpmn');
-const bpmnXml = fs.readFileSync(bpmnFilePath, 'utf8');
+const app = express();
+const port = 3000;
 
-const moddle = new BpmnModdle({ bpmnbc: bpmnbcDescriptor });
+app.use(cors());
+app.use(express.json());
 
-(async () => {
-  const {
-    rootElement: definitions
-  } = await moddle.fromXML(bpmnXml);
+app.post('/compile', async (req, res) => {
+  const { xml } = req.body;
 
-  generateContracts(definitions);
-})();
+  const moddle = new BpmnModdle({ bpmnbc: bpmnbcDescriptor });
+
+  try {
+    // Removing old output
+    await cleanOutputDirectories();
+
+    const { rootElement: definitions } = await moddle.fromXML(xml);
+    generateContracts(definitions);
+    res.status(200).send('Compilation successful');
+  } catch (err) {
+    console.error('Error during compilation:', err);
+    res.status(500).send('Compilation failed');
+  }
+});
+
+app.listen(port, () => {
+  console.log(`Server listening at http://localhost:${port}`);
+});
+
+const cleanOutputDirectories = async () => {
+  const contractsDir = path.resolve('./output/contracts');
+  const interfaceDir = path.resolve('./output/interface');
+
+  try {
+    // Ensure directories exist
+    await fs.ensureDir(contractsDir);
+    await fs.ensureDir(interfaceDir);
+
+    // Clean directories
+    await fs.emptyDir(contractsDir);
+    await fs.emptyDir(interfaceDir);
+  } catch (err) {
+    console.error('Error cleaning output directories:', err);
+  }
+};

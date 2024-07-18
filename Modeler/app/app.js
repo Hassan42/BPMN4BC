@@ -12,7 +12,7 @@ import diagramXML from '../resources/diagram.bpmn';
 
 
 
-import { ZeebePropertiesProviderModule  } from 'bpmn-js-properties-panel';
+import { ZeebePropertiesProviderModule } from 'bpmn-js-properties-panel';
 import ZeebeBehaviorsModule from 'camunda-bpmn-js-behaviors/lib/camunda-cloud';
 import zeebeModdle from 'zeebe-bpmn-moddle/resources/zeebe';
 
@@ -62,9 +62,9 @@ bpmnModeler.importXML(diagramXML).catch((err) => {
 //copied from https://github.com/bpmn-io/bpmn-js-examples/blob/main/properties-panel-extension/src/app.js
 // bootstrap diagram functions
 
-$(function() {
+$(function () {
 
-  $('#js-create-diagram').click(function(e) {
+  $('#js-create-diagram').click(function (e) {
     e.stopPropagation();
     e.preventDefault();
 
@@ -74,7 +74,7 @@ $(function() {
   var downloadLink = $('#js-download-diagram');
   var downloadSvgLink = $('#js-download-svg');
 
-  $('.buttons a').click(function(e) {
+  $('.buttons a').click(function (e) {
     if (!$(this).is('.active')) {
       e.preventDefault();
       e.stopPropagation();
@@ -94,7 +94,7 @@ $(function() {
     }
   }
 
-  var exportArtifacts = debounce(async function() {
+  var exportArtifacts = debounce(async function () {
 
     try {
 
@@ -124,15 +124,15 @@ $(function() {
   bpmnModeler.on('commandStack.changed', exportArtifacts);
 
   // Handle file upload
-  $('#js-upload-diagram').change(async function(e) {
+  $('#js-upload-diagram').change(async function (e) {
     const file = e.target.files[0];
 
     if (file) {
       const reader = new FileReader();
 
-      reader.onload = async function(event) {
+      reader.onload = async function (event) {
         const xml = event.target.result;
-        
+
         try {
           await bpmnModeler.importXML(xml);
         } catch (err) {
@@ -141,6 +141,27 @@ $(function() {
       };
 
       reader.readAsText(file);
+    }
+  });
+  $('#js-compile-diagram').click(async function () {
+    try {
+      const { xml } = await bpmnModeler.saveXML({ format: true });
+
+      const response = await fetch('http://localhost:3000/compile', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ xml })
+      });
+
+      if (response.ok) {
+        alert('Compilation successful');
+      } else {
+        alert('Compilation failed');
+      }
+    } catch (err) {
+      console.error('Error happened during compilation: ', err);
     }
   });
 });
