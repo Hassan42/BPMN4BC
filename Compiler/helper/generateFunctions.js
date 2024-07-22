@@ -192,8 +192,6 @@ function generateEntryFunction(activity, process) {
       }
       case 'bpmn:ScriptTask': {
         const inputParameters = extractInputParameters(element);
-        const returnParams = parseReturnValues(element.returns || '');
-
         const inputs = inputParameters.map(param => {
           if (param.value.startsWith('${') && param.value.endsWith('}')) {
             const varName = param.value.slice(2, -1);
@@ -203,6 +201,7 @@ function generateEntryFunction(activity, process) {
           }
         }).join(', ');
 
+        const returnParams = parseReturnValues(element.returns || '');
         const elementOutputParameters = extractOutputParameters(element);
         const combinedElementOutputParams = [
           ...returnParams.map(param => ({ ...param, transactional: 'true' })),
@@ -231,7 +230,7 @@ function generateEntryFunction(activity, process) {
 
         if (elementContractName !== contractName) {
           if (scriptOutputAssignments) {
-          proceedingLogic += `(${scriptOutputAssignments}) = I${elementContractName}(contracts["${elementContractName}"]).${element.id}(${inputs});\n`;
+            proceedingLogic += `(${scriptOutputAssignments}) = I${elementContractName}(contracts["${elementContractName}"]).${element.id}(${inputs});\n`;
           } else{
             proceedingLogic += `I${elementContractName}(contracts["${elementContractName}"]).${element.id}(${inputs});\n`;
           }
@@ -262,9 +261,11 @@ function generateEntryFunction(activity, process) {
       }
       case 'bpmn:ExclusiveGateway': {
         const outgoingFlows = element.outgoing;
+        //Merge XOR
         if (outgoingFlows.length === 1) {
           const branchProceedingElements = getProceedingElementsFromFlow(outgoingFlows[0], process);
           branchProceedingElements.forEach(branchElement => processElement(branchElement));
+        //Split XOR
         } else {
           outgoingFlows.forEach((flow, index) => {
             const condition = flow.conditionExpression ? flow.conditionExpression.body : null; // Conditions for each branch
