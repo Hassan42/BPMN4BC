@@ -7,7 +7,7 @@ const solidityPlugin = require('prettier-plugin-solidity/standalone');
  * @returns The collaboration element.
  * @throws {Error} If no collaboration element is found.
  */
-function findCollaboration(definitions) {
+const findCollaboration = (definitions) => {
     const collaboration = definitions.rootElements.find(element => element.$type === 'bpmn:Collaboration');
     if (!collaboration) {
         throw new Error('No collaboration found in BPMN XML.');
@@ -21,7 +21,7 @@ function findCollaboration(definitions) {
  * @param participant - The participant whose process is to be found.
  * @returns The process associated with the participant, or undefined if not found.
  */
-function findProcessForParticipant(definitions, participant) {
+const findProcessForParticipant = (definitions, participant) => {
     return definitions.rootElements.find(element => element.id === participant.processRef.id);
 }
 
@@ -30,7 +30,7 @@ function findProcessForParticipant(definitions, participant) {
  * @param process - The process whose lanes are to be found.
  * @returns {Array} The lanes within the process.
  */
-function findLanesForProcess(process) {
+const findLanesForProcess = (process) => {
     const lanes = [];
     const laneSets = process.laneSets || [];
     laneSets.forEach(laneSet => {
@@ -47,7 +47,7 @@ function findLanesForProcess(process) {
  * @param lane - The lane whose activities are to be found.
  * @returns {Array} The activities within the lane.
  */
-function findActivitiesForLane(lane) {
+const findActivitiesForLane = (lane) => {
     //Supported activities
     const activityTypes = [
         'bpmn:ReceiveTask',
@@ -61,7 +61,7 @@ function findActivitiesForLane(lane) {
  * @param {Object} lane - The lane whose gateways are to be found.
  * @returns {Array} The gateways within the lane.
  */
-function findGatewaysForLane(lane) {
+const findGatewaysForLane = (lane) => {
     // Supported gateway types
     const gatewayTypes = [
         'bpmn:ParallelGateway',
@@ -77,7 +77,7 @@ function findGatewaysForLane(lane) {
  * @param {Object} process - The process object.
  * @returns {Array} - An array of activities within the process.
  */
-function findActivitiesForProcess(process) {
+const findActivitiesForProcess = (process) => {
     // Implement this function to find and return all activities for a given process
     const activityTypes = [
         'bpmn:ReceiveTask',
@@ -91,7 +91,7 @@ function findActivitiesForProcess(process) {
  * @param {Object} process - The process whose events are to be found.
  * @returns {Array} The events within the process.
  */
-function findEventsForProcess(process) {
+const findEventsForProcess = (process) => {
     const eventTypes = [
         'bpmn:StartEvent',
         'bpmn:EndEvent',
@@ -107,7 +107,7 @@ function findEventsForProcess(process) {
  * @param {Object} lane - The lane whose events are to be found.
  * @returns {Array} The events within the lane.
  */
-function findEventsForLane(lane) {
+const findEventsForLane = (lane) => {
     const eventTypes = [
         'bpmn:StartEvent',
         'bpmn:EndEvent',
@@ -123,7 +123,7 @@ function findEventsForLane(lane) {
  * @param process - The process whose gateways are to be found.
  * @returns {Array} The gateways within the process.
  */
-function findGatewaysForProcess(process) {
+const findGatewaysForProcess = (process) => {
     // Supported gateway types
     const gatewayTypes = [
         'bpmn:ParallelGateway',
@@ -139,7 +139,7 @@ function findGatewaysForProcess(process) {
  * @param {Object} element - The element to find flows for.
  * @returns {Object} An object containing the incoming and outgoing flows.
  */
-function findFlowsForElement(element) {
+const findFlowsForElement = (element) => {
     const incoming = element.incoming || [];
     const outgoing = element.outgoing || [];
 
@@ -152,7 +152,7 @@ function findFlowsForElement(element) {
  * @param {Object} process - The process object containing flow elements.
  * @returns {Array} The list of proceeding elements.
  */
-function getProceedingElementsFromFlow(flow, process) {
+const getProceedingElementsFromFlow = (flow, process) => {
     const proceedingElements = [];
 
     function traverse(currentFlow) {
@@ -190,7 +190,7 @@ function getProceedingElementsFromFlow(flow, process) {
  * @param {Object} activity - The activity object.
  * @returns {Array} The list of output parameters.
  */
-function extractOutputParameters(activity) {
+const extractOutputParameters = (activity) => {
     const outputParameters = [];
 
     if (activity.extensionElements && activity.extensionElements.values) {
@@ -213,7 +213,7 @@ function extractOutputParameters(activity) {
  * @param {Object} activity - The activity object.
  * @returns {Array} The list of input parameters.
  */
-function extractInputParameters(activity) {
+const extractInputParameters = (activity) => {
     const inputParameters = [];
 
     if (activity.extensionElements && activity.extensionElements.values) {
@@ -236,7 +236,7 @@ function extractInputParameters(activity) {
  * @param {string} type - The parameter type.
  * @returns {boolean} True if the type is a value type, false otherwise.
  */
-function isValueType(type) {
+const isValueType = (type) => {
     const valueTypes = ['uint'];
     return valueTypes.some(valueType => type.startsWith(valueType));
 }
@@ -246,7 +246,7 @@ function isValueType(type) {
  * @param {string} code - The Solidity code to format.
  * @returns {Promise<string>} - The formatted Solidity code.
  */
-async function formatSolidityCode(code) {
+const formatSolidityCode = async (code) => {
     return prettier.format(code, {
         parser: "solidity-parse",
         plugins: [solidityPlugin],
@@ -259,7 +259,7 @@ async function formatSolidityCode(code) {
  * @param {Object} process - The process containing the lanes.
  * @returns {string} The contract name for the given element.
  */
-function getContractNameForElement(element, process) {
+const getContractNameForElement = (element, process) => {
     for (const laneSet of process.laneSets || []) {
         for (const lane of laneSet.lanes || []) {
             if (lane.flowNodeRef.some(node => node.id === element.id)) {

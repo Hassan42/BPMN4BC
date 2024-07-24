@@ -1,13 +1,13 @@
 const express = require('express');
 const cors = require('cors');
-const fs = require('fs');
+const fs = require('fs-extra');
 const path = require('path');
 const BpmnModdle = require('bpmn-moddle');
 const bpmnbcDescriptor = require('./resources/BC.json');
 const { generateContracts } = require('./helper/generateContracts');
 
 const app = express();
-const port = 3000;
+const port = 8000;
 
 app.use(cors());
 app.use(express.json());
@@ -36,7 +36,7 @@ app.listen(port, () => {
 
 const cleanOutputDirectories = async () => {
   const contractsDir = path.resolve('./output/contracts');
-  const interfaceDir = path.resolve('./output/interface');
+  const interfaceDir = path.resolve('./output/interfaces');
 
   try {
     // Ensure directories exist

@@ -176,7 +176,7 @@ function generateEntryFunction(activity, process) {
     .join('\n');
 
   let proceedingLogic = '';
-  const definedVariables = new Set(outputParameters.map(param => param.name));
+  const definedVariables = new Set(outputParameters.filter(param => String(param.transactional).trim().toLowerCase() == "true").map(param => param.name));
 
   function processElement(element) {
     const elementContractName = getContractNameForElement(element, process);

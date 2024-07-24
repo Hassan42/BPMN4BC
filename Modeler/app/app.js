@@ -73,7 +73,7 @@ $(function () {
 
   var downloadLink = $('#js-download-diagram');
   var downloadSvgLink = $('#js-download-svg');
-
+  
   $('.buttons a').click(function (e) {
     if (!$(this).is('.active')) {
       e.preventDefault();
@@ -147,7 +147,7 @@ $(function () {
     try {
       const { xml } = await bpmnModeler.saveXML({ format: true });
 
-      const response = await fetch('http://localhost:3000/compile', {
+      const response = await fetch('http://localhost:8000/compile', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
