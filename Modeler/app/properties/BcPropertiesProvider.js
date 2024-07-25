@@ -41,11 +41,12 @@ export default function BcPropertiesProvider(propertiesPanel, injector, translat
      * @return {Object[]} modified groups
      */
     return function(groups) {
-
+      
       const businessObject = element.businessObject;
       const isReceiveTask = is(businessObject, "bpmn:ReceiveTask");
       const isScriptTask = is(businessObject, "bpmn:ScriptTask");
       const isSendTask = is(businessObject, "bpmn:SendTask");
+      const isFlow = is(businessObject, "bpmn:SequenceFlow");
       const elementParent = element.parent?.businessObject ?? undefined;
 
       //if element is bc or lane in a bc pool
@@ -65,6 +66,11 @@ export default function BcPropertiesProvider(propertiesPanel, injector, translat
           groups = groups.filter(group => group.id !== 'inputs' && group.id !== 'outputs');
         }
       }
+      
+      if(isFlow){
+        groups = groups.filter(group => group.id !== 'condition');
+      }
+
      
       return groups;
     };
