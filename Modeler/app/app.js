@@ -6,11 +6,7 @@ import {
 } from 'bpmn-js-properties-panel';
 
 
-import { getBusinessObject } from 'bpmn-js/lib/util/ModelUtil';
-
 import diagramXML from '../resources/diagram.bpmn';
-
-
 
 import { ZeebePropertiesProviderModule } from 'bpmn-js-properties-panel';
 import ZeebeBehaviorsModule from 'camunda-bpmn-js-behaviors/lib/camunda-cloud';
@@ -19,7 +15,6 @@ import zeebeModdle from 'zeebe-bpmn-moddle/resources/zeebe';
 import customElements from './custom';
 import bcPropertiesProvider from "./properties";
 import bcExtension from '../resources/BC';
-
 
 import $ from 'jquery';
 
@@ -162,6 +157,28 @@ $(function () {
       }
     } catch (err) {
       console.error('Error happened during compilation: ', err);
+    }
+  });
+
+  $('#js-deploy-diagram').click(async function () {
+    try {
+      const { xml } = await bpmnModeler.saveXML({ format: true });
+
+      const response = await fetch('http://localhost:3000/deploy', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ xml })
+      });
+
+      if (response.ok) {
+        alert('Deployment successful');
+      } else {
+        alert('Deployment failed');
+      }
+    } catch (err) {
+      console.error('Error happened during deployment: ', err);
     }
   });
 });

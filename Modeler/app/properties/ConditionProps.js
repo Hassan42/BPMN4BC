@@ -34,27 +34,32 @@ export function ConditionProps(props) {
 
   const entries = [];
 
-  if (getConditionalEventDefinition(element)) {
-    entries.push(...VariableEventProps({ element }));
-  }
+  // if (getConditionalEventDefinition(element)) {
+  //   entries.push(...VariableEventProps({ element }));
+  // }
 
+  // entries.push({
+  //   id: "conditionType",
+  //   component: ConditionType,
+  //   isEdited: isSelectEntryEdited
+  // });
+
+  // const conditionType = getConditionType(element);
   entries.push({
-    id: "conditionType",
-    component: ConditionType,
-    isEdited: isSelectEntryEdited
+    id: "conditionExpression",
+    component: ConditionExpression,
+    isEdited: isTextFieldEntryEdited
   });
 
-  const conditionType = getConditionType(element);
-
-  if (conditionType === "script") {
-    entries.push(...ConditionScriptProps({ element }));
-  } else if (conditionType === "expression") {
-    entries.push({
-      id: "conditionExpression",
-      component: ConditionExpression,
-      isEdited: isTextFieldEntryEdited
-    });
-  }
+  // if (conditionType === "script") {
+  //   entries.push(...ConditionScriptProps({ element }));
+  // } else if (conditionType === "expression") {
+  //   entries.push({
+  //     id: "conditionExpression",
+  //     component: ConditionExpression,
+  //     isEdited: isTextFieldEntryEdited
+  //   });
+  // }
 
   return entries;
 }
@@ -115,7 +120,11 @@ function ConditionExpression(props) {
     debounce = useService("debounceInput");
 
   const getValue = () => {
-    return getConditionExpression(element).get("body");
+    const conditionExpression = getConditionExpression(element);
+    if (conditionExpression && conditionExpression.body !== undefined) {
+      return conditionExpression.body;
+    }
+    return "";
   };
 
   const setValue = (value) => {
@@ -428,7 +437,7 @@ function getConditionType(element) {
   const conditionExpression = getConditionExpression(element);
 
   if (!conditionExpression) {
-    return "";
+    return "expression";
   } else {
     return conditionExpression.get("language") === undefined
       ? "expression"
@@ -445,12 +454,13 @@ function getConditionType(element) {
  */
 function getConditionExpression(element) {
   const businessObject = getBusinessObject(element);
-
+  let conditionExpression;
   if (is(businessObject, "bpmn:SequenceFlow")) {
-    return businessObject.get("conditionExpression");
+    conditionExpression = businessObject.get("conditionExpression");
   } else if (getConditionalEventDefinition(businessObject)) {
-    return getConditionalEventDefinition(businessObject).get("condition");
+    conditionExpression = getConditionalEventDefinition(businessObject).get("condition");
   }
+  return conditionExpression || null; // Return null if undefined
 }
 
 function getScriptType(element) {

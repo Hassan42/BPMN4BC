@@ -5,6 +5,7 @@
 import BcProps from './BcProps';
 import OutputParametersProps from './BcOutputsProps';
 import InputParametersProps from './BcInputsProps';
+import RoleParametersProps from './BcRolesProp';
 
 import { ListGroup } from '@bpmn-io/properties-panel';
 import { is } from 'bpmn-js/lib/util/ModelUtil';
@@ -47,6 +48,7 @@ export default function BcPropertiesProvider(propertiesPanel, injector, translat
       const isScriptTask = is(businessObject, "bpmn:ScriptTask");
       const isSendTask = is(businessObject, "bpmn:SendTask");
       const isFlow = is(businessObject, "bpmn:SequenceFlow");
+      const isCollaboration = is(businessObject, "bpmn:Collaboration");
       const elementParent = element.parent?.businessObject ?? undefined;
 
       //if element is bc or lane in a bc pool
@@ -67,8 +69,13 @@ export default function BcPropertiesProvider(propertiesPanel, injector, translat
         }
       }
       
+      //Using custom condition properties
       if(isFlow){
         groups = groups.filter(group => group.id !== 'condition');
+      }
+
+      if(isCollaboration){
+        groups.push(createBcRoleGroup(element, injector, translate));
       }
 
      
@@ -115,6 +122,18 @@ function createBcOutputGroup(element, injector, translate) {
     label: translate('Outputs'),
     component: ListGroup,
     ...OutputParametersProps({ element, injector })
+  };
+
+  return BcOutputGroup;
+}
+
+function createBcRoleGroup(element, injector, translate) {
+
+  const BcOutputGroup = {
+    id: 'BCRoles',
+    label: translate('Roles'),
+    component: ListGroup,
+    ...RoleParametersProps({ element, injector })
   };
 
   return BcOutputGroup;

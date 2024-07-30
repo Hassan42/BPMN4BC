@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-contract Process_1_DefaultContract {
+contract Process_1u6ic7g_DefaultContract {
     enum State {
         Closed,
         Open,
@@ -16,26 +16,27 @@ contract Process_1_DefaultContract {
         _;
     }
 
-    constructor(address[] memory addresses) {
-        state["Activity_0or79ow"] = State.Open;
+    modifier isSender(address _sender) {
+        require(msg.sender == _sender, "Not the sender");
+        _;
     }
+
+    constructor() {
+        state["Activity_00bmswp"] = State.Closed;
+    }
+
+    function setContracts(address[] memory addresses) public {}
 
     function setState(string memory _activity, uint8 _state) public {
         require(_state <= 3, "Not Valid State");
         state[_activity] = State(_state);
     }
 
-    function Activity_0or79ow() public isOpen("Activity_0or79ow") {
-        if (localStorage.p2 > 3) {
-            Activity_0s5co9l();
-        } else {
-            Activity_1pq06pu();
-        }
-
-        state["Activity_0or79ow"] = State.Completed;
+    function Activity_00bmswp()
+        public
+        isSender(test)
+        isOpen("Activity_00bmswp")
+    {
+        state["Activity_00bmswp"] = State.Completed;
     }
-
-    function Activity_0s5co9l() public {}
-
-    function Activity_1pq06pu() public {}
 }

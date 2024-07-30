@@ -81,12 +81,12 @@ function Sender(props) {
   const debounce = useService('debounceInput');
 
   const getValue = () => {
-    return element.businessObject.bcsenderaddress || '';
+    return element.businessObject.bcsender || '';
   };
 
   const setValue = value => {
     return modeling.updateProperties(element, {
-      bcsenderaddress: value
+      bcsender: value
     });
   };
 

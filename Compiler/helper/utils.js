@@ -270,6 +270,34 @@ const getContractNameForElement = (element, process) => {
     return `${process.id.replace(/\s+/g, '')}_DefaultContract`;
 }
 
+/**
+ * Extracts roles from a given collaboration element.
+ * @param {Object} collaboration - The collaboration element from the BPMN XML.
+ * @returns {Array} An array of role objects, each containing `role`, `address`.
+ * @throws {Error} If the collaboration element does not contain `roleParameters`.
+ */
+const extractRolesFromCollaboration = (collaboration) => {
+    const roleParameters = [];
+
+    if (collaboration.extensionElements && collaboration.extensionElements.values) {
+        const roleParams = collaboration.extensionElements.values.find(extension => extension.$type === 'bpmnbc:RoleParameters');
+        if (roleParams && roleParams.values) {
+            roleParams.values.forEach(param => {
+                if (param.$type === 'bpmnbc:RoleParameter') {
+                    roleParameters.push({
+                        role: param.role || '',
+                        address: param.address || '',
+                    });
+                }
+            });
+        } else {
+            throw new Error('No roleParameters found in the collaboration element.');
+        }
+    }
+
+    return roleParameters;
+}
+
 module.exports = {
     findCollaboration,
     findProcessForParticipant,
@@ -286,5 +314,6 @@ module.exports = {
     formatSolidityCode,
     getContractNameForElement,
     findEventsForProcess,
-    findEventsForLane
+    findEventsForLane,
+    extractRolesFromCollaboration
 };

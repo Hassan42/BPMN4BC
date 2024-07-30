@@ -3,7 +3,7 @@ const {
   extractOutputParameters,
   extractInputParameters,
   isValueType,
-  getContractNameForElement
+  getContractNameForElement,
 } = require('./utils.js');
 
 /**
@@ -32,7 +32,6 @@ function generateFunctionSignatures(solidityCode) {
 
   return functionSignatures.join('\n');
 }
-
 
 /**
  * Generates logic for a Solidity script function.
@@ -103,7 +102,6 @@ function generateScriptFunction(activity) {
   `;
 }
 
-
 /**
  * Parses the encoded return values string and extracts types and variable names.
  * @param {string} encodedString - The encoded return values string.
@@ -131,9 +129,16 @@ function parseReturnValues(encodedString) {
  * @param {Object} process - The process object containing flow elements.
  * @returns {string} The logic for the entry function.
  */
-function generateEntryFunction(activity, process) {
+function generateEntryFunction(activity, process, roles) {
   const contractName = getContractNameForElement(activity, process);
-  const proceedingElements = activity.outgoing.flatMap(flow => getProceedingElementsFromFlow(flow, process));
+  const senderRole =  activity.bcsender?.replace(/\s+/g, '') || '';
+  const senderAddress = roles.find(r => r.role === senderRole)?.address.replace(/\s+/g, '') || '';
+
+  if (!senderRole || !senderAddress) {
+    throw new Error(`Sender role or address not defined in actvitiy ${activity.id}.`);
+  }
+
+  const proceedingElements = activity.outgoing?.flatMap(flow => getProceedingElementsFromFlow(flow, process)) || [];
   const outputParameters = extractOutputParameters(activity);
 
   const externalParams = outputParameters
@@ -297,13 +302,12 @@ function generateEntryFunction(activity, process) {
         proceedingLogic += `// Logic for ${element.name || element.id}\n`;
     }
   }
-
   proceedingElements.forEach(element => {
     processElement(element);
   });
 
   return `
-    function ${activity.id.replace(/\s+/g, '')}(${externalParams}) public isOpen("${activity.id.replace(/\s+/g, '')}") {
+    function ${activity.id.replace(/\s+/g, '')}(${externalParams}) public isSender(${senderAddress}) isOpen("${activity.id.replace(/\s+/g, '')}") {
         ${storageAssignments}
         ${transactionalAssignments}
         ${proceedingLogic}
@@ -317,7 +321,7 @@ function generateEntryFunction(activity, process) {
  * @param {Array} activities - The list of activities.
  * @returns {Array} The list of generated Solidity functions.
  */
-function generateFunctions(activities, process) {
+function generateFunctions(activities, process, roles) {
   let functions = [];
 
   activities.forEach(activity => {
@@ -328,7 +332,7 @@ function generateFunctions(activities, process) {
         functionLogic = generateScriptFunction(activity);
         break;
       case 'bpmn:ReceiveTask':
-        functionLogic = generateEntryFunction(activity, process);
+        functionLogic = generateEntryFunction(activity, process, roles);
         break;
       default:
         throw new Error(`Task type ${activity.$type} not supported`);

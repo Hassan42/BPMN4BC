@@ -33,7 +33,7 @@
             "type": "String"
           },
           {
-            "name": "bcsenderaddress",
+            "name": "bcsender",
             "isAttr": true,
             "type": "String"
           },
@@ -92,6 +92,17 @@
         ]
       },
       {
+        "name": "RoleParameters",
+        "superClass": [ "Element" ],
+        "properties": [
+          {
+            "name": "values",
+            "isMany": true,
+            "type": "RoleParameter"
+          }
+        ]
+      },
+      {
         "name": "OutputParameter",
         "properties": [
           {
@@ -136,6 +147,21 @@
           },
           {
             "name": "type",
+            "isAttr": true,
+            "type": "String"
+          }
+        ]
+      },
+      {
+        "name": "RoleParameter",
+        "properties": [
+          {
+            "name": "role",
+            "isAttr": true,
+            "type": "String"
+          },
+          {
+            "name": "address",
             "isAttr": true,
             "type": "String"
           }

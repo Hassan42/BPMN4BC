@@ -17,9 +17,18 @@ export function getOutputParameters(element) {
   return parameters && parameters.get('values');
 }
 
-
 export function getInputParameters(element) {
   const parameters = getInputParametersExtension(element);
+  return parameters && parameters.get('values');
+}
+
+export function getRolesExtension(element) {
+  const businessObject = getBusinessObject(element);
+  return getExtension(businessObject, 'bpmnbc:RoleParameters');
+}
+
+export function getRoleParameters(element) {
+  const parameters = getRolesExtension(element);
   return parameters && parameters.get('values');
 }
 
@@ -52,6 +61,9 @@ export function createInputParameters(properties, parent, bpmnFactory) {
   return createElement('bpmnbc:InputParameters', properties, parent, bpmnFactory);
 }
 
+export function createRoleParameters(properties, parent, bpmnFactory) {
+  return createElement('bpmnbc:RoleParameters', properties, parent, bpmnFactory);
+}
 
 export function nextId(prefix) {
   const ids = new Ids([ 32,32,1 ]);

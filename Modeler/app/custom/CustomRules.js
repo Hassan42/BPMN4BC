@@ -87,18 +87,14 @@ CustomRules.prototype.init = function () {
       return false; 
     }
 
-
     // Assign role to the receive task
     if (is(sourceBo, "bpmn:SendTask") && is(targetBo, "bpmn:ReceiveTask") && (bcSource === "true") && (bcTarget === "true")) {
       let participantRole = source.parent && source.parent.businessObject.name;
       if (participantRole) {
-        targetBo.bcsenderaddress = participantRole;
+        targetBo.bcsender = participantRole;
         sourceBo.bcid = targetBo.bcid;
       }
     }
-
-
-
     return;
   });
 };

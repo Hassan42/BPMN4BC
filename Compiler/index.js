@@ -22,8 +22,8 @@ app.post('/compile', async (req, res) => {
     await cleanOutputDirectories();
 
     const { rootElement: definitions } = await moddle.fromXML(xml);
-    generateContracts(definitions);
-    res.status(200).send('Compilation successful');
+    const contracts = await generateContracts(definitions);
+    res.status(200).json(contracts);
   } catch (err) {
     console.error('Error during compilation:', err);
     res.status(500).send('Compilation failed');
