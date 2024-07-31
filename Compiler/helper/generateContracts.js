@@ -26,6 +26,7 @@ async function generateContract(contractName, activities, gateways, lanes, event
     .flat();
 
   const receiveFunctionNames = activities.filter(activity => activity.$type === 'bpmn:ReceiveTask').map(activity => activity.id.replace(/\s+/g, ''));
+  const receiveFunctionCount = receiveFunctionNames.length || 0;
   const stateMappings = receiveFunctionNames.map(name => {
     return startEventIds.includes(name) ? `state["${name}"] = State.Open;` : `state["${name}"] = State.Closed;`;
   }).join('\n');
@@ -44,17 +45,22 @@ async function generateContract(contractName, activities, gateways, lanes, event
   ${contractsImports}
   contract ${contractName} {
       enum State { Closed, Open, Completed }
+
       mapping(string => State) public state;
 
+      uint receiveFunctionCount = ${receiveFunctionCount};
+
       mapping(string => address) public contracts;
+
+      mapping(address => string) public addressToRole;
 
       modifier isOpen(string memory _activity) {
         require(state[_activity] == State.Open, "Activity is not open");
           _;
       }
 
-      modifier isSender(address _sender) {
-        require(msg.sender == _sender, "Not the sender");
+      modifier isSender(string memory _role) {
+        require(compareStrings(addressToRole[msg.sender], _role), "Caller does not have the required role");
         _;
       }
 
@@ -63,16 +69,32 @@ async function generateContract(contractName, activities, gateways, lanes, event
 
       constructor() {
           ${stateMappings}
-
       }
 
       function setContracts(address[] memory addresses) public{
           ${contractsMapping}
       }
 
+      function setResources(string[] memory roles, address[] memory addresses) public {
+        require(roles.length == addresses.length, "Roles and addresses arrays must be of the same length");
+
+        for (uint i = 0; i < addresses.length; i++) {
+            addressToRole[addresses[i]] = roles[i];
+        }
+      }
+
       function setState(string memory _activity, uint8 _state) public {
         require(_state <= 3, "Not Valid State");
         state[_activity] = State(_state);
+      }
+
+      function getState(string memory _activity) public view returns (State) {
+        return state[_activity];
+      }
+
+      //To be replaced with ENUM
+      function compareStrings(string memory a, string memory b) internal pure returns (bool) {
+        return keccak256(abi.encodePacked(a)) == keccak256(abi.encodePacked(b));
       }
 
       ${functions}

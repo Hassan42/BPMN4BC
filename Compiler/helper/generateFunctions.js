@@ -132,10 +132,11 @@ function parseReturnValues(encodedString) {
 function generateEntryFunction(activity, process, roles) {
   const contractName = getContractNameForElement(activity, process);
   const senderRole =  activity.bcsender?.replace(/\s+/g, '') || '';
+  //We assign addresses dynamically on deployment
   const senderAddress = roles.find(r => r.role === senderRole)?.address.replace(/\s+/g, '') || '';
 
-  if (!senderRole || !senderAddress) {
-    throw new Error(`Sender role or address not defined in actvitiy ${activity.id}.`);
+  if (!senderRole) {
+    throw new Error(`Sender role is not defined in actvitiy ${activity.id}.`);
   }
 
   const proceedingElements = activity.outgoing?.flatMap(flow => getProceedingElementsFromFlow(flow, process)) || [];
@@ -307,7 +308,7 @@ function generateEntryFunction(activity, process, roles) {
   });
 
   return `
-    function ${activity.id.replace(/\s+/g, '')}(${externalParams}) public isSender(${senderAddress}) isOpen("${activity.id.replace(/\s+/g, '')}") {
+    function ${activity.id.replace(/\s+/g, '')}(${externalParams}) public isSender("${senderRole}") isOpen("${activity.id.replace(/\s+/g, '')}") {
         ${storageAssignments}
         ${transactionalAssignments}
         ${proceedingLogic}

@@ -160,11 +160,11 @@ $(function () {
     }
   });
 
-  $('#js-deploy-diagram').click(async function () {
+  $('#js-execute-diagram').click(async function () {
     try {
       const { xml } = await bpmnModeler.saveXML({ format: true });
 
-      const response = await fetch('http://localhost:3000/deploy', {
+      const response = await fetch('http://localhost:3000/execute', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -173,12 +173,12 @@ $(function () {
       });
 
       if (response.ok) {
-        alert('Deployment successful');
+        alert('Execution successful');
       } else {
-        alert('Deployment failed');
+        alert('Execution failed');
       }
     } catch (err) {
-      console.error('Error happened during deployment: ', err);
+      console.error('Error happened during execution: ', err);
     }
   });
 });
