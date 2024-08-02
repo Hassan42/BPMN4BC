@@ -14,6 +14,8 @@
     "hardhat": "^2.22.6"
   },
   "dependencies": {
+    "@ethersproject/providers": "^5.7.2",
+    "axios": "^1.7.3",
     "cors": "^2.8.5",
     "dockerode": "^4.0.2",
     "eth-gas-reporter": "^0.2.25",

@@ -1,13 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
-
-contract Process_1_DefaultContract {
+import "./ILane_03zow9n_Contract.sol";
+import "./ILane_0sutvb9_Contract.sol";
+import "./ILane_1j6rnt7_Contract.sol";
+contract Lane_0sutvb9_Contract {
     enum State {
         Closed,
         Open,
         Completed
     }
+
     mapping(string => State) public state;
+
+    uint receiveFunctionCount = 1;
 
     mapping(string => address) public contracts;
 
@@ -27,10 +32,14 @@ contract Process_1_DefaultContract {
     }
 
     constructor() {
-        state["Activity_1nhshfn"] = State.Open;
+        state["Activity_1yapod5"] = State.Open;
     }
 
-    function setContracts(address[] memory addresses) public {}
+    function setContracts(address[] memory addresses) public {
+        contracts["Lane_03zow9n_Contract"] = addresses[0];
+        contracts["Lane_0sutvb9_Contract"] = addresses[1];
+        contracts["Lane_1j6rnt7_Contract"] = addresses[2];
+    }
 
     function setResources(
         string[] memory roles,
@@ -51,6 +60,10 @@ contract Process_1_DefaultContract {
         state[_activity] = State(_state);
     }
 
+    function getState(string memory _activity) public view returns (State) {
+        return state[_activity];
+    }
+
     //To be replaced with ENUM
     function compareStrings(
         string memory a,
@@ -59,11 +72,11 @@ contract Process_1_DefaultContract {
         return keccak256(abi.encodePacked(a)) == keccak256(abi.encodePacked(b));
     }
 
-    function Activity_1nhshfn()
+    function Activity_1yapod5()
         public
-        isSender("Test")
-        isOpen("Activity_1nhshfn")
+        isSender("test")
+        isOpen("Activity_1yapod5")
     {
-        state["Activity_1nhshfn"] = State.Completed;
+        state["Activity_1yapod5"] = State.Completed;
     }
 }

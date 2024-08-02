@@ -1,24 +1,24 @@
 const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
-const fs = require('fs');
+const fs = require('fs-extra');
 const path = require('path');
 const Docker = require('dockerode');
+const hardhat = require('hardhat');
+const{executeHardhatTask} = require('./utils');
 
 const app = express();
 const port = 3000;
+
 const compilerPort = 8000;
+const contractsDir = path.resolve('./contracts');
 
-app.use(cors());
-app.use(express.json());
-
-// Initialize Docker client
-const docker = new Docker();
-
-// Define Docker container name
+const docker = new Docker(); // Initialize Docker client
 const containerName = 'ganache';
 const containerPort = '8545';
 
+app.use(cors());
+app.use(express.json());
 app.use(express.json());
 
 // Start Ganache container
@@ -80,21 +80,56 @@ app.post('/stop', async (req, res) => {
 app.post('/execute', async (req, res) => {
   const { xml } = req.body;
 
+  await cleanOutputDirectories();
+
   try {
     // Call the compile route to generate the contracts
     const response = await axios.post(`http://localhost:${compilerPort}/compile`, { xml });
     const contracts = response.data;
 
+    // Ensure the contracts directory exists
+    if (!fs.existsSync(contractsDir)) {
+      fs.mkdirSync(contractsDir, { recursive: true });
+    }
+
+    // Convert the object to a JSON string
+    const contractsJsonPath = path.join(contractsDir, 'contracts_meta.json');
+    const contractsJson = JSON.stringify(contracts, null, 2);
+
+    // Write the JSON string to a file
+    fs.writeFileSync(contractsJsonPath, contractsJson, 'utf8');
+    console.log(`wrote JSON file to ${contractsJsonPath}`);
+
     // Save the contracts and interfaces in the specified folder
     contracts.forEach(contract => {
-      const contractPath = path.resolve('./contracts', `${contract.contractName}.sol`);
+      const contractPath = path.join(contractsDir, `${contract.contractName}.sol`);
       fs.writeFileSync(contractPath, contract.contract, 'utf8');
+      console.log(`wrote contract file to ${contractPath}`);
 
-      const interfacePath = path.resolve('./contracts', `I${contract.contractName}.sol`);
+      const interfacePath = path.join(contractsDir, `I${contract.contractName}.sol`);
       fs.writeFileSync(interfacePath, contract.interface, 'utf8');
+      console.log(`wrote interface file to ${interfacePath}`);
     });
 
-    console.log('Execution Successful.')
+    //Compilation
+    console.log('Compiling started...');
+    const compileResult = await executeHardhatTask('compile', 'ganache');
+    console.log('Compilation successful!');
+    console.log('Compile Output:', compileResult);
+
+
+    //Deployment
+    console.log('Deployment started...');
+    const deployResult = await executeHardhatTask('deploy-contracts', 'ganache');
+    console.log('Deployment successful!');
+    console.log('Deploy Output:', deployResult);
+
+    //Execution
+    console.log('Execution started...');
+    const executionResult = await executeHardhatTask('execute', 'ganache');
+    console.log('Execution successful!');
+    console.log('Execution Output:', executionResult);
+
     res.status(200).send('Contracts executed successfully');
   } catch (err) {
     console.error('Error during execution:', err);
@@ -105,3 +140,18 @@ app.post('/execute', async (req, res) => {
 app.listen(port, () => {
   console.log(`Server listening at http://localhost:${port}`);
 });
+
+
+//Clean contracts dir
+const cleanOutputDirectories = async () => {
+
+  try {
+    // Ensure directories exist
+    await fs.ensureDir(contractsDir);
+
+    // Clean directories
+    await fs.emptyDir(contractsDir);
+  } catch (err) {
+    console.error('Error cleaning output directories:', err);
+  }
+};

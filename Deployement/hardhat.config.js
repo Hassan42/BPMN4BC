@@ -1,5 +1,6 @@
 require("@nomicfoundation/hardhat-toolbox");
-
+require('./tasks/deployContractsTask');
+require('./tasks/execute');
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
   networks: {

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-interface IProcess_1_DefaultContract {
+interface ILane_0sutvb9_Contract {
     enum State {
         Closed,
         Open,
@@ -13,7 +13,7 @@ interface IProcess_1_DefaultContract {
         address[] memory addresses
     ) external;
     function setState(string memory _activity, uint8 _state) external;
-    function getState(string memory _activity) external returns (State memory);
+    function getState(string memory _activity) external returns (State);
     function compareStrings(
         string memory a,
         string memory b

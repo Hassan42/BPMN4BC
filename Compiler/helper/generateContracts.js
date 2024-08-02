@@ -36,7 +36,7 @@ async function generateContract(contractName, activities, gateways, lanes, event
   }).join('\n');
 
   const contractsImports = lanes.map((lane, index) => {
-    return `import '../interfaces/I${lane.id}_Contract.sol';`;
+    return `import './I${lane.id}_Contract.sol';`;
   }).join('\n');
   
   const solidityCode = `
