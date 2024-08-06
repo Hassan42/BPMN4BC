@@ -23,26 +23,6 @@ const writeContractsFile = (contracts) => {
     fs.writeFileSync(contractsJsonPath, JSON.stringify(contracts, null, 2), 'utf8');
 };
 
-// Define contract management functions
-const addContract = (contractName, contractCode, contractInterface) => {
-    const contracts = readContractsFile();
-
-    // Check if the contract name already exists
-    const existingContract = contracts.find(c => c.contractName === contractName);
-    if (existingContract) {
-        throw new Error(`Contract name ${contractName} already exists.`);
-    }
-
-    // Add the new contract
-    contracts.push({
-        contractName,
-        contract: contractCode,
-        interface: contractInterface
-    });
-
-    writeContractsFile(contracts);
-};
-
 const updateContractAddress = (contractName, newAddress) => {
     const contracts = readContractsFile();
     const contract = contracts.find(c => c.contractName === contractName);
@@ -58,7 +38,7 @@ const updateContractAddress = (contractName, newAddress) => {
 };
 
 const getContractByName = (contractName) => {
-    const contracts = readContractsFile();
+    const contracts = getAllContracts();
     const contract = contracts.find(c => c.contractName === contractName);
     if (!contract) {
         throw new Error(`Contract name "${contractName}" not found.`);
@@ -67,13 +47,170 @@ const getContractByName = (contractName) => {
 };
 
 const getContractByAddress = (contractAddress) => {
-    const contracts = readContractsFile();
+    const contracts = getAllContracts();
     const contract = contracts.find(c => c.address === contractAddress);
     if (!contract) {
         throw new Error(`Contract address "${contractAddress}" not found.`);
     }
     return contract;
 };
+
+const getContractsAddresses = () => {
+    const contracts = getAllContracts();
+
+    const missingAddresses = contracts.filter(contract => !contract.address);
+
+    //No missing address is allowed
+    if (missingAddresses.length > 0) {
+        throw new Error(`The following contracts are missing addresses: ${missingAddresses.map(c => c.contractName).join(', ')}`);
+    }
+
+    const addresses = contracts.map(contract => contract.address);
+
+    return addresses;
+}
+
+// Get all roles from all contracts
+const getAllRoles = () => {
+    const contracts = getAllContracts();
+    const rolesSet = new Set();
+
+    contracts.forEach(contract => {
+        if (contract.contractRoles && Array.isArray(contract.contractRoles)) {
+            contract.contractRoles.forEach(roleObject => {
+                if (roleObject.role) {
+                    rolesSet.add(roleObject.role);
+                }
+            });
+        }
+    });
+
+    return Array.from(rolesSet);
+};
+
+// Get all tasks from all contracts grouped by contract name
+const getAllTasks = () => {
+    // Retrieve all contracts
+    const contracts = getAllContracts();
+
+    const tasksByContract = {};
+
+    // Iterate over each contract
+    contracts.forEach(contract => {
+        if (contract.receiveTasks && Array.isArray(contract.receiveTasks)) {
+            // Initialize an empty array for the contract if not already present
+            if (!tasksByContract[contract.contractName]) {
+                tasksByContract[contract.contractName] = [];
+            }
+
+            // Add each task to the corresponding contract's array
+            contract.receiveTasks.forEach(task => {
+                tasksByContract[contract.contractName].push(task);
+            });
+        }
+    });
+
+    return tasksByContract;
+};
+
+
+// Get all task IDs from specific contracts
+const getAllTaskIds = (contractName) => {
+    if (!contractName) {
+        throw new Error('Contract name must be provided.');
+    }
+
+    // Retrieve all contracts
+    const contracts = getAllContracts();
+
+    // Find the contract by name
+    const contract = contracts.find(c => c.contractName === contractName);
+
+    // Throw an error if the contract is not found
+    if (!contract) {
+        throw new Error(`Contract with name "${contractName}" not found.`);
+    }
+
+    // Extract task IDs from the found contract
+    if (contract.receiveTasks && Array.isArray(contract.receiveTasks)) {
+        // Create a set of unique task IDs
+        const taskIdsSet = new Set(contract.receiveTasks.map(task => task.id).filter(id => id));
+
+        // Return task IDs as an array
+        return Array.from(taskIdsSet);
+    }
+
+    // If the contract has no tasks, return an empty array
+    return [];
+};
+// Update the state of a task by its ID
+const updateTaskState = (contractName, taskId, newState) => {
+    // Read and parse the existing contracts file
+    const contracts = getAllContracts();
+
+    // Find the contract by name
+    const contract = contracts.find(c => c.contractName === contractName);
+
+    // If the contract is not found, throw an error
+    if (!contract) {
+        throw new Error(`Contract with name "${contractName}" not found.`);
+    }
+
+    // Ensure the contract has a tasks array
+    if (!contract.receiveTasks || !Array.isArray(contract.receiveTasks)) {
+        throw new Error(`No tasks found for contract "${contractName}".`);
+    }
+
+    // Find the task by ID
+    const task = contract.receiveTasks.find(task => task.id === taskId);
+
+    // If the task is not found, throw an error
+    if (!task) {
+        throw new Error(`Task ID "${taskId}" not found in contract "${contractName}".`);
+    }
+
+    // Update the task state
+    task.state = newState;
+
+    // Write the updated contracts object back to the file
+    writeContractsFile(contracts);
+};
+
+
+
+// Add or update a role with an address
+const updateRoleAddress = (contractName, roleName, address) => {
+    // Read and parse the existing contracts file
+    const contracts = readContractsFile();
+
+    // Find the contract by name
+    const contract = contracts.find(c => c.contractName === contractName);
+
+    // If the contract is not found, throw an error
+    if (!contract) {
+        throw new Error(`Contract name "${contractName}" not found.`);
+    }
+
+    // Ensure the contract has a roles array
+    if (!Array.isArray(contract.contractRoles)) {
+        contract.contractRoles = [];
+    }
+
+    // Check if the role already exists
+    const existingRole = contract.contractRoles.find(role => role.role === roleName);
+
+    if (existingRole) {
+        // Update the existing role's address
+        existingRole.address = address;
+    } else {
+        // Add a new role with the address
+        contract.contractRoles.push({ role: roleName, address });
+    }
+
+    // Write the updated contracts object back to the file
+    writeContractsFile(contracts);
+};
+
 
 // New function to get all contracts
 const getAllContracts = () => {
@@ -82,11 +219,16 @@ const getAllContracts = () => {
 
 // Export the contract management functions
 const createContractManager = () => ({
-    addContract,
     updateContractAddress,
     getContractByName,
     getContractByAddress,
-    getAllContracts
+    getAllRoles,
+    getContractsAddresses,
+    getAllContracts,
+    updateRoleAddress,
+    getAllTasks,
+    getAllTaskIds,
+    updateTaskState
 });
 
 module.exports = createContractManager;

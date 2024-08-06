@@ -1,4 +1,4 @@
-const { findCollaboration, findProcessForParticipant, findLanesForProcess, findActivitiesForLane, findActivitiesForProcess, findGatewaysForProcess, findGatewaysForLane, formatSolidityCode, findEventsForProcess, findEventsForLane, extractRolesFromCollaboration } = require('./utils.js');
+const { generateContractMeta, findCollaboration, findProcessForParticipant, findLanesForProcess, findActivitiesForLane, findActivitiesForProcess, findGatewaysForProcess, findGatewaysForLane, formatSolidityCode, findEventsForProcess, findEventsForLane, extractRolesFromCollaboration } = require('./utils.js');
 const { generateFunctions, generateFunctionSignatures } = require('./generateFunctions.js');
 const { generateStorage } = require('./generateStorage.js');
 const { generateGateways } = require('./generateGateways.js');
@@ -25,8 +25,11 @@ async function generateContract(contractName, activities, gateways, lanes, event
     .map(startEvent => startEvent.outgoing.map(flow => flow.targetRef.id))
     .flat();
 
-  const receiveFunctionNames = activities.filter(activity => activity.$type === 'bpmn:ReceiveTask').map(activity => activity.id.replace(/\s+/g, ''));
+  const receiveTasks = activities.filter(activity => activity.$type === 'bpmn:ReceiveTask');
+  const receiveFunctionNames = receiveTasks.map(activity => activity.id.replace(/\s+/g, ''));
+
   const receiveFunctionCount = receiveFunctionNames.length || 0;
+
   const stateMappings = receiveFunctionNames.map(name => {
     return startEventIds.includes(name) ? `state["${name}"] = State.Open;` : `state["${name}"] = State.Closed;`;
   }).join('\n');
@@ -54,14 +57,10 @@ async function generateContract(contractName, activities, gateways, lanes, event
 
       mapping(address => string) public addressToRole;
 
-      modifier isOpen(string memory _activity) {
+      modifier isAccessible(string memory _activity, string memory _role) {
         require(state[_activity] == State.Open, "Activity is not open");
-          _;
-      }
-
-      modifier isSender(string memory _role) {
         require(compareStrings(addressToRole[msg.sender], _role), "Caller does not have the required role");
-        _;
+          _;
       }
 
       ${solidityEvents}
@@ -75,12 +74,16 @@ async function generateContract(contractName, activities, gateways, lanes, event
           ${contractsMapping}
       }
 
-      function setResources(string[] memory roles, address[] memory addresses) public {
-        require(roles.length == addresses.length, "Roles and addresses arrays must be of the same length");
-
-        for (uint i = 0; i < addresses.length; i++) {
-            addressToRole[addresses[i]] = roles[i];
+      function setResources(string[] memory _roles, address[] memory _addresses) public {
+        require(_roles.length == _addresses.length, "Roles and addresses arrays must be of the same length");
+      
+        for (uint i = 0; i < _addresses.length; i++) {
+            addressToRole[_addresses[i]] = _roles[i];
         }
+      }
+
+      function setResource(string memory _role, address _address) public {
+        addressToRole[_address] = _role;
       }
 
       function setState(string memory _activity, uint8 _state) public {
@@ -108,7 +111,9 @@ async function generateContract(contractName, activities, gateways, lanes, event
     const outputPath = path.resolve('./output/contracts', `${contractName}.sol`);
     fs.writeFileSync(outputPath, formattedSolidityCode, 'utf8');
     console.log(`Generated Solidity contract: ${contractName}`);
-    return {contractName: contractName, contract: formattedSolidityCode, interface: formattedSolidityInterface};
+    const contractMeta = generateContractMeta(contractName, receiveTasks, roles, startEventIds, formattedSolidityCode, formattedSolidityInterface);
+    return contractMeta;
+    // return {contractName: contractName, contract: formattedSolidityCode, interface: formattedSolidityInterface, contractRoles: contractRoles, TaskToRole: receiveTaskToRoleMap};
   } catch (error) {
     throw('Error formatting or writing Solidity code:', error);
   }

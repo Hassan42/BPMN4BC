@@ -5,6 +5,7 @@ const fs = require('fs-extra');
 const path = require('path');
 const Docker = require('dockerode');
 const hardhat = require('hardhat');
+const createContractManager = require('./contractsManager');
 const{executeHardhatTask} = require('./utils');
 
 const app = express();
@@ -76,6 +77,28 @@ app.post('/stop', async (req, res) => {
   }
 });
 
+
+app.get('/query', async (req, res) => {
+  try {
+
+      const contractManager = createContractManager();
+
+      // Execute the Hardhat task
+      await executeHardhatTask('query-contracts', 'ganache');
+      
+      // Send successful response
+      console.log('Query successful!');
+      const tasks = contractManager.getAllTasks();
+      console.log('Query Output:', tasks);
+      res.status(200).json({ result: tasks});
+  } catch (err) {
+      // Handle errors and send error response
+      console.error('Error executing Hardhat task:', err);
+      res.status(500).json({ message: 'An error occurred.'});
+  }
+});
+
+
 //Deploy route to compile and save the generated contracts
 app.post('/execute', async (req, res) => {
   const { xml } = req.body;
@@ -103,11 +126,11 @@ app.post('/execute', async (req, res) => {
     // Save the contracts and interfaces in the specified folder
     contracts.forEach(contract => {
       const contractPath = path.join(contractsDir, `${contract.contractName}.sol`);
-      fs.writeFileSync(contractPath, contract.contract, 'utf8');
+      fs.writeFileSync(contractPath, contract.contractCode, 'utf8');
       console.log(`wrote contract file to ${contractPath}`);
 
       const interfacePath = path.join(contractsDir, `I${contract.contractName}.sol`);
-      fs.writeFileSync(interfacePath, contract.interface, 'utf8');
+      fs.writeFileSync(interfacePath, contract.contractInterface, 'utf8');
       console.log(`wrote interface file to ${interfacePath}`);
     });
 
@@ -115,20 +138,23 @@ app.post('/execute', async (req, res) => {
     console.log('Compiling started...');
     const compileResult = await executeHardhatTask('compile', 'ganache');
     console.log('Compilation successful!');
-    console.log('Compile Output:', compileResult);
+    console.log('Compile Output:');
+    console.log(compileResult);
 
 
     //Deployment
     console.log('Deployment started...');
     const deployResult = await executeHardhatTask('deploy-contracts', 'ganache');
     console.log('Deployment successful!');
-    console.log('Deploy Output:', deployResult);
+    console.log('Deploy Output:');
+    console.log(deployResult);
 
     //Execution
     console.log('Execution started...');
-    const executionResult = await executeHardhatTask('execute', 'ganache');
+    const executionResult = await executeHardhatTask('execute-contracts', 'ganache');
     console.log('Execution successful!');
-    console.log('Execution Output:', executionResult);
+    console.log('Execution Output:');
+    console.log(executionResult);
 
     res.status(200).send('Contracts executed successfully');
   } catch (err) {

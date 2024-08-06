@@ -13,7 +13,7 @@ const {
  */
 function generateFunctionSignatures(solidityCode) {
   const functionSignatures = [];
-  const functionRegex = /function\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(([^)]*)\)\s*(public|external|internal|private)?\s*([a-zA-Z0-9_()"]+)?\s*(returns\s*\([^)]*\))?\s*{/g;
+  const functionRegex = /function\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(([^)]*)\)\s*(public|external|internal|private)?\s*([\w\s()".,]*?)\s*(returns\s*\([^)]*\))?\s*({|;)/g;
   let match;
 
   while ((match = functionRegex.exec(solidityCode)) !== null) {
@@ -133,7 +133,7 @@ function generateEntryFunction(activity, process, roles) {
   const contractName = getContractNameForElement(activity, process);
   const senderRole =  activity.bcsender?.replace(/\s+/g, '') || '';
   //We assign addresses dynamically on deployment
-  const senderAddress = roles.find(r => r.role === senderRole)?.address.replace(/\s+/g, '') || '';
+  // const senderAddress = roles.find(r => r.role === senderRole)?.address.replace(/\s+/g, '') || '';
 
   if (!senderRole) {
     throw new Error(`Sender role is not defined in actvitiy ${activity.id}.`);
@@ -308,7 +308,7 @@ function generateEntryFunction(activity, process, roles) {
   });
 
   return `
-    function ${activity.id.replace(/\s+/g, '')}(${externalParams}) public isSender("${senderRole}") isOpen("${activity.id.replace(/\s+/g, '')}") {
+    function ${activity.id.replace(/\s+/g, '')}(${externalParams}) public isAccessible("${senderRole}", "${activity.id.replace(/\s+/g, '')}") {
         ${storageAssignments}
         ${transactionalAssignments}
         ${proceedingLogic}

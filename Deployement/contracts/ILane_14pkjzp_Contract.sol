@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-interface ILane_0sutvb9_Contract {
+interface ILane_14pkjzp_Contract {
     enum State {
         Closed,
         Open,
@@ -9,13 +9,15 @@ interface ILane_0sutvb9_Contract {
     }
     function setContracts(address[] memory addresses) external;
     function setResources(
-        string[] memory roles,
-        address[] memory addresses
+        string[] memory _roles,
+        address[] memory _addresses
     ) external;
+    function setResource(string memory _role, address _address) external;
     function setState(string memory _activity, uint8 _state) external;
     function getState(string memory _activity) external returns (State);
     function compareStrings(
         string memory a,
         string memory b
     ) external returns (bool);
+    function Activity_0swvw0f() external;
 }

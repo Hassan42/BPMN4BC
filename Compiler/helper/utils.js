@@ -237,7 +237,7 @@ const extractInputParameters = (activity) => {
  * @returns {boolean} True if the type is a value type, false otherwise.
  */
 const isValueType = (type) => {
-    const valueTypes = ['uint'];
+    const valueTypes = ['uint', 'address'];
     return valueTypes.some(valueType => type.startsWith(valueType));
 }
 
@@ -298,6 +298,34 @@ const extractRolesFromCollaboration = (collaboration) => {
     return roleParameters;
 }
 
+const generateContractMeta = (contractName, receiveTasks, roles, startEventIds, formattedSolidityCode, formattedSolidityInterface) => {
+
+    const receiveTaskRoles = new Set(receiveTasks.map(task => task.bcsender));
+
+    // Filter roles based on those used in ReceiveTasks and format as an array of objects
+    const contractRoles = roles
+        .filter(role => receiveTaskRoles.has(role.role))
+        .map(role => ({ role: role.role }));
+
+
+    // Create an array to store receive tasks info
+    const receiveTasksInfo = receiveTasks.map(task => ({
+        id: task.id.replace(/\s+/g, ''), // Remove whitespace from task ID
+        sender: task.bcsender,
+        name: task.name || '',
+        state: startEventIds.includes(task.id.replace(/\s+/g, '')) ? 'Open' : `Closed`
+    }));
+
+
+    return {
+        contractName: contractName,
+        contractRoles: contractRoles,
+        receiveTasks: receiveTasksInfo,
+        contractCode: formattedSolidityCode,
+        contractInterface: formattedSolidityInterface
+    };
+}
+
 module.exports = {
     findCollaboration,
     findProcessForParticipant,
@@ -315,5 +343,6 @@ module.exports = {
     getContractNameForElement,
     findEventsForProcess,
     findEventsForLane,
-    extractRolesFromCollaboration
+    extractRolesFromCollaboration,
+    generateContractMeta
 };
