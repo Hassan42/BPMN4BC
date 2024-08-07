@@ -159,12 +159,11 @@ $(function () {
       console.error('Error happened during compilation: ', err);
     }
   });
-
-  $('#js-execute-diagram').click(async function () {
+  $('#js-deploy-diagram').click(async function () {
     try {
       const { xml } = await bpmnModeler.saveXML({ format: true });
 
-      const response = await fetch('http://localhost:3000/execute', {
+      const response = await fetch('http://localhost:3000/deploy', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -173,12 +172,12 @@ $(function () {
       });
 
       if (response.ok) {
-        alert('Execution successful');
+        alert('Deployment successful');
       } else {
-        alert('Execution failed');
+        alert('Deployment failed');
       }
     } catch (err) {
-      console.error('Error happened during execution: ', err);
+      console.error('Error happened during deployment: ', err);
     }
   });
 });

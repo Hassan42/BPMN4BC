@@ -217,6 +217,50 @@ const getAllContracts = () => {
     return readContractsFile();
 };
 
+
+const getTaskById = (contractName, taskId) => {
+    const contracts = getAllContracts();
+
+    // Find the contract by name
+    const contract = contracts.find(c => c.contractName === contractName);
+
+    if (!contract) {
+        throw new Error(`Contract with name "${contractName}" not found.`);
+    }
+
+    // Find the task by ID
+    const task = contract.receiveTasks && contract.receiveTasks.find(task => task.id === taskId);
+
+    if (!task) {
+        throw new Error(`Task ID "${taskId}" not found in contract "${contractName}".`);
+    }
+
+    // Return the task object
+    return task;
+};
+
+const getAddressByRole = (contractName, roleName) => {
+    const contracts = getAllContracts();
+
+    // Find the contract by name
+    const contract = contracts.find(c => c.contractName === contractName);
+
+    if (!contract) {
+        throw new Error(`Contract with name "${contractName}" not found.`);
+    }
+
+    // Find the role by name
+    const role = contract.contractRoles && contract.contractRoles.find(role => role.role === roleName);
+
+    if (!role) {
+        throw new Error(`Role "${roleName}" not found in contract "${contractName}".`);
+    }
+
+    // Return the address associated with the role
+    return role.address;
+};
+
+
 // Export the contract management functions
 const createContractManager = () => ({
     updateContractAddress,
@@ -228,7 +272,9 @@ const createContractManager = () => ({
     updateRoleAddress,
     getAllTasks,
     getAllTaskIds,
-    updateTaskState
+    updateTaskState,
+    getTaskById,
+    getAddressByRole
 });
 
 module.exports = createContractManager;

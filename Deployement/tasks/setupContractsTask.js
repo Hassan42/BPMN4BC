@@ -2,7 +2,7 @@ const { task } = require('hardhat/config');
 const createContractManager = require('../contractsManager'); // Adjust the path to your contractsManager file
 const {setContracts, setResources} = require('../scripts/helper.js');
 
-task('execute-contracts', 'Execute the contracts')
+task('setup-contracts', 'Execute the contracts')
   .setAction(async (taskArgs, { ethers }) => {
     const contractManager = createContractManager();
 

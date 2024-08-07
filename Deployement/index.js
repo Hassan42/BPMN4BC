@@ -55,6 +55,8 @@ app.post('/start', async (req, res) => {
 // Stop Ganache container
 app.post('/stop', async (req, res) => {
   try {
+    await cleanOutputDirectories();
+
     // List all containers and find if the Ganache container exists
     const containers = await docker.listContainers({ all: true });
     const existingContainer = containers.find(c => c.Names.includes(`/${containerName}`));
@@ -77,7 +79,7 @@ app.post('/stop', async (req, res) => {
   }
 });
 
-
+// Query Contracts on Ganache network
 app.get('/query', async (req, res) => {
   try {
 
@@ -98,9 +100,8 @@ app.get('/query', async (req, res) => {
   }
 });
 
-
 //Deploy route to compile and save the generated contracts
-app.post('/execute', async (req, res) => {
+app.post('/deploy', async (req, res) => {
   const { xml } = req.body;
 
   await cleanOutputDirectories();
@@ -150,23 +151,46 @@ app.post('/execute', async (req, res) => {
     console.log(deployResult);
 
     //Execution
-    console.log('Execution started...');
-    const executionResult = await executeHardhatTask('execute-contracts', 'ganache');
-    console.log('Execution successful!');
-    console.log('Execution Output:');
+    console.log('Setup started...');
+    const executionResult = await executeHardhatTask('setup-contracts', 'ganache');
+    console.log('Setup successful!');
+    console.log('Setup Output:');
     console.log(executionResult);
 
-    res.status(200).send('Contracts executed successfully');
+    res.status(200).send('Contracts deployment successfully');
   } catch (err) {
-    console.error('Error during execution:', err);
-    res.status(500).send('Execution failed.');
+    console.error('Error during deployment:', err);
+    res.status(500).send('Deployment failed.');
+  }
+});
+
+//Execute task in contract
+app.post('/executeTask', async (req, res) => {
+  try {
+    const taskArgs = req.body;
+
+    console.log(taskArgs)
+    // Validate the structure of taskArgs
+    if (typeof taskArgs !== 'object' || !taskArgs.taskId || !taskArgs.contractName || !Array.isArray(taskArgs.inputs)) {
+      return res.status(400).json({ message: 'Invalid request. Please provide taskArgs with taskName, contractName, and inputs.' });
+    }
+
+
+    // Execute the Hardhat task
+    const queryResult = await executeHardhatTask("execute-task", "ganache", taskArgs);
+    console.log(queryResult)
+    // Send successful response
+    res.status(200).json({ message: 'Task executed successfully.' });
+  } catch (err) {
+    // Handle errors and send error response
+    console.error('Error executing Hardhat task:', err);
+    res.status(500).json({ message: 'An error occurred.', error: err.message });
   }
 });
 
 app.listen(port, () => {
   console.log(`Server listening at http://localhost:${port}`);
 });
-
 
 //Clean contracts dir
 const cleanOutputDirectories = async () => {

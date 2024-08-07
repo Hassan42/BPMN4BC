@@ -307,14 +307,27 @@ const generateContractMeta = (contractName, receiveTasks, roles, startEventIds, 
         .filter(role => receiveTaskRoles.has(role.role))
         .map(role => ({ role: role.role }));
 
-
+        
     // Create an array to store receive tasks info
-    const receiveTasksInfo = receiveTasks.map(task => ({
-        id: task.id.replace(/\s+/g, ''), // Remove whitespace from task ID
-        sender: task.bcsender,
-        name: task.name || '',
-        state: startEventIds.includes(task.id.replace(/\s+/g, '')) ? 'Open' : `Closed`
-    }));
+    const receiveTasksInfo = receiveTasks.map(task => {
+        const outputParameters = extractOutputParameters(task);
+
+        // Filter external parameters
+        const externalParams = outputParameters.filter(param => String(param.external).trim() === "true")
+            .map(param => ({
+                name: param.name,
+                type: param.type
+            }));
+
+        // Create task info object
+        return {
+            id: task.id.replace(/\s+/g, ''), // Remove whitespace from task ID
+            sender: task.bcsender,
+            name: task.name || '',
+            state: startEventIds.includes(task.id.replace(/\s+/g, '')) ? 'Open' : 'Closed',
+            externalParams // Add external parameters to task info
+        };
+    });
 
 
     return {

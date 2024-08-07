@@ -5,11 +5,22 @@ const { exec } = require('child_process');
  *
  * @param {string} taskName - The name of the Hardhat task to run.
  * @param {string} networkName - The name of the network to use.
+ * @param {Object} taskArgs - The arguments for the Hardhat task.
  * @returns {Promise<string>} - A promise that resolves with the command output.
  */
-const executeHardhatTask = (taskName, networkName) => {
+const executeHardhatTask = async (taskName, networkName, taskArgs) => {
   // Construct the command string
-  const command = `npx hardhat ${taskName} --network ${networkName}`;
+  let command = `npx hardhat ${taskName} --network ${networkName}`;
+
+  if (taskArgs) {
+    // Convert taskArgs to a JSON string and escape double quotes
+    const jsonArgs = JSON.stringify(taskArgs).replace(/"/g, '\\"');
+    
+    // Append task arguments to the command
+    command += ` --taskargs "${jsonArgs}"`;
+  }
+
+  console.log('Executing command:', command);
 
   // Return a promise that executes the command
   return new Promise((resolve, reject) => {
@@ -27,5 +38,4 @@ const executeHardhatTask = (taskName, networkName) => {
   });
 };
 
-// Export the function for use in other files
 module.exports = { executeHardhatTask };

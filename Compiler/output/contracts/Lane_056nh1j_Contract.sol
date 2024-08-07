@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
-import "./ILane_14pkjzp_Contract.sol";
-import "./ILane_0cbowdc_Contract.sol";
-contract Lane_0cbowdc_Contract {
+import "./ILane_056nh1j_Contract.sol";
+contract Lane_056nh1j_Contract {
     enum State {
         Closed,
         Open,
@@ -11,7 +10,7 @@ contract Lane_0cbowdc_Contract {
 
     mapping(string => State) public state;
 
-    uint receiveFunctionCount = 2;
+    uint receiveFunctionCount = 1;
 
     mapping(string => address) public contracts;
 
@@ -26,14 +25,17 @@ contract Lane_0cbowdc_Contract {
         _;
     }
 
+    struct LocalStorage {
+        uint p1;
+    }
+    LocalStorage public localStorage;
+
     constructor() {
-        state["Activity_0u7dp3b"] = State.Open;
-        state["Activity_1g0f2bi"] = State.Closed;
+        state["Activity_1o9gt8p"] = State.Open;
     }
 
     function setContracts(address[] memory addresses) public {
-        contracts["Lane_14pkjzp_Contract"] = addresses[0];
-        contracts["Lane_0cbowdc_Contract"] = addresses[1];
+        contracts["Lane_056nh1j_Contract"] = addresses[0];
     }
 
     function setResources(
@@ -71,13 +73,11 @@ contract Lane_0cbowdc_Contract {
         return keccak256(abi.encodePacked(a)) == keccak256(abi.encodePacked(b));
     }
 
-    function Activity_0u7dp3b() public isAccessible("a2", "Activity_0u7dp3b") {
-        state["Activity_1g0f2bi"] = State.Open;
+    function Activity_1o9gt8p(
+        uint p1
+    ) public isAccessible("Activity_1o9gt8p", "a1") {
+        localStorage.p1 = p1;
 
-        state["Activity_0u7dp3b"] = State.Completed;
-    }
-
-    function Activity_1g0f2bi() public isAccessible("a3", "Activity_1g0f2bi") {
-        state["Activity_1g0f2bi"] = State.Completed;
+        state["Activity_1o9gt8p"] = State.Completed;
     }
 }

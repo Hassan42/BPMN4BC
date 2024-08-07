@@ -308,7 +308,7 @@ function generateEntryFunction(activity, process, roles) {
   });
 
   return `
-    function ${activity.id.replace(/\s+/g, '')}(${externalParams}) public isAccessible("${senderRole}", "${activity.id.replace(/\s+/g, '')}") {
+    function ${activity.id.replace(/\s+/g, '')}(${externalParams}) public isAccessible("${activity.id.replace(/\s+/g, '')}", "${senderRole}") {
         ${storageAssignments}
         ${transactionalAssignments}
         ${proceedingLogic}

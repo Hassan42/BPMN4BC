@@ -13,7 +13,6 @@ const setContracts = async (contractManager, contractName, contractInstance) => 
     }
 }
 
-
 const setResources = async (contractManager, contractName, contractInstance) => {
     try {
         // Fetch all roles used by contracts
@@ -61,7 +60,6 @@ const bigIntToStateString = (bigIntValue) => {
     return stateEnum[intValue] || 'Unknown State';
 };
 
-
 const queryContract = async (contractManager, contractName, contractInstance) => {
     const taskIds = contractManager.getAllTaskIds(contractName);
 
@@ -77,10 +75,44 @@ const queryContract = async (contractManager, contractName, contractInstance) =>
     }
 }
 
+const executeTask = async (contractManager, contractName, contractInstance, taskId, inputs) => {
+    try {
+        // Get the task by its ID
+        const task = contractManager.getTaskById(contractName, taskId);
+
+        // Get the address of the role associated with this task
+        const roleAddress = contractManager.getAddressByRole(contractName, task.sender);
+
+        // Retrieve all available signers
+        const signers = await ethers.getSigners();
+
+        // Find if the roleAddress exists among the signers
+        const roleSigner = signers.find(signer => signer.address === roleAddress);
+
+        if (!roleSigner) {
+            throw new Error(`Role address "${roleAddress}" is not in the list of available signers.`);
+        }
+        
+        // Attach to the contract instance with the role address as the signer
+        // We change the signer in the backend, in a deployment version the sender has to sign on their side
+        const contractWithSigner = contractInstance.connect(roleSigner);
+
+        // Unpack inputs and call the function on the contract instance
+        if (typeof contractWithSigner[taskId] === 'function') {
+            await contractWithSigner[taskId](...inputs); // Call the contract function with unpacked inputs
+            console.log(`Executed ${taskId} with inputs ${inputs}`);
+        } else {
+            throw new Error(`Function "${taskId}" not found on contract instance.`);
+        }
+    } catch (error) {
+        console.error(`Error executing task ${taskId}:`, error);
+    }
+}
 
 module.exports = {
     setContracts,
     setResources,
     bigIntToStateString,
-    queryContract
+    queryContract,
+    executeTask
 };
