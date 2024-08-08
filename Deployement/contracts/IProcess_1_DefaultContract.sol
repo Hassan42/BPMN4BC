@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-interface ILane_056nh1j_Contract {
+interface IProcess_1_DefaultContract {
     enum State {
         Closed,
         Open,
@@ -19,5 +19,7 @@ interface ILane_056nh1j_Contract {
         string memory a,
         string memory b
     ) external returns (bool);
-    function Activity_1o9gt8p(uint p1) external;
+    function Activity_1338c96(uint cost) external;
+    function Activity_0z6ea92() external;
+    function Activity_1lu73bj() external;
 }

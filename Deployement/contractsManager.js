@@ -176,8 +176,6 @@ const updateTaskState = (contractName, taskId, newState) => {
     writeContractsFile(contracts);
 };
 
-
-
 // Add or update a role with an address
 const updateRoleAddress = (contractName, roleName, address) => {
     // Read and parse the existing contracts file
@@ -211,10 +209,74 @@ const updateRoleAddress = (contractName, roleName, address) => {
     writeContractsFile(contracts);
 };
 
-
 // New function to get all contracts
 const getAllContracts = () => {
     return readContractsFile();
+};
+
+// Update local storage of a task
+const updateLocalStorage = (contractName, taskId, inputs) => {
+    // Read all contracts
+    const contracts = readContractsFile();
+
+    // Find the contract by name
+    const contract = contracts.find(c => c.contractName === contractName);
+
+    if (!contract) {
+        throw new Error(`Contract with name "${contractName}" not found.`);
+    }
+
+    // Find the task by ID within the contract
+    const task = contract.receiveTasks.find(task => task.id === taskId);
+
+    if (!task) {
+        throw new Error(`Task ID "${taskId}" not found in contract "${contractName}".`);
+    }
+
+    // Get external parameters for the task
+    const { externalParams } = task;
+
+    if (!externalParams) {
+        throw new Error(`No external parameters found for task "${taskId}" in contract "${contractName}".`);
+    }
+
+    // Check if the number of inputs matches the number of external parameters
+    if (inputs.length !== externalParams.length) {
+        throw new Error(`Number of inputs (${inputs.length}) does not match number of external parameters (${externalParams.length}).`);
+    }
+
+    // Update external parameters based on the inputs
+    externalParams.forEach((param, index) => {
+        if (param.type) {
+            const value = inputs[index];
+            if (value !== undefined) {
+                switch (param.type) {
+                    case 'string':
+                        if (typeof value !== 'string') {
+                            throw new Error(`Expected string for type 'string', but got ${typeof value}`);
+                        }
+                        param.value = String(value);
+                        break;
+                    case 'uint':
+                        const uintValue = Number(value);
+                        if (isNaN(uintValue) || uintValue < 0) {
+                            throw new Error(`Invalid value for type 'uint': ${value}`);
+                        }
+                        param.value = uintValue;
+                        break;
+                    default:
+                        throw new Error(`Unsupported type: ${param.type}`);
+                }
+            } else {
+                throw new Error(`Missing input for parameter at index ${index}`);
+            }
+        }
+    });
+
+    // Write the updated contracts object back to the file
+    writeContractsFile(contracts);
+
+    console.log(`Local storage updated for task "${taskId}" in contract "${contractName}".`);
 };
 
 
@@ -274,7 +336,8 @@ const createContractManager = () => ({
     getAllTaskIds,
     updateTaskState,
     getTaskById,
-    getAddressByRole
+    getAddressByRole,
+    updateLocalStorage
 });
 
 module.exports = createContractManager;

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
-import "./ILane_056nh1j_Contract.sol";
-contract Lane_056nh1j_Contract {
+
+contract Process_1_DefaultContract {
     enum State {
         Closed,
         Open,
@@ -26,17 +26,15 @@ contract Lane_056nh1j_Contract {
     }
 
     struct LocalStorage {
-        uint p1;
+        uint cost;
     }
     LocalStorage public localStorage;
 
     constructor() {
-        state["Activity_1o9gt8p"] = State.Open;
+        state["Activity_1338c96"] = State.Open;
     }
 
-    function setContracts(address[] memory addresses) public {
-        contracts["Lane_056nh1j_Contract"] = addresses[0];
-    }
+    function setContracts(address[] memory addresses) public {}
 
     function setResources(
         string[] memory _roles,
@@ -73,11 +71,25 @@ contract Lane_056nh1j_Contract {
         return keccak256(abi.encodePacked(a)) == keccak256(abi.encodePacked(b));
     }
 
-    function Activity_1o9gt8p(
-        uint p1
-    ) public isAccessible("Activity_1o9gt8p", "a1") {
-        localStorage.p1 = p1;
+    function Activity_1338c96(
+        uint cost
+    ) public isAccessible("Activity_1338c96", "a1") {
+        localStorage.cost = cost;
 
-        state["Activity_1o9gt8p"] = State.Completed;
+        if (localStorage.cost > 3) {
+            Activity_0z6ea92();
+        } else {
+            Activity_1lu73bj();
+        }
+
+        state["Activity_1338c96"] = State.Completed;
+    }
+
+    function Activity_0z6ea92() public {
+        localStorage.cost = 100;
+    }
+
+    function Activity_1lu73bj() public {
+        localStorage.cost = 10;
     }
 }

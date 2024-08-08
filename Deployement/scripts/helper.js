@@ -60,6 +60,7 @@ const bigIntToStateString = (bigIntValue) => {
     return stateEnum[intValue] || 'Unknown State';
 };
 
+//Query contract data
 const queryContract = async (contractManager, contractName, contractInstance) => {
     const taskIds = contractManager.getAllTaskIds(contractName);
 
@@ -67,6 +68,15 @@ const queryContract = async (contractManager, contractName, contractInstance) =>
         try {
             // Query the current state of the task
             const newState = await contractInstance.getState(taskId);
+            if (typeof contractInstance.localStorage === 'function') {
+                // Fetch localStorage if the method exists
+                const newData = await contractInstance.localStorage();
+                         
+                // Ensure newData is an array
+                const newDataArray = Array.isArray(newData) ? newData : [newData];
+
+                contractManager.updateLocalStorage(contractName, taskId, newDataArray);
+            }
             contractManager.updateTaskState(contractName, taskId, bigIntToStateString(newState));
             console.log(`Updated state of task ${taskId}`);
         } catch (error) {

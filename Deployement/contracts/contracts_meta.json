@@ -1,6 +1,6 @@
 [
   {
-    "contractName": "Lane_056nh1j_Contract",
+    "contractName": "Process_1_DefaultContract",
     "contractRoles": [
       {
         "role": "a1",
@@ -9,21 +9,21 @@
     ],
     "receiveTasks": [
       {
-        "id": "Activity_1o9gt8p",
+        "id": "Activity_1338c96",
         "sender": "a1",
-        "name": "",
-        "state": "Open",
+        "name": "send cost",
+        "state": "Completed",
         "externalParams": [
           {
-            "name": "p1",
+            "name": "cost",
             "type": "uint",
-            "value": ""
+            "value": 100
           }
         ]
       }
     ],
-    "contractCode": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\nimport \"./ILane_056nh1j_Contract.sol\";\ncontract Lane_056nh1j_Contract {\n    enum State {\n        Closed,\n        Open,\n        Completed\n    }\n\n    mapping(string => State) public state;\n\n    uint receiveFunctionCount = 1;\n\n    mapping(string => address) public contracts;\n\n    mapping(address => string) public addressToRole;\n\n    modifier isAccessible(string memory _activity, string memory _role) {\n        require(state[_activity] == State.Open, \"Activity is not open\");\n        require(\n            compareStrings(addressToRole[msg.sender], _role),\n            \"Caller does not have the required role\"\n        );\n        _;\n    }\n\n    struct LocalStorage {\n        uint p1;\n    }\n    LocalStorage public localStorage;\n\n    constructor() {\n        state[\"Activity_1o9gt8p\"] = State.Open;\n    }\n\n    function setContracts(address[] memory addresses) public {\n        contracts[\"Lane_056nh1j_Contract\"] = addresses[0];\n    }\n\n    function setResources(\n        string[] memory _roles,\n        address[] memory _addresses\n    ) public {\n        require(\n            _roles.length == _addresses.length,\n            \"Roles and addresses arrays must be of the same length\"\n        );\n\n        for (uint i = 0; i < _addresses.length; i++) {\n            addressToRole[_addresses[i]] = _roles[i];\n        }\n    }\n\n    function setResource(string memory _role, address _address) public {\n        addressToRole[_address] = _role;\n    }\n\n    function setState(string memory _activity, uint8 _state) public {\n        require(_state <= 3, \"Not Valid State\");\n        state[_activity] = State(_state);\n    }\n\n    function getState(string memory _activity) public view returns (State) {\n        return state[_activity];\n    }\n\n    //To be replaced with ENUM\n    function compareStrings(\n        string memory a,\n        string memory b\n    ) internal pure returns (bool) {\n        return keccak256(abi.encodePacked(a)) == keccak256(abi.encodePacked(b));\n    }\n\n    function Activity_1o9gt8p(\n        uint p1\n    ) public isAccessible(\"Activity_1o9gt8p\", \"a1\") {\n        localStorage.p1 = p1;\n\n        state[\"Activity_1o9gt8p\"] = State.Completed;\n    }\n}\n",
-    "contractInterface": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\ninterface ILane_056nh1j_Contract {\n    enum State {\n        Closed,\n        Open,\n        Completed\n    }\n    function setContracts(address[] memory addresses) external;\n    function setResources(\n        string[] memory _roles,\n        address[] memory _addresses\n    ) external;\n    function setResource(string memory _role, address _address) external;\n    function setState(string memory _activity, uint8 _state) external;\n    function getState(string memory _activity) external returns (State);\n    function compareStrings(\n        string memory a,\n        string memory b\n    ) external returns (bool);\n    function Activity_1o9gt8p(uint p1) external;\n}\n",
-    "address": "0xF3e8295d567c3d048D59058B378eb89AA97F8F72"
+    "contractCode": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\ncontract Process_1_DefaultContract {\n    enum State {\n        Closed,\n        Open,\n        Completed\n    }\n\n    mapping(string => State) public state;\n\n    uint receiveFunctionCount = 1;\n\n    mapping(string => address) public contracts;\n\n    mapping(address => string) public addressToRole;\n\n    modifier isAccessible(string memory _activity, string memory _role) {\n        require(state[_activity] == State.Open, \"Activity is not open\");\n        require(\n            compareStrings(addressToRole[msg.sender], _role),\n            \"Caller does not have the required role\"\n        );\n        _;\n    }\n\n    struct LocalStorage {\n        uint cost;\n    }\n    LocalStorage public localStorage;\n\n    constructor() {\n        state[\"Activity_1338c96\"] = State.Open;\n    }\n\n    function setContracts(address[] memory addresses) public {}\n\n    function setResources(\n        string[] memory _roles,\n        address[] memory _addresses\n    ) public {\n        require(\n            _roles.length == _addresses.length,\n            \"Roles and addresses arrays must be of the same length\"\n        );\n\n        for (uint i = 0; i < _addresses.length; i++) {\n            addressToRole[_addresses[i]] = _roles[i];\n        }\n    }\n\n    function setResource(string memory _role, address _address) public {\n        addressToRole[_address] = _role;\n    }\n\n    function setState(string memory _activity, uint8 _state) public {\n        require(_state <= 3, \"Not Valid State\");\n        state[_activity] = State(_state);\n    }\n\n    function getState(string memory _activity) public view returns (State) {\n        return state[_activity];\n    }\n\n    //To be replaced with ENUM\n    function compareStrings(\n        string memory a,\n        string memory b\n    ) internal pure returns (bool) {\n        return keccak256(abi.encodePacked(a)) == keccak256(abi.encodePacked(b));\n    }\n\n    function Activity_1338c96(\n        uint cost\n    ) public isAccessible(\"Activity_1338c96\", \"a1\") {\n        localStorage.cost = cost;\n\n        if (localStorage.cost > 3) {\n            Activity_0z6ea92();\n        } else {\n            Activity_1lu73bj();\n        }\n\n        state[\"Activity_1338c96\"] = State.Completed;\n    }\n\n    function Activity_0z6ea92() public {\n        localStorage.cost = 100;\n    }\n\n    function Activity_1lu73bj() public {\n        localStorage.cost = 10;\n    }\n}\n",
+    "contractInterface": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\ninterface IProcess_1_DefaultContract {\n    enum State {\n        Closed,\n        Open,\n        Completed\n    }\n    function setContracts(address[] memory addresses) external;\n    function setResources(\n        string[] memory _roles,\n        address[] memory _addresses\n    ) external;\n    function setResource(string memory _role, address _address) external;\n    function setState(string memory _activity, uint8 _state) external;\n    function getState(string memory _activity) external returns (State);\n    function compareStrings(\n        string memory a,\n        string memory b\n    ) external returns (bool);\n    function Activity_1338c96(uint cost) external;\n    function Activity_0z6ea92() external;\n    function Activity_1lu73bj() external;\n}\n",
+    "address": "0x55CC3eD4D34508dCD3427E297E4783542D623b7f"
   }
 ]
