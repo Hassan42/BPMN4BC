@@ -1,4 +1,7 @@
 const { exec } = require('child_process');
+const path = require('path');
+const fs = require('fs');
+const axios = require('axios');
 
 /**
  * Executes a Hardhat command with a specified task and network.
@@ -15,7 +18,7 @@ const executeHardhatTask = async (taskName, networkName, taskArgs) => {
   if (taskArgs) {
     // Convert taskArgs to a JSON string and escape double quotes
     const jsonArgs = JSON.stringify(taskArgs).replace(/"/g, '\\"');
-    
+
     // Append task arguments to the command
     command += ` --taskargs "${jsonArgs}"`;
   }
@@ -38,4 +41,73 @@ const executeHardhatTask = async (taskName, networkName, taskArgs) => {
   });
 };
 
-module.exports = { executeHardhatTask };
+// Fetch the latest gas price from Infura
+const fetchGasPrice = async (infuraUrl) => {
+  try {
+    const response = await axios.post(infuraUrl, {
+      jsonrpc: '2.0',
+      method: 'eth_gasPrice',
+      params: [],
+      id: 1
+    });
+    return parseInt(response.data.result, 16); // Convert hex to decimal
+  } catch (error) {
+    console.error('Error fetching gas price:', error);
+    throw new Error('Unable to fetch gas price');
+  }
+};
+
+
+const updateHardhatConfig = (networkId, url) => {
+  const hardhatConfigPath = path.resolve(__dirname, 'hardhat.config.js');
+
+  // Read the existing Hardhat configuration file
+  const configFileContent = fs.readFileSync(hardhatConfigPath, 'utf8');
+
+  // Extract the JSON portion of the config
+  const jsonStart = configFileContent.indexOf('{');
+  const jsonEnd = configFileContent.lastIndexOf('}') + 1;
+
+  if (jsonStart === -1 || jsonEnd === -1) {
+    throw new Error('Invalid Hardhat configuration file format.');
+  }
+
+  const jsonString = configFileContent.slice(jsonStart, jsonEnd);
+  let config;
+
+  try {
+    // Parse the JSON portion
+    config = JSON.parse(jsonString);
+  } catch (error) {
+    throw new Error('Error parsing Hardhat configuration JSON.');
+  }
+
+  // Update the networks section
+  if (!config.networks) {
+    config.networks = {};
+  }
+
+  if (!config.networks[networkId]) {
+    config.networks[networkId] = { url };
+  }
+
+  // Reconstruct the full configuration content
+  const updatedConfigContent = `
+  require("@nomicfoundation/hardhat-toolbox");
+  require('./tasks/deployContractsTask');
+  require('./tasks/queryContractsTask');
+  require('./tasks/setupContractsTask');
+  require('./tasks/executeTask');
+  require('./tasks/executeAllTask');
+  /** @type import('hardhat/config').HardhatUserConfig */
+
+  module.exports = ${JSON.stringify(config, null, 2)};
+  `;
+
+  // Write the updated configuration back to the file
+  fs.writeFileSync(hardhatConfigPath, updatedConfigContent, 'utf8');
+};
+
+
+
+module.exports = { executeHardhatTask, fetchGasPrice, updateHardhatConfig };

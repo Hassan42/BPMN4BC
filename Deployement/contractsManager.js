@@ -55,27 +55,36 @@ const getContractByAddress = (contractAddress) => {
     return contract;
 };
 
-const getContractsAddresses = () => {
+const getContractsAddresses = (network) => {
     const contracts = getAllContracts();
 
-    const missingAddresses = contracts.filter(contract => !contract.address);
+    // Filter contracts based on the network
+    const networkContracts = contracts.filter(contract => contract.networkId === network);
+
+    // Check for contracts that are missing addresses
+    const missingAddresses = networkContracts.filter(contract => !contract.address);
+
 
     //No missing address is allowed
     if (missingAddresses.length > 0) {
         throw new Error(`The following contracts are missing addresses: ${missingAddresses.map(c => c.contractName).join(', ')}`);
     }
 
-    const addresses = contracts.map(contract => contract.address);
+    const addresses = networkContracts.map(contract => contract.address);
 
     return addresses;
 }
 
 // Get all roles from all contracts
-const getAllRoles = () => {
+const getAllRoles = (network) => {
     const contracts = getAllContracts();
+
+    // Filter contracts based on the network
+    const networkContracts = contracts.filter(contract => contract.networkId === network);
+
     const rolesSet = new Set();
 
-    contracts.forEach(contract => {
+    networkContracts.forEach(contract => {
         if (contract.contractRoles && Array.isArray(contract.contractRoles)) {
             contract.contractRoles.forEach(roleObject => {
                 if (roleObject.role) {
@@ -112,7 +121,6 @@ const getAllTasks = () => {
 
     return tasksByContract;
 };
-
 
 // Get all task IDs from specific contracts
 const getAllTaskIds = (contractName) => {
@@ -214,8 +222,7 @@ const getAllContracts = () => {
     return readContractsFile();
 };
 
-// Update local storage of a task
-const updateLocalStorage = (contractName, taskId, inputs) => {
+const updateLocalStorage = (contractName, inputs) => {
     // Read all contracts
     const contracts = readContractsFile();
 
@@ -226,27 +233,16 @@ const updateLocalStorage = (contractName, taskId, inputs) => {
         throw new Error(`Contract with name "${contractName}" not found.`);
     }
 
-    // Find the task by ID within the contract
-    const task = contract.receiveTasks.find(task => task.id === taskId);
+    // Access the localStorage from the contract object
+    const localStorage = contract.localStorage;
 
-    if (!task) {
-        throw new Error(`Task ID "${taskId}" not found in contract "${contractName}".`);
+    // Check if the number of inputs matches the number of localStorage parameters
+    if (inputs.length !== localStorage.length) {
+        throw new Error(`Number of inputs (${inputs.length}) does not match number of localStorage parameters (${localStorage.length}).`);
     }
 
-    // Get external parameters for the task
-    const { externalParams } = task;
-
-    if (!externalParams) {
-        throw new Error(`No external parameters found for task "${taskId}" in contract "${contractName}".`);
-    }
-
-    // Check if the number of inputs matches the number of external parameters
-    if (inputs.length !== externalParams.length) {
-        throw new Error(`Number of inputs (${inputs.length}) does not match number of external parameters (${externalParams.length}).`);
-    }
-
-    // Update external parameters based on the inputs
-    externalParams.forEach((param, index) => {
+    // Update localStorage parameters based on the inputs
+    localStorage.forEach((param, index) => {
         if (param.type) {
             const value = inputs[index];
             if (value !== undefined) {
@@ -276,9 +272,8 @@ const updateLocalStorage = (contractName, taskId, inputs) => {
     // Write the updated contracts object back to the file
     writeContractsFile(contracts);
 
-    console.log(`Local storage updated for task "${taskId}" in contract "${contractName}".`);
+    console.log(`Local storage updated for contract "${contractName}".`);
 };
-
 
 const getTaskById = (contractName, taskId) => {
     const contracts = getAllContracts();
@@ -322,6 +317,95 @@ const getAddressByRole = (contractName, roleName) => {
     return role.address;
 };
 
+// Function to get a contract address by its name
+const getContractAddressByName = (contractName) => {
+    const contracts = readContractsFile(); // Read the contracts file
+
+    // Find the contract by its name
+    const contract = contracts.find(c => c.contractName === contractName);
+
+    if (!contract) {
+        throw new Error(`Contract with name "${contractName}" not found.`);
+    }
+
+    // Return the address of the found contract
+    return contract.address;
+};
+
+const getContractsState = (network) => {
+    // Read all contracts from the data source
+    const contracts = getAllContracts();
+
+    // Filter contracts based on the network
+    const networkContracts = contracts.filter(contract => contract.networkId === network);
+
+    // Create a new object containing only receiveTasks and localStorage for each contract
+    const contractsState = networkContracts.reduce((acc, contract) => {
+        // Extract only the necessary fields
+        const { contractName, networkId, receiveTasks, localStorage } = contract;
+
+        // Add the contract's relevant data to the result object
+        acc[contractName] = {
+            receiveTasks,
+            localStorage
+        };
+
+        return acc;
+    }, {});
+
+    return contractsState;
+};
+
+const updateTaskGas = (contractName, taskId, gasUsed) => {
+      // Read and parse the existing contracts file
+      const contracts = getAllContracts();
+
+      // Find the contract by name
+      const contract = contracts.find(c => c.contractName === contractName);
+  
+      // If the contract is not found, throw an error
+      if (!contract) {
+          throw new Error(`Contract with name "${contractName}" not found.`);
+      }
+  
+      // Ensure the contract has a tasks array
+      if (!contract.receiveTasks || !Array.isArray(contract.receiveTasks)) {
+          throw new Error(`No tasks found for contract "${contractName}".`);
+      }
+  
+      // Find the task by ID
+      const task = contract.receiveTasks.find(task => task.id === taskId);
+  
+      // If the task is not found, throw an error
+      if (!task) {
+          throw new Error(`Task ID "${taskId}" not found in contract "${contractName}".`);
+      }
+  
+      // Update the task gas usage
+      task.gasUsed = gasUsed;
+  
+      // Write the updated contracts object back to the file
+      writeContractsFile(contracts);
+}
+
+// Function to get all unique network IDs
+const getNetworks = () => {
+    const contracts = readContractsFile();
+
+    // Use a Set to collect unique network IDs
+    const networkIds = new Set();
+
+    // Iterate over each contract and add its networkId to the Set
+    contracts.forEach(contract => {
+        if (contract.networkId) {
+            networkIds.add(contract.networkId);
+        }
+    });
+
+    // Convert the Set to an array and return
+    return Array.from(networkIds);
+};
+
 
 // Export the contract management functions
 const createContractManager = () => ({
@@ -337,7 +421,11 @@ const createContractManager = () => ({
     updateTaskState,
     getTaskById,
     getAddressByRole,
-    updateLocalStorage
+    updateLocalStorage,
+    getContractAddressByName,
+    getContractsState,
+    updateTaskGas,
+    getNetworks
 });
 
 module.exports = createContractManager;

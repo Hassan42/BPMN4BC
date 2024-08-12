@@ -298,9 +298,29 @@ const extractRolesFromCollaboration = (collaboration) => {
     return roleParameters;
 }
 
-const generateContractMeta = (contractName, receiveTasks, roles, startEventIds, formattedSolidityCode, formattedSolidityInterface) => {
+const generateContractMeta = (contractName, networkId, activities, roles, startEventIds, formattedSolidityCode, formattedSolidityInterface) => {
 
+    const receiveTasks = activities.filter(activity => activity.$type === 'bpmn:ReceiveTask');
     const receiveTaskRoles = new Set(receiveTasks.map(task => task.bcsender));
+
+    // Use an array to store unique output parameters
+    const localStorage = [];
+
+    activities.forEach(activity => {
+        const outputParameters = extractOutputParameters(activity);
+
+        outputParameters.forEach(param => {
+            if (String(param.transactional).trim().toLowerCase() !== "true") {
+                // Generate a unique key for the parameter
+                const paramKey = `${param.type}_${param.name}`;
+
+                // Check if the parameter is already added to the array
+                if (!localStorage.some(p => `${p.type}_${p.name}` === paramKey)) {
+                    localStorage.push({ type: param.type, name: param.name });
+                }
+            }
+        });
+    });
 
     // Filter roles based on those used in ReceiveTasks and format as an array of objects
     const contractRoles = roles
@@ -332,10 +352,12 @@ const generateContractMeta = (contractName, receiveTasks, roles, startEventIds, 
 
     return {
         contractName: contractName,
+        networkId: networkId,
         contractRoles: contractRoles,
         receiveTasks: receiveTasksInfo,
         contractCode: formattedSolidityCode,
-        contractInterface: formattedSolidityInterface
+        contractInterface: formattedSolidityInterface,
+        localStorage: localStorage
     };
 }
 

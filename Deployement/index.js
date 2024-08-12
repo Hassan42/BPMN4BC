@@ -6,7 +6,7 @@ const path = require('path');
 const Docker = require('dockerode');
 const hardhat = require('hardhat');
 const createContractManager = require('./contractsManager');
-const{executeHardhatTask} = require('./utils');
+const { executeHardhatTask, fetchGasPrice, updateHardhatConfig } = require('./utils');
 
 const app = express();
 const port = 3000;
@@ -15,40 +15,75 @@ const compilerPort = 8000;
 const contractsDir = path.resolve('./contracts');
 
 const docker = new Docker(); // Initialize Docker client
-const containerName = 'ganache';
-const containerPort = '8545';
 
 app.use(cors());
 app.use(express.json());
 app.use(express.json());
 
 // Start Ganache container
-app.post('/start', async (req, res) => {
-  try {
-    // Check if container is already running
-    const containers = await docker.listContainers({ all: true });
-    const existingContainer = containers.find(c => c.Names.includes(`/${containerName}`));
 
-    if (existingContainer) {
-      return res.status(400).json({ message: 'Ganache is already running.' });
+// Start Ganache containers
+app.post('/start', async (req, res) => {
+  const { networks } = req.body;  // Extract networks array from the request body
+
+  try {
+    if (!Array.isArray(networks) || networks.length === 0) {
+      return res.status(400).json({ message: 'Networks array is required and cannot be empty.' });
     }
 
-    // Create and start the Ganache container
-    const container = await docker.createContainer({
-      Image: 'trufflesuite/ganache-core',
-      name: containerName,
-      Cmd: ['--port', containerPort, '--hostname', '0.0.0.0'],
-      ExposedPorts: { [`${containerPort}/tcp`]: {} },
-      HostConfig: {
-        PortBindings: { [`${containerPort}/tcp`]: [{ HostPort: containerPort }] }
+    const containerPromises = networks.map(async (network) => {
+      const { networkId, port, fork, infuraUrl } = network;
+      const containerName = networkId;
+
+      // Check if container is already running
+      const containers = await docker.listContainers({ all: true });
+      const existingContainer = containers.find(c => c.Names.includes(`/${containerName}`));
+
+      if (existingContainer) {
+        return { networkId, message: 'Container already running.' };
       }
+
+      // Base command options for Ganache
+      const cmdOptions = ['--port', port.toString(), '--host', '0.0.0.0'];
+
+      // Add forking options if specified
+      if (fork && infuraUrl) {
+        cmdOptions.push('--fork', `${infuraUrl}`);  // Fork from the provided URL
+
+        // Fetch the latest gas price from Infura
+        const gasPrice = await fetchGasPrice(infuraUrl);
+
+        // Add gas price option to Ganache if the gas price was successfully fetched
+        cmdOptions.push('--gasPrice', gasPrice.toString());  // Ganache expects gasPrice in wei
+      } else if (fork) {
+        return { containerName, message: 'Infura URL must be provided if forking is enabled.' };
+      }
+
+      // Update Hardhat config
+      updateHardhatConfig(containerName, `http://localhost:${port}`);
+
+      // Create and start the Ganache container
+      const container = await docker.createContainer({
+        Image: 'trufflesuite/ganache:latest',  // Ganache Docker image
+        name: containerName,
+        Cmd: cmdOptions,
+        ExposedPorts: { [`${port}/tcp`]: {} },
+        HostConfig: {
+          PortBindings: { [`${port}/tcp`]: [{ HostPort: port.toString() }] }
+        }
+      });
+
+      await container.start();
+
+      return { containerName, message: `Ganache started successfully.` };
     });
 
-    await container.start();
-    res.status(200).json({ message: 'Ganache started successfully.' });
+    const results = await Promise.all(containerPromises);
+
+    res.status(200).json(results);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Error starting Ganache.' });
+    console.error('Error starting Ganache containers:', error);
+    res.status(500).json({ message: 'Error starting Ganache containers.' });
   }
 });
 
@@ -57,46 +92,72 @@ app.post('/stop', async (req, res) => {
   try {
     await cleanOutputDirectories();
 
-    // List all containers and find if the Ganache container exists
+    // List all containers
     const containers = await docker.listContainers({ all: true });
-    const existingContainer = containers.find(c => c.Names.includes(`/${containerName}`));
 
-    if (!existingContainer) {
-      return res.status(400).json({ message: 'Ganache is not running.' });
+    // Filter out containers related to Ganache
+    const ganacheContainers = containers.filter(c => c.Names.some(name => name.startsWith('/ganache-')));
+
+    if (ganacheContainers.length === 0) {
+      return res.status(400).json({ message: 'No Ganache containers are running.' });
     }
 
-    // Get the actual container instance using the container ID
-    const container = docker.getContainer(existingContainer.Id);
+    // Stop and remove each Ganache container
+    const stopContainerPromises = ganacheContainers.map(async containerInfo => {
+      const container = docker.getContainer(containerInfo.Id);
 
-    // Stop and remove the container
-    await container.stop();
-    await container.remove();
+      // Stop and remove the container
+      await container.stop();
+      await container.remove();
 
-    res.status(200).json({ message: 'Ganache stopped and removed successfully.' });
+      return { containerId: containerInfo.Id, message: 'Container stopped and removed successfully.' };
+    });
+
+    const results = await Promise.all(stopContainerPromises);
+
+    res.status(200).json({ message: 'All Ganache containers stopped and removed successfully.', results });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Error stopping Ganache.' });
+    console.error('Error stopping Ganache containers:', error);
+    res.status(500).json({ message: 'Error stopping Ganache containers.' });
   }
 });
 
 // Query Contracts on Ganache network
 app.get('/query', async (req, res) => {
   try {
+    const contractManager = createContractManager();
+    const networks = contractManager.getNetworks(); // Get the list of networks
 
-      const contractManager = createContractManager();
+    // Ensure we have networks to query
+    if (networks.length === 0) {
+      return res.status(200).json({ message: 'No networks found.' });
+    }
 
-      // Execute the Hardhat task
-      await executeHardhatTask('query-contracts', 'ganache');
-      
-      // Send successful response
-      console.log('Query successful!');
-      const tasks = contractManager.getAllTasks();
-      console.log('Query Output:', tasks);
-      res.status(200).json({ result: tasks});
+    // Object to store results
+    const results = {};
+
+    // Iterate over each network and execute the query-contracts task
+    for (const network of networks) {
+      try {
+        // Execute the Hardhat task for the current network
+        await executeHardhatTask('query-contracts', network, {network: network});
+
+        // Retrieve and store the contracts state for the current network
+        const contractsState = contractManager.getContractsState(network);
+        results[network] = contractsState;
+      } catch (err) {
+        // Handle errors specific to the network
+        console.error(`Error executing Hardhat task for network ${network}:`, err);
+        results[network] = { error: 'Failed to retrieve contracts state.' };
+      }
+    }
+
+    // Send successful response with the results for all networks
+    res.status(200).json({ result: results });
   } catch (err) {
-      // Handle errors and send error response
-      console.error('Error executing Hardhat task:', err);
-      res.status(500).json({ message: 'An error occurred.'});
+    // Handle unexpected errors
+    console.error('Error executing query:', err);
+    res.status(500).json({ message: 'An error occurred.' });
   }
 });
 
@@ -122,42 +183,53 @@ app.post('/deploy', async (req, res) => {
 
     // Write the JSON string to a file
     fs.writeFileSync(contractsJsonPath, contractsJson, 'utf8');
-    console.log(`wrote JSON file to ${contractsJsonPath}`);
+    console.log(`Wrote JSON file to ${contractsJsonPath}`);
 
     // Save the contracts and interfaces in the specified folder
     contracts.forEach(contract => {
       const contractPath = path.join(contractsDir, `${contract.contractName}.sol`);
       fs.writeFileSync(contractPath, contract.contractCode, 'utf8');
-      console.log(`wrote contract file to ${contractPath}`);
+      console.log(`Wrote contract file to ${contractPath}`);
 
       const interfacePath = path.join(contractsDir, `I${contract.contractName}.sol`);
       fs.writeFileSync(interfacePath, contract.contractInterface, 'utf8');
-      console.log(`wrote interface file to ${interfacePath}`);
+      console.log(`Wrote interface file to ${interfacePath}`);
     });
 
-    //Compilation
-    console.log('Compiling started...');
-    const compileResult = await executeHardhatTask('compile', 'ganache');
-    console.log('Compilation successful!');
-    console.log('Compile Output:');
-    console.log(compileResult);
+    const contractManager = createContractManager();
+
+    const networks = contractManager.getNetworks();
+
+    const networkResults = {};
+    for (const network of networks) {
+
+      // Compile contracts for each network
+      console.log(`Compiling started for network ${network}...`);
+      const compileResult = await executeHardhatTask('compile', network);
+      console.log(`Compilation successful for network ${network}!`);
+      console.log('Compile Output:', compileResult);
+      networkResults[network] = { compile: compileResult };
 
 
-    //Deployment
-    console.log('Deployment started...');
-    const deployResult = await executeHardhatTask('deploy-contracts', 'ganache');
-    console.log('Deployment successful!');
-    console.log('Deploy Output:');
-    console.log(deployResult);
+      // Deploy contracts to each network
+      console.log(`Deployment started for network ${network}...`);
+      const deployResult = await executeHardhatTask('deploy-contracts', network, {network: network});
+      console.log(`Deployment successful for network ${network}!`);
+      console.log('Deploy Output:', deployResult);
+      networkResults[network].deploy = deployResult;
 
-    //Execution
-    console.log('Setup started...');
-    const executionResult = await executeHardhatTask('setup-contracts', 'ganache');
-    console.log('Setup successful!');
-    console.log('Setup Output:');
-    console.log(executionResult);
 
-    res.status(200).send('Contracts deployment successfully');
+      // Setup contracts for each network
+      console.log(`Setup started for network ${network}...`);
+      const setupResult = await executeHardhatTask('setup-contracts', network, {network: network});
+      console.log(`Setup successful for network ${network}!`);
+      console.log('Setup Output:', setupResult);
+      networkResults[network].setup = setupResult;
+    }
+
+
+
+    res.status(200).json({ message: 'Contracts deployment successfully', results: networkResults });
   } catch (err) {
     console.error('Error during deployment:', err);
     res.status(500).send('Deployment failed.');
@@ -169,16 +241,31 @@ app.post('/executeTask', async (req, res) => {
   try {
     const taskArgs = req.body;
 
-    console.log(taskArgs)
     // Validate the structure of taskArgs
-    if (typeof taskArgs !== 'object' || !taskArgs.taskId || !taskArgs.contractName || !Array.isArray(taskArgs.inputs)) {
+    if (typeof taskArgs !== 'object' || !taskArgs.taskId || !taskArgs.contractName || !taskArgs.network || !Array.isArray(taskArgs.inputs)) {
       return res.status(400).json({ message: 'Invalid request. Please provide taskArgs with taskName, contractName, and inputs.' });
     }
 
+    const network = taskArgs.network;
 
     // Execute the Hardhat task
-    const queryResult = await executeHardhatTask("execute-task", "ganache", taskArgs);
-    console.log(queryResult)
+    const executionResult = await executeHardhatTask("execute-task", network, taskArgs);
+    console.log(executionResult)
+    // Send successful response
+    res.status(200).json({ message: 'Task executed successfully.' });
+  } catch (err) {
+    // Handle errors and send error response
+    console.error('Error executing Hardhat task:', err);
+    res.status(500).json({ message: 'Error executing task.' });
+  }
+});
+
+
+//Execute task in contract
+app.post('/executeAll', async (req, res) => {
+  try {
+    const executionResult = await executeHardhatTask("execute-all", "ganache");
+    console.log(executionResult)
     // Send successful response
     res.status(200).json({ message: 'Task executed successfully.' });
   } catch (err) {
@@ -187,6 +274,7 @@ app.post('/executeTask', async (req, res) => {
     res.status(500).json({ message: 'An error occurred.', error: err.message });
   }
 });
+
 
 app.listen(port, () => {
   console.log(`Server listening at http://localhost:${port}`);

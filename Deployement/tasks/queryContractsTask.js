@@ -5,15 +5,27 @@ const createContractManager = require('../contractsManager');
 const {queryContract} = require('../scripts/helper.js');
 
 
-task('query-contracts', 'query all contracts and updates contracts.json', async (taskArgs, hre) => {
+
+task('query-contracts', 'query all contracts and updates contracts.json')
+.addParam('taskargs', 'JSON string containing task arguments')
+.setAction(async (taskArgs, hre) => {
+
+    let args;
+    try {
+        args = JSON.parse(taskArgs.taskargs);
+    } catch (e) {
+        console.error('Error parsing taskArgs:', e);
+        return;
+    }
+    const { network } = args;
     const { ethers } = hre;
-    const [deployer] = await ethers.getSigners();
     const contractManager = createContractManager(); // Create an instance of the contract manager
 
     const contracts = contractManager.getAllContracts();
+    const networkContracts = contracts.filter(contract => contract.networkId === network);
 
     // Iterate over each contract
-    for (const contract of contracts) {
+    for (const contract of networkContracts) {
         const contractAddress = contract.address;
         const contractName = contract.contractName;
 

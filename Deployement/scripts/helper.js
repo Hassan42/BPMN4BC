@@ -1,8 +1,8 @@
 
-const setContracts = async (contractManager, contractName, contractInstance) => {
+const setContracts = async (contractManager, network, contractName, contractInstance) => {
 
-    const addresses = contractManager.getContractsAddresses();
-
+    const addresses = contractManager.getContractsAddresses(network);
+ 
     try {
         // Call setContracts function
         const tx = await contractInstance.setContracts(addresses);
@@ -13,10 +13,10 @@ const setContracts = async (contractManager, contractName, contractInstance) => 
     }
 }
 
-const setResources = async (contractManager, contractName, contractInstance) => {
+const setResources = async (contractManager, network, contractName, contractInstance) => {
     try {
         // Fetch all roles used by contracts
-        const roles = contractManager.getAllRoles();
+        const roles = contractManager.getAllRoles(network);
 
         // Get signers
         const signers = await ethers.getSigners();
@@ -64,26 +64,78 @@ const bigIntToStateString = (bigIntValue) => {
 const queryContract = async (contractManager, contractName, contractInstance) => {
     const taskIds = contractManager.getAllTaskIds(contractName);
 
+    if (typeof contractInstance.localStorage === 'function') {
+        // Fetch localStorage if the method exists
+        const newData = await contractInstance.localStorage();
+
+        // Ensure newData is an array
+        const newDataArray = Array.isArray(newData) ? newData : [newData];
+
+        contractManager.updateLocalStorage(contractName, newDataArray);
+    }
+
+
     for (const taskId of taskIds) {
         try {
             // Query the current state of the task
             const newState = await contractInstance.getState(taskId);
-            if (typeof contractInstance.localStorage === 'function') {
-                // Fetch localStorage if the method exists
-                const newData = await contractInstance.localStorage();
-                         
-                // Ensure newData is an array
-                const newDataArray = Array.isArray(newData) ? newData : [newData];
-
-                contractManager.updateLocalStorage(contractName, taskId, newDataArray);
-            }
             contractManager.updateTaskState(contractName, taskId, bigIntToStateString(newState));
             console.log(`Updated state of task ${taskId}`);
         } catch (error) {
             console.error(`Error processing task ${taskId}:`, error);
         }
     }
+
+    return contractManager.getAllTasks();
 }
+
+//Query all contracts
+const queryContracts = async (contractManager) => {
+
+    const contracts = contractManager.getAllContracts();
+
+    // Iterate over each contract
+    for (const contract of contracts) {
+        const contractAddress = contract.address;
+        const contractName = contract.contractName;
+
+        console.log(`Querying ${contractName} at address ${contractAddress}`);
+
+        // Retrieve the contract factory based on the contract name
+        const contractFactory = await ethers.getContractFactory(contractName);
+
+        // Attach to the contract
+        const contractInstance = contractFactory.attach(contractAddress);
+
+        if (typeof contractInstance.localStorage === 'function') {
+            // Fetch localStorage if the method exists
+            const newData = await contractInstance.localStorage();
+
+            // Ensure newData is an array
+            const newDataArray = Array.isArray(newData) ? newData : [newData];
+
+            contractManager.updateLocalStorage(contractName, newDataArray);
+        }
+
+        const taskIds = contractManager.getAllTaskIds(contractName);
+
+
+        for (const taskId of taskIds) {
+            try {
+                // Query the current state of the task
+                const newState = await contractInstance.getState(taskId);
+                contractManager.updateTaskState(contractName, taskId, bigIntToStateString(newState));
+                console.log(`Updated state of task ${taskId}`);
+            } catch (error) {
+                console.error(`Error processing task ${taskId}:`, error);
+            }
+        }
+
+    }
+
+    return contractManager.getAllTasks();
+}
+
 
 const executeTask = async (contractManager, contractName, contractInstance, taskId, inputs) => {
     try {
@@ -102,15 +154,19 @@ const executeTask = async (contractManager, contractName, contractInstance, task
         if (!roleSigner) {
             throw new Error(`Role address "${roleAddress}" is not in the list of available signers.`);
         }
-        
+
         // Attach to the contract instance with the role address as the signer
         // We change the signer in the backend, in a deployment version the sender has to sign on their side
         const contractWithSigner = contractInstance.connect(roleSigner);
 
         // Unpack inputs and call the function on the contract instance
         if (typeof contractWithSigner[taskId] === 'function') {
-            await contractWithSigner[taskId](...inputs); // Call the contract function with unpacked inputs
+            const txResponse = await contractWithSigner[taskId](...inputs); // Call the contract function with unpacked inputs
+            const receipt = await txResponse.wait();
+            const gasUsed = receipt.gasUsed.toString();
+            contractManager.updateTaskGas(contractName, taskId, gasUsed);
             console.log(`Executed ${taskId} with inputs ${inputs}`);
+            console.log(`Gas used for ${taskId}: ${gasUsed}`);
         } else {
             throw new Error(`Function "${taskId}" not found on contract instance.`);
         }
@@ -119,10 +175,22 @@ const executeTask = async (contractManager, contractName, contractInstance, task
     }
 }
 
+// Function to generate a random value based on the type
+const generateRandomValue = (type) => {
+    if (type === 'string') {
+      return Math.random().toString(36).substring(2, 15); // Generate a random string
+    } else if (type === 'uint') {
+      return Math.floor(Math.random() * 1000); // Generate a random uint (integer)
+    }
+    throw new Error('Unknown type');
+  };
+
 module.exports = {
     setContracts,
     setResources,
     bigIntToStateString,
     queryContract,
-    executeTask
+    queryContracts,
+    executeTask,
+    generateRandomValue
 };
