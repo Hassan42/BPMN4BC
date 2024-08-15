@@ -31,7 +31,7 @@ export default function BcPropertiesProvider(propertiesPanel, injector, translat
    *
    * @return {(Object[]) => (Object[])} groups middleware
    */
-  this.getGroups = function(element) {
+  this.getGroups = function (element) {
 
     /**
      * We return a middleware that modifies
@@ -41,20 +41,22 @@ export default function BcPropertiesProvider(propertiesPanel, injector, translat
      *
      * @return {Object[]} modified groups
      */
-    return function(groups) {
-      
+    return function (groups) {
+
       const businessObject = element.businessObject;
       const isReceiveTask = is(businessObject, "bpmn:ReceiveTask");
       const isScriptTask = is(businessObject, "bpmn:ScriptTask");
       const isSendTask = is(businessObject, "bpmn:SendTask");
       const isFlow = is(businessObject, "bpmn:SequenceFlow");
       const isCollaboration = is(businessObject, "bpmn:Collaboration");
+      const isParticipant = is(businessObject, "bpmn:Participant");
+      const isLane = is(businessObject, "bpmn:Lane");
       const elementParent = element.parent?.businessObject ?? undefined;
 
       //if element is bc or lane in a bc pool
-      if (businessObject.bc === "true" || (is(businessObject, "bpmn:Lane") && (elementParent.bc === "true"))) {
+      if (businessObject.bc === "true") {
         groups.push(createBcGroup(element, translate));
-        
+
         if (isSendTask || isScriptTask) {
           groups.push(createBcInputGroup(element, injector, translate));
         }
@@ -62,23 +64,45 @@ export default function BcPropertiesProvider(propertiesPanel, injector, translat
         if (isReceiveTask || isScriptTask) {
           groups.push(createBcOutputGroup(element, injector, translate));
         }
-        
+
         //filtering out zeebe properties 
         if (isReceiveTask || isSendTask || isScriptTask) {
           groups = groups.filter(group => group.id !== 'inputs' && group.id !== 'outputs');
         }
       }
-      
+
+      // Check if the participant has no lanes
+      if (isParticipant && businessObject.bc === "true") {
+        const process = businessObject.processRef; // Get the associated process
+        if (process) {
+          const laneSets = process.get('laneSets');
+          if (laneSets) {
+            const hasLanes = laneSets.some(laneSet => laneSet.get('lanes').length > 0);
+            if (!hasLanes) {
+              groups.push(createBcOutputGroup(element, injector, translate));
+            } else {
+              // Remove bcOutputGroup if lanes are present
+              groups = groups.filter(group => group.id !== 'bcOutputGroup');
+            }
+          }
+        }
+      }
+
+      // Check if the element is a Lane and its parent is a blockchain environment
+      if (isLane && (elementParent.bc === "true")) {
+        groups.push(createBcOutputGroup(element, injector, translate));
+      }
+
       //Using custom condition properties
-      if(isFlow){
+      if (isFlow) {
         groups = groups.filter(group => group.id !== 'condition');
       }
 
-      if(isCollaboration){
+      if (isCollaboration) {
         groups.push(createBcRoleGroup(element, injector, translate));
       }
 
-     
+
       return groups;
     };
   };
@@ -87,7 +111,7 @@ export default function BcPropertiesProvider(propertiesPanel, injector, translat
   propertiesPanel.registerProvider(LOW_PRIORITY, this);
 }
 
-BcPropertiesProvider.$inject = [ 'propertiesPanel', 'injector', 'translate' ];
+BcPropertiesProvider.$inject = ['propertiesPanel', 'injector', 'translate'];
 
 
 function createBcGroup(element, translate) {

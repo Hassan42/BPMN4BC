@@ -298,13 +298,30 @@ const extractRolesFromCollaboration = (collaboration) => {
     return roleParameters;
 }
 
-const generateContractMeta = (contractName, networkId, activities, roles, startEventIds, formattedSolidityCode, formattedSolidityInterface) => {
+const generateContractMeta = (contractName, networkId, activities, roles, lane, participant, startEventIds, formattedSolidityCode, formattedSolidityInterface) => {
 
     const receiveTasks = activities.filter(activity => activity.$type === 'bpmn:ReceiveTask');
     const receiveTaskRoles = new Set(receiveTasks.map(task => task.bcsender));
 
     // Use an array to store unique output parameters
     const localStorage = [];
+
+    // Extract and add output parameters based on lanes and participant
+    if (lane) {
+        const outputParameters = extractOutputParameters(lane);
+        outputParameters.forEach(param => {
+            if (String(param.transactional).trim().toLowerCase() !== "true") {
+                localStorage.push({ type: param.type, name: param.name });
+            }
+        });
+    } else {
+        const participantOutputParameters = extractOutputParameters(participant);
+        participantOutputParameters.forEach(param => {
+            if (String(param.transactional).trim().toLowerCase() !== "true") {
+                localStorage.push({ type: param.type, name: param.name });
+            }
+        });
+    }
 
     activities.forEach(activity => {
         const outputParameters = extractOutputParameters(activity);

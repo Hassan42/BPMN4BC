@@ -28,16 +28,21 @@ export default function OutputParameterProps(props) {
       component: Type,
       idPrefix,
       parameter
-    },
-    {
-      id: idPrefix + '-scope',
-      component: Scope,
-      idPrefix,
-      parameter
-    },
+    }
   ];
 
-  if(is(element, "bpmn:ReceiveTask")){
+  if (!is(element, "bpmn:Lane") && !is(element, "bpmn:Participant")) {
+    entries.push(
+      {
+        id: idPrefix + '-scope',
+        component: Scope,
+        idPrefix,
+        parameter
+      }
+    )
+  }
+
+  if (is(element, "bpmn:ReceiveTask") || is(element, "bpmn:Lane") || is(element, "bpmn:Participant")) {
     entries.push(
       {
         id: idPrefix + '-external',
@@ -50,18 +55,17 @@ export default function OutputParameterProps(props) {
 
   // Update isExternal based on the parameter
   isExternal = parameter.external;
-  console.log(parameter);
   //if external we dont have hardcoded value
-  if(!isExternal){
-      entries.push(
-        {
-          id: idPrefix + '-value',
-          component: Value,
-          idPrefix,
-          parameter
-        }
-      )
-    }
+  if (!isExternal) {
+    entries.push(
+      {
+        id: idPrefix + '-value',
+        component: Value,
+        idPrefix,
+        parameter
+      }
+    )
+  }
 
   return entries;
 }
@@ -161,7 +165,7 @@ function Type(props) {
     return parameter.type;
   };
 
-  
+
   const getOptions = () => {
     return [
       { value: 'string', label: 'string' },

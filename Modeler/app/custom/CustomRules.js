@@ -82,10 +82,18 @@ CustomRules.prototype.init = function () {
     const bcTarget = targetBo.bc;
     const bcSource = sourceBo.bc;
 
-    // Allow outgoing connection from ScriptTask to AND gateway but not incoming
-    if (is(targetBo, "bpmn:ScriptTask") && (bcTarget === "true") && is(sourceBo, "bpmn:ParallelGateway")) {
-      return false; 
+    if (is(sourceBo, "bpmn:ParallelGateway")) {
+      // Check existing connections from this ParallelGateway to ScriptTask
+      const existingScriptTasks = source.outgoing
+        .filter(flow => is(flow.target.businessObject, 'bpmn:ScriptTask'))
+        .map(flow => flow.source);
+  
+      // If there is already a ScriptTask connected, disallow additional connections
+      if (existingScriptTasks.length > 0 && (bcTarget === "true")) {
+        return false;
+      }
     }
+  
 
     // Assign role to the receive task
     if (is(sourceBo, "bpmn:SendTask") && is(targetBo, "bpmn:ReceiveTask") && (bcSource === "true") && (bcTarget === "true")) {

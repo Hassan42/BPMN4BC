@@ -240,9 +240,10 @@ const updateLocalStorage = (contractName, inputs) => {
     if (inputs.length !== localStorage.length) {
         throw new Error(`Number of inputs (${inputs.length}) does not match number of localStorage parameters (${localStorage.length}).`);
     }
-
+    console.log(inputs)
     // Update localStorage parameters based on the inputs
     localStorage.forEach((param, index) => {
+        console.log(param)
         if (param.type) {
             const value = inputs[index];
             if (value !== undefined) {

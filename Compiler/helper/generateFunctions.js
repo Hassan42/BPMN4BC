@@ -22,7 +22,7 @@ function generateFunctionSignatures(solidityCode) {
     const visibility = match[3] || 'public';
     // const modifiers = match[4] || '';
     const returnType = match[5] || '';
-    
+
     // Exclude private functions
     if (visibility !== 'private') {
       const signature = `function ${functionName}(${functionParams}) external ${returnType};`;
@@ -131,7 +131,7 @@ function parseReturnValues(encodedString) {
  */
 function generateEntryFunction(activity, process, roles) {
   const contractName = getContractNameForElement(activity, process);
-  const senderRole =  activity.bcsender?.replace(/\s+/g, '') || '';
+  const senderRole = activity.bcsender?.replace(/\s+/g, '') || '';
   //We assign addresses dynamically on deployment
   // const senderAddress = roles.find(r => r.role === senderRole)?.address.replace(/\s+/g, '') || '';
 
@@ -237,7 +237,7 @@ function generateEntryFunction(activity, process, roles) {
         if (elementContractName !== contractName) {
           if (scriptOutputAssignments) {
             proceedingLogic += `(${scriptOutputAssignments}) = I${elementContractName}(contracts["${elementContractName}"]).${element.id}(${inputs});\n`;
-          } else{
+          } else {
             proceedingLogic += `I${elementContractName}(contracts["${elementContractName}"]).${element.id}(${inputs});\n`;
           }
         } else {
@@ -253,7 +253,7 @@ function generateEntryFunction(activity, process, roles) {
         //if join AND gateway
         if (element.incoming.length > 1) {
           const elementContractName = getContractNameForElement(element, process);
-          const gatewayFunctionName = elementContractName !== contractName 
+          const gatewayFunctionName = elementContractName !== contractName
             ? `I${elementContractName}(contracts["${elementContractName}"]).checkGateway_${element.id}`
             : `checkGateway_${element.id}`;
 
@@ -267,29 +267,54 @@ function generateEntryFunction(activity, process, roles) {
       }
       case 'bpmn:ExclusiveGateway': {
         const outgoingFlows = element.outgoing;
-        //Merge XOR
-        if (outgoingFlows.length === 1) {
-          const branchProceedingElements = getProceedingElementsFromFlow(outgoingFlows[0], process);
-          branchProceedingElements.forEach(branchElement => processElement(branchElement));
-        //Split XOR
-        } else {
-          outgoingFlows.forEach((flow, index) => {
-            const condition = flow.conditionExpression ? flow.conditionExpression.body : null; // Conditions for each branch
-            const branchProceedingElements = getProceedingElementsFromFlow(flow, process);
-            if (condition) {
-              let conditionExpression = condition.replace(/^\s*=\s*/, '').replace(/\$\{(.+?)\}/g, (match, varName) => {
-                return definedVariables.has(varName) ? varName : `localStorage.${varName}`;
-              });
-              proceedingLogic += index === 0 ? `if (${conditionExpression}) {\n` : `else if (${conditionExpression}) {\n`;
+    
+        // Separate flows with conditions and those without conditions
+        const flowsWithConditions = [];
+        const flowsWithoutConditions = [];
+
+ 
+    
+        outgoingFlows.forEach(flow => {
+            if (flow.conditionExpression && flow.conditionExpression.body) {
+                flowsWithConditions.push(flow);
             } else {
-              proceedingLogic += `else {\n`;
+                flowsWithoutConditions.push(flow);
             }
-            branchProceedingElements.forEach(branchElement => processElement(branchElement)); // We process the elements in each branch of the XOR recursively 
-            proceedingLogic += `}\n`;
-          });
+        });
+
+    
+        // Merge XOR logic
+        if (outgoingFlows.length === 1) {
+            const branchProceedingElements = getProceedingElementsFromFlow(outgoingFlows[0], process);
+            branchProceedingElements.forEach(branchElement => processElement(branchElement));
+        // Split XOR logic
+        } else {
+            // Process flows with conditions first
+            flowsWithConditions.forEach((flow, index) => {
+                const condition = flow.conditionExpression ? flow.conditionExpression.body : null;
+                const branchProceedingElements = getProceedingElementsFromFlow(flow, process);
+                if (condition) {
+                    let conditionExpression = condition.replace(/^\s*=\s*/, '').replace(/\$\{(.+?)\}/g, (match, varName) => {
+                        return definedVariables.has(varName) ? varName : `localStorage.${varName}`;
+                    });
+                    proceedingLogic += index === 0 ? `if (${conditionExpression}) {\n` : `else if (${conditionExpression}) {\n`;
+                    branchProceedingElements.forEach(branchElement => processElement(branchElement));
+                    proceedingLogic += `}\n`;
+                }
+            });
+    
+            // Process flows without conditions (default case)
+            if (flowsWithoutConditions.length > 0) {
+                proceedingLogic += `else {\n`;
+                flowsWithoutConditions.forEach(flow => {
+                    const branchProceedingElements = getProceedingElementsFromFlow(flow, process);
+                    branchProceedingElements.forEach(branchElement => processElement(branchElement));
+                });
+                proceedingLogic += `}\n`;
+            }
         }
         break;
-      }
+    }
       case 'bpmn:IntermediateThrowEvent': {
         const eventName = element.bceventname || element.id.replace(/\s+/g, '');
         proceedingLogic += `emit ${eventName}();\n`;
@@ -303,9 +328,31 @@ function generateEntryFunction(activity, process, roles) {
         proceedingLogic += `// Logic for ${element.name || element.id}\n`;
     }
   }
+
+
+  // Check for any incoming connections to an EventBasedGateway
+  const incomingFlows = activity.incoming || [];
+  incomingFlows.forEach(flow => {
+    const previousElement = process.flowElements.find(el => el.id === flow.sourceRef.id);
+    if (previousElement) {
+      if (previousElement.$type === 'bpmn:EventBasedGateway') {
+        const outgoingFlows = previousElement.outgoing;
+        const targetElements = outgoingFlows.map(flow => process.flowElements.find(el => el.id === flow.targetRef.id));
+
+        targetElements.forEach(target => {
+          if (target && target.$type === 'bpmn:ReceiveTask' && target.id !== activity.id) {
+            proceedingLogic += `state["${target.id.replace(/\s+/g, '')}"] = State.Closed;\n`;
+          }
+        });
+      }
+    }
+  });
+
+
   proceedingElements.forEach(element => {
     processElement(element);
   });
+
 
   return `
     function ${activity.id.replace(/\s+/g, '')}(${externalParams}) public isAccessible("${activity.id.replace(/\s+/g, '')}", "${senderRole}") {
