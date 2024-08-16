@@ -267,54 +267,52 @@ function generateEntryFunction(activity, process, roles) {
       }
       case 'bpmn:ExclusiveGateway': {
         const outgoingFlows = element.outgoing;
-    
+
         // Separate flows with conditions and those without conditions
         const flowsWithConditions = [];
         const flowsWithoutConditions = [];
 
- 
-    
         outgoingFlows.forEach(flow => {
-            if (flow.conditionExpression && flow.conditionExpression.body) {
-                flowsWithConditions.push(flow);
-            } else {
-                flowsWithoutConditions.push(flow);
-            }
+          if (flow.conditionExpression && flow.conditionExpression.body) {
+            flowsWithConditions.push(flow);
+          } else {
+            flowsWithoutConditions.push(flow);
+          }
         });
 
-    
+
         // Merge XOR logic
         if (outgoingFlows.length === 1) {
-            const branchProceedingElements = getProceedingElementsFromFlow(outgoingFlows[0], process);
-            branchProceedingElements.forEach(branchElement => processElement(branchElement));
-        // Split XOR logic
+          const branchProceedingElements = getProceedingElementsFromFlow(outgoingFlows[0], process);
+          branchProceedingElements.forEach(branchElement => processElement(branchElement));
+          // Split XOR logic
         } else {
-            // Process flows with conditions first
-            flowsWithConditions.forEach((flow, index) => {
-                const condition = flow.conditionExpression ? flow.conditionExpression.body : null;
-                const branchProceedingElements = getProceedingElementsFromFlow(flow, process);
-                if (condition) {
-                    let conditionExpression = condition.replace(/^\s*=\s*/, '').replace(/\$\{(.+?)\}/g, (match, varName) => {
-                        return definedVariables.has(varName) ? varName : `localStorage.${varName}`;
-                    });
-                    proceedingLogic += index === 0 ? `if (${conditionExpression}) {\n` : `else if (${conditionExpression}) {\n`;
-                    branchProceedingElements.forEach(branchElement => processElement(branchElement));
-                    proceedingLogic += `}\n`;
-                }
-            });
-    
-            // Process flows without conditions (default case)
-            if (flowsWithoutConditions.length > 0) {
-                proceedingLogic += `else {\n`;
-                flowsWithoutConditions.forEach(flow => {
-                    const branchProceedingElements = getProceedingElementsFromFlow(flow, process);
-                    branchProceedingElements.forEach(branchElement => processElement(branchElement));
-                });
-                proceedingLogic += `}\n`;
+          // Process flows with conditions first
+          flowsWithConditions.forEach((flow, index) => {
+            const condition = flow.conditionExpression ? flow.conditionExpression.body : null;
+            const branchProceedingElements = getProceedingElementsFromFlow(flow, process);
+            if (condition) {
+              let conditionExpression = condition.replace(/^\s*=\s*/, '').replace(/\$\{(.+?)\}/g, (match, varName) => {
+                return definedVariables.has(varName) ? varName : `localStorage.${varName}`;
+              });
+              proceedingLogic += index === 0 ? `if (${conditionExpression}) {\n` : `else if (${conditionExpression}) {\n`;
+              branchProceedingElements.forEach(branchElement => processElement(branchElement));
+              proceedingLogic += `}\n`;
             }
+          });
+
+          // Process flows without conditions (default case)
+          if (flowsWithoutConditions.length > 0) {
+            proceedingLogic += `else {\n`;
+            flowsWithoutConditions.forEach(flow => {
+              const branchProceedingElements = getProceedingElementsFromFlow(flow, process);
+              branchProceedingElements.forEach(branchElement => processElement(branchElement));
+            });
+            proceedingLogic += `}\n`;
+          }
         }
         break;
-    }
+      }
       case 'bpmn:IntermediateThrowEvent': {
         const eventName = element.bceventname || element.id.replace(/\s+/g, '');
         proceedingLogic += `emit ${eventName}();\n`;
@@ -349,17 +347,22 @@ function generateEntryFunction(activity, process, roles) {
   });
 
 
+
+
   proceedingElements.forEach(element => {
     processElement(element);
   });
 
+
+  // Determine if the current activity has a subsequent ReceiveTask with the same ID
+  const hasNextReceiveTask = proceedingElements.some(element => element.$type === 'bpmn:ReceiveTask' && element.id === activity.id);
 
   return `
     function ${activity.id.replace(/\s+/g, '')}(${externalParams}) public isAccessible("${activity.id.replace(/\s+/g, '')}", "${senderRole}") {
         ${storageAssignments}
         ${transactionalAssignments}
         ${proceedingLogic}
-        state["${activity.id.replace(/\s+/g, '')}"] = State.Completed;
+        ${!hasNextReceiveTask ? `state["${activity.id.replace(/\s+/g, '')}"] = State.Completed;` : ''}
     }
   `;
 }

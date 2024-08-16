@@ -27,9 +27,9 @@ contract Process_1_DefaultContract {
 
     event Owner_Registered();
 
-    event Event_1o3n0dt();
-
     event Event_1n4z8ak();
+
+    event Event_1o3n0dt();
 
     struct LocalStorage {
         string property_owner;
@@ -40,10 +40,10 @@ contract Process_1_DefaultContract {
 
     constructor() {
         state["Activity_0hnfduf"] = State.Open;
-        state["Activity_11aq4w4"] = State.Closed;
         state["Activity_03z2h2j"] = State.Open;
         state["Activity_0twj7n8"] = State.Closed;
         state["Activity_063mdk6"] = State.Closed;
+        state["Activity_11aq4w4"] = State.Open;
     }
 
     function setContracts(address[] memory addresses) public {}
@@ -88,9 +88,42 @@ contract Process_1_DefaultContract {
     ) public isAccessible("Activity_0hnfduf", "Authority") {
         localStorage.zone = zone;
 
-        state["Activity_11aq4w4"] = State.Open;
+        state["Activity_0hnfduf"] = State.Open;
+    }
 
-        state["Activity_0hnfduf"] = State.Completed;
+    function Activity_03z2h2j(
+        string memory landID
+    ) public isAccessible("Activity_03z2h2j", "Buyer") {
+        localStorage.landID = landID;
+
+        // Logic for Gateway_10wlqkf
+        state["Activity_0twj7n8"] = State.Open;
+        state["Activity_063mdk6"] = State.Open;
+
+        state["Activity_03z2h2j"] = State.Completed;
+    }
+
+    function Activity_0twj7n8(
+        string memory new_owner
+    ) public isAccessible("Activity_0twj7n8", "Landlord") {
+        state["Activity_063mdk6"] = State.Closed;
+
+        Activity_1ue8g60(new_owner);
+        emit Event_1o3n0dt();
+        state["Activity_03z2h2j"] = State.Open;
+
+        state["Activity_0twj7n8"] = State.Completed;
+    }
+
+    function Activity_063mdk6()
+        public
+        isAccessible("Activity_063mdk6", "Landlord")
+    {
+        state["Activity_0twj7n8"] = State.Closed;
+        emit Event_1n4z8ak();
+        state["Activity_03z2h2j"] = State.Open;
+
+        state["Activity_063mdk6"] = State.Completed;
     }
 
     function Activity_11aq4w4(
@@ -111,36 +144,7 @@ contract Process_1_DefaultContract {
         localStorage.property_owner = owner;
     }
 
-    function Activity_03z2h2j(
-        string memory landID
-    ) public isAccessible("Activity_03z2h2j", "Buyer") {
-        localStorage.landID = landID;
-
-        // Logic for Gateway_10wlqkf
-        state["Activity_0twj7n8"] = State.Open;
-        state["Activity_063mdk6"] = State.Open;
-
-        state["Activity_03z2h2j"] = State.Completed;
-    }
-
-    function Activity_0twj7n8(
-        string memory property_owner
-    ) public isAccessible("Activity_0twj7n8", "Landlord") {
-        localStorage.property_owner = property_owner;
-
-        state["Activity_063mdk6"] = State.Closed;
-        emit Event_1o3n0dt();
-
-        state["Activity_0twj7n8"] = State.Completed;
-    }
-
-    function Activity_063mdk6()
-        public
-        isAccessible("Activity_063mdk6", "Landlord")
-    {
-        state["Activity_0twj7n8"] = State.Closed;
-        emit Event_1n4z8ak();
-
-        state["Activity_063mdk6"] = State.Completed;
+    function Activity_1ue8g60(string memory new_owner) public {
+        localStorage.property_owner = new_owner;
     }
 }

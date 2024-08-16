@@ -36,7 +36,8 @@ CustomRules.prototype.init = function () {
         is(shapeBo, "bpmn:EventBasedGateway") ||
         is(shapeBo, "bpmn:ExclusiveGateway") ||
         is(shapeBo, "bpmn:StartEvent") ||
-        is(shapeBo, "bpmn:EndEvent")) &&
+        is(shapeBo, "bpmn:EndEvent") ||
+        is(shapeBo, "bpmn:DataObjectReference")) &&
         (!is(shapeBo, "bpmn:SendTask")) &&
         (!is(shapeBo, "bpmn:IntermediateCatchEvent")) &&
         (!is(shapeBo, "bpmn:Participant"));
