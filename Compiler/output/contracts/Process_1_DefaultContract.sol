@@ -134,7 +134,9 @@ contract Process_1_DefaultContract {
             Activity_0doea6v(owner);
             emit Owner_Registered();
         } else {
-            revert("End Event reached: Event_15zrmvl");
+            revert(
+                "End Event reached: Event_15zrmvl, Zone not open for registration."
+            );
         }
 
         state["Activity_11aq4w4"] = State.Completed;

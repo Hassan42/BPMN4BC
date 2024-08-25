@@ -51,6 +51,15 @@ export default function (element) {
       isEdited: isTextFieldEntryEdited
     }
   );
+  } else if(is(element, 'bpmn:EndEvent')){
+    props.push(
+      {
+        id: 'error',
+        element,
+        component: Error,
+        isEdited: isTextFieldEntryEdited
+      }
+    );
   }
 // else if (is(element, 'bpmn:Lane') || (is(element, 'bpmn:Participant') && (element.children.length == 0))){
 //   props.push({
@@ -72,6 +81,33 @@ export default function (element) {
 return props;
 }
 
+function Error(props) {
+  const { element, id } = props;
+
+  const modeling = useService('modeling');
+  const translate = useService('translate');
+  const debounce = useService('debounceInput');
+
+  const getValue = () => {
+    return element.businessObject.error || '';
+  };
+
+  const setValue = value => {
+    return modeling.updateProperties(element, {
+      error: value
+    });
+  };
+
+  return html`<${TextFieldEntry}
+    id=${id}
+    element=${element}
+    description=${translate('Revert Error Message')}
+    label=${translate('Error')}
+    getValue=${getValue}
+    setValue=${setValue}
+    debounce=${debounce}
+  />`;
+}
 
 function Sender(props) {
   const { element, id } = props;

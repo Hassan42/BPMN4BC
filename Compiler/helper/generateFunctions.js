@@ -319,7 +319,7 @@ function generateEntryFunction(activity, process, roles) {
         break;
       }
       case 'bpmn:EndEvent': {
-        proceedingLogic += `revert("End Event reached: ${element.id.replace(/\s+/g, '')}");\n`;
+        proceedingLogic += `revert("End Event reached: ${element.id.replace(/\s+/g, '')}, ${element.error}");\n`;
         break;
       }
       default:

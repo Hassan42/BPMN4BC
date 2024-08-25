@@ -66,6 +66,11 @@
             "name": "returns",
             "isAttr": true,
             "type": "String"
+          },
+          {
+            "name": "error",
+            "isAttr": true,
+            "type": "String"
           }
         ]
       },
