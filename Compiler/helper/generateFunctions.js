@@ -87,13 +87,17 @@ function generateScriptFunction(activity) {
     })
     .join('\n');
 
+  // Check if solidityScript contains "localStorage" and determine visibility
+  const hasLocalStorageAssignment = /localStorage\.[\w_]+\s*[\+\-\*\/%]?\s*=[^;]*;/.test(solidityScript);
+  const functionVisibility = hasLocalStorageAssignment ? '' : 'view';
+
   const scriptWithoutReturn = solidityScript.replace(/return\s+.*?;/g, '').trim();
   const returnStatement = combinedReturnParams.length > 0
     ? `return (${combinedReturnParams.map(param => param.name).join(', ')});`
     : '';
 
   return `
-    function ${activity.id.replace(/\s+/g, '')}(${inputTypes}) public ${returnClause} {
+    function ${activity.id.replace(/\s+/g, '')}(${inputTypes}) public ${functionVisibility} ${returnClause} {
         ${storageAssignments}
         ${transactionalAssignments}
         ${scriptWithoutReturn}

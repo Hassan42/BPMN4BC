@@ -40,7 +40,6 @@ task('deploy-contracts', 'Deploys all contracts and updates contracts.json')
                 continue;
             }
 
-            // Add the 'ganache-' prefix to the network ID from the contract info
             const contractNetworkId = contractInfo.networkId;
             if (contractNetworkId !== network) {
                 console.log(`Skipping ${contractName} as it is not intended for network ${network}.`);

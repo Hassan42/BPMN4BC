@@ -4,90 +4,68 @@
     "networkId": "network-1",
     "contractRoles": [
       {
-        "role": "Buyer"
-      },
-      {
-        "role": "Authority"
-      },
-      {
-        "role": "Landlord"
+        "role": "User"
       }
     ],
     "receiveTasks": [
       {
-        "id": "Activity_0hnfduf",
-        "sender": "Authority",
-        "name": "Registration Zones",
+        "id": "Activity_0hg1f91",
+        "sender": "User",
+        "name": "swap tokens",
         "state": "Open",
         "externalParams": [
           {
-            "name": "zone",
-            "type": "uint"
-          }
-        ]
-      },
-      {
-        "id": "Activity_03z2h2j",
-        "sender": "Buyer",
-        "name": "Purchase Request",
-        "state": "Open",
-        "externalParams": [
-          {
-            "name": "landID",
-            "type": "string"
-          }
-        ]
-      },
-      {
-        "id": "Activity_0twj7n8",
-        "sender": "Landlord",
-        "name": "Accept Request",
-        "state": "Closed",
-        "externalParams": [
-          {
-            "name": "new_owner",
-            "type": "string"
-          }
-        ]
-      },
-      {
-        "id": "Activity_063mdk6",
-        "sender": "Landlord",
-        "name": "Reject Request",
-        "state": "Closed",
-        "externalParams": []
-      },
-      {
-        "id": "Activity_11aq4w4",
-        "sender": "Landlord",
-        "name": "Property Registration",
-        "state": "Open",
-        "externalParams": [
-          {
-            "name": "request_zone",
+            "name": "_deadline",
             "type": "uint"
           },
           {
-            "name": "owner",
+            "name": "_amountIn",
+            "type": "uint"
+          },
+          {
+            "name": "_minAmountOut",
+            "type": "uint"
+          }
+        ]
+      }
+    ],
+    "contractCode": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\ncontract Process_1_DefaultContract {\n    enum State {\n        Closed,\n        Open,\n        Completed\n    }\n\n    mapping(string => State) public state;\n\n    uint receiveFunctionCount = 1;\n\n    mapping(string => address) public contracts;\n\n    mapping(address => string) public addressToRole;\n\n    modifier isAccessible(string memory _activity, string memory _role) {\n        require(state[_activity] == State.Open, \"Activity is not open\");\n        require(\n            compareStrings(addressToRole[msg.sender], _role),\n            \"Caller does not have the required role\"\n        );\n        _;\n    }\n\n    event Event_1d691ho();\n\n    struct LocalStorage {\n        uint ReserveA;\n        uint ReserveB;\n    }\n    LocalStorage public localStorage;\n\n    constructor() {\n        state[\"Activity_0hg1f91\"] = State.Open;\n        localStorage.ReserveA = 100;\n        localStorage.ReserveB = 100;\n    }\n\n    function setContracts(address[] memory addresses) public {}\n\n    function setResources(\n        string[] memory _roles,\n        address[] memory _addresses\n    ) public {\n        require(\n            _roles.length == _addresses.length,\n            \"Roles and addresses arrays must be of the same length\"\n        );\n\n        for (uint i = 0; i < _addresses.length; i++) {\n            addressToRole[_addresses[i]] = _roles[i];\n        }\n    }\n\n    function setResource(string memory _role, address _address) public {\n        addressToRole[_address] = _role;\n    }\n\n    function setState(string memory _activity, uint8 _state) public {\n        require(_state <= 3, \"Not Valid State\");\n        state[_activity] = State(_state);\n    }\n\n    function getState(string memory _activity) public view returns (State) {\n        return state[_activity];\n    }\n\n    //To be replaced with ENUM\n    function compareStrings(\n        string memory a,\n        string memory b\n    ) internal pure returns (bool) {\n        return keccak256(abi.encodePacked(a)) == keccak256(abi.encodePacked(b));\n    }\n\n    function Activity_15dqul7(uint _amountIn) public view returns (uint) {\n        require(_amountIn > 0, \" INSUFFICIENT_INPUT_AMOUNT\");\n\n        uint amountOut;\n\n        amountOut = (_amountIn * localStorage.ReserveB) / localStorage.ReserveA;\n        return (amountOut);\n    }\n\n    function Activity_0hg1f91(\n        uint _deadline,\n        uint _amountIn,\n        uint _minAmountOut\n    ) public isAccessible(\"Activity_0hg1f91\", \"User\") {\n        if (_deadline >= block.timestamp) {\n            uint amountOut;\n            (amountOut) = Activity_15dqul7(_amountIn);\n            if (amountOut > _minAmountOut) {\n                Activity_11u68g6(amountOut, _amountIn);\n                emit Event_1d691ho();\n            } else {\n                revert(\n                    \"End Event reached: Event_0lvec7f, Amount is less than minimum\"\n                );\n            }\n        } else {\n            revert(\"End Event reached: Event_06wt5e1, Deadline reached\");\n        }\n\n        state[\"Activity_0hg1f91\"] = State.Completed;\n    }\n\n    function Activity_11u68g6(uint amountOut, uint _amountIn) public {\n        localStorage.ReserveB -= amountOut;\n        localStorage.ReserveA += _amountIn;\n    }\n}\n",
+    "contractInterface": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\ninterface IProcess_1_DefaultContract {\n    enum State {\n        Closed,\n        Open,\n        Completed\n    }\n    function setContracts(address[] memory addresses) external;\n    function setResources(\n        string[] memory _roles,\n        address[] memory _addresses\n    ) external;\n    function setResource(string memory _role, address _address) external;\n    function setState(string memory _activity, uint8 _state) external;\n    function getState(string memory _activity) external returns (State);\n    function compareStrings(\n        string memory a,\n        string memory b\n    ) external returns (bool);\n    function Activity_15dqul7(uint _amountIn) external returns (uint);\n    function Activity_0hg1f91(\n        uint _deadline,\n        uint _amountIn,\n        uint _minAmountOut\n    ) external;\n    function Activity_11u68g6(uint amountOut, uint _amountIn) external;\n}\n",
+    "localStorage": [
+      {
+        "type": "uint",
+        "name": "ReserveA"
+      },
+      {
+        "type": "uint",
+        "name": "ReserveB"
+      }
+    ]
+  },
+  {
+    "contractName": "Process_081yz0e_DefaultContract",
+    "networkId": "network-2",
+    "contractRoles": [],
+    "receiveTasks": [
+      {
+        "id": "Activity_1ce26nj",
+        "sender": "Exchanger",
+        "name": "swap hashes",
+        "state": "Open",
+        "externalParams": [
+          {
+            "name": "Swap_Hash",
             "type": "string"
           }
         ]
       }
     ],
-    "contractCode": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\ncontract Process_1_DefaultContract {\n    enum State {\n        Closed,\n        Open,\n        Completed\n    }\n\n    mapping(string => State) public state;\n\n    uint receiveFunctionCount = 5;\n\n    mapping(string => address) public contracts;\n\n    mapping(address => string) public addressToRole;\n\n    modifier isAccessible(string memory _activity, string memory _role) {\n        require(state[_activity] == State.Open, \"Activity is not open\");\n        require(\n            compareStrings(addressToRole[msg.sender], _role),\n            \"Caller does not have the required role\"\n        );\n        _;\n    }\n\n    event Property_Mint();\n\n    event Property_Transfer_Rejection();\n\n    event Property_Transferred();\n\n    struct LocalStorage {\n        string property_owner;\n        uint zone;\n        string landID;\n    }\n    LocalStorage public localStorage;\n\n    constructor() {\n        state[\"Activity_0hnfduf\"] = State.Open;\n        state[\"Activity_03z2h2j\"] = State.Open;\n        state[\"Activity_0twj7n8\"] = State.Closed;\n        state[\"Activity_063mdk6\"] = State.Closed;\n        state[\"Activity_11aq4w4\"] = State.Open;\n    }\n\n    function setContracts(address[] memory addresses) public {}\n\n    function setResources(\n        string[] memory _roles,\n        address[] memory _addresses\n    ) public {\n        require(\n            _roles.length == _addresses.length,\n            \"Roles and addresses arrays must be of the same length\"\n        );\n\n        for (uint i = 0; i < _addresses.length; i++) {\n            addressToRole[_addresses[i]] = _roles[i];\n        }\n    }\n\n    function setResource(string memory _role, address _address) public {\n        addressToRole[_address] = _role;\n    }\n\n    function setState(string memory _activity, uint8 _state) public {\n        require(_state <= 3, \"Not Valid State\");\n        state[_activity] = State(_state);\n    }\n\n    function getState(string memory _activity) public view returns (State) {\n        return state[_activity];\n    }\n\n    //To be replaced with ENUM\n    function compareStrings(\n        string memory a,\n        string memory b\n    ) internal pure returns (bool) {\n        return keccak256(abi.encodePacked(a)) == keccak256(abi.encodePacked(b));\n    }\n\n    function Activity_0hnfduf(\n        uint zone\n    ) public isAccessible(\"Activity_0hnfduf\", \"Authority\") {\n        localStorage.zone = zone;\n\n        state[\"Activity_0hnfduf\"] = State.Open;\n    }\n\n    function Activity_03z2h2j(\n        string memory landID\n    ) public isAccessible(\"Activity_03z2h2j\", \"Buyer\") {\n        localStorage.landID = landID;\n\n        // Logic for Gateway_10wlqkf\n        state[\"Activity_0twj7n8\"] = State.Open;\n        state[\"Activity_063mdk6\"] = State.Open;\n\n        state[\"Activity_03z2h2j\"] = State.Completed;\n    }\n\n    function Activity_0twj7n8(\n        string memory new_owner\n    ) public isAccessible(\"Activity_0twj7n8\", \"Landlord\") {\n        state[\"Activity_063mdk6\"] = State.Closed;\n\n        Activity_1ue8g60(new_owner);\n        emit Property_Transferred();\n        state[\"Activity_03z2h2j\"] = State.Open;\n\n        state[\"Activity_0twj7n8\"] = State.Completed;\n    }\n\n    function Activity_063mdk6()\n        public\n        isAccessible(\"Activity_063mdk6\", \"Landlord\")\n    {\n        state[\"Activity_0twj7n8\"] = State.Closed;\n        emit Property_Transfer_Rejection();\n        state[\"Activity_03z2h2j\"] = State.Open;\n\n        state[\"Activity_063mdk6\"] = State.Completed;\n    }\n\n    function Activity_11aq4w4(\n        uint request_zone,\n        string memory owner\n    ) public isAccessible(\"Activity_11aq4w4\", \"Landlord\") {\n        if (localStorage.zone == request_zone) {\n            Activity_0doea6v(owner);\n            emit Property_Mint();\n        } else {\n            revert(\n                \"End Event reached: Event_15zrmvl, Zone not open for registration.\"\n            );\n        }\n\n        state[\"Activity_11aq4w4\"] = State.Completed;\n    }\n\n    function Activity_0doea6v(string memory owner) public {\n        localStorage.property_owner = owner;\n    }\n\n    function Activity_1ue8g60(string memory new_owner) public {\n        localStorage.property_owner = new_owner;\n    }\n}\n",
-    "contractInterface": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\ninterface IProcess_1_DefaultContract {\n    enum State {\n        Closed,\n        Open,\n        Completed\n    }\n    function setContracts(address[] memory addresses) external;\n    function setResources(\n        string[] memory _roles,\n        address[] memory _addresses\n    ) external;\n    function setResource(string memory _role, address _address) external;\n    function setState(string memory _activity, uint8 _state) external;\n    function getState(string memory _activity) external returns (State);\n    function compareStrings(\n        string memory a,\n        string memory b\n    ) external returns (bool);\n    function Activity_0hnfduf(uint zone) external;\n    function Activity_03z2h2j(string memory landID) external;\n    function Activity_0twj7n8(string memory new_owner) external;\n    function Activity_063mdk6() external;\n    function Activity_11aq4w4(uint request_zone, string memory owner) external;\n    function Activity_0doea6v(string memory owner) external;\n    function Activity_1ue8g60(string memory new_owner) external;\n}\n",
+    "contractCode": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\ncontract Process_081yz0e_DefaultContract {\n    enum State {\n        Closed,\n        Open,\n        Completed\n    }\n\n    mapping(string => State) public state;\n\n    uint receiveFunctionCount = 1;\n\n    mapping(string => address) public contracts;\n\n    mapping(address => string) public addressToRole;\n\n    modifier isAccessible(string memory _activity, string memory _role) {\n        require(state[_activity] == State.Open, \"Activity is not open\");\n        require(\n            compareStrings(addressToRole[msg.sender], _role),\n            \"Caller does not have the required role\"\n        );\n        _;\n    }\n\n    struct LocalStorage {\n        string Swap_Hash;\n    }\n    LocalStorage public localStorage;\n\n    constructor() {\n        state[\"Activity_1ce26nj\"] = State.Open;\n    }\n\n    function setContracts(address[] memory addresses) public {}\n\n    function setResources(\n        string[] memory _roles,\n        address[] memory _addresses\n    ) public {\n        require(\n            _roles.length == _addresses.length,\n            \"Roles and addresses arrays must be of the same length\"\n        );\n\n        for (uint i = 0; i < _addresses.length; i++) {\n            addressToRole[_addresses[i]] = _roles[i];\n        }\n    }\n\n    function setResource(string memory _role, address _address) public {\n        addressToRole[_address] = _role;\n    }\n\n    function setState(string memory _activity, uint8 _state) public {\n        require(_state <= 3, \"Not Valid State\");\n        state[_activity] = State(_state);\n    }\n\n    function getState(string memory _activity) public view returns (State) {\n        return state[_activity];\n    }\n\n    //To be replaced with ENUM\n    function compareStrings(\n        string memory a,\n        string memory b\n    ) internal pure returns (bool) {\n        return keccak256(abi.encodePacked(a)) == keccak256(abi.encodePacked(b));\n    }\n\n    function Activity_1ce26nj(\n        string memory Swap_Hash\n    ) public isAccessible(\"Activity_1ce26nj\", \"Exchanger\") {\n        localStorage.Swap_Hash = Swap_Hash;\n\n        state[\"Activity_1ce26nj\"] = State.Open;\n    }\n}\n",
+    "contractInterface": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\ninterface IProcess_081yz0e_DefaultContract {\n    enum State {\n        Closed,\n        Open,\n        Completed\n    }\n    function setContracts(address[] memory addresses) external;\n    function setResources(\n        string[] memory _roles,\n        address[] memory _addresses\n    ) external;\n    function setResource(string memory _role, address _address) external;\n    function setState(string memory _activity, uint8 _state) external;\n    function getState(string memory _activity) external returns (State);\n    function compareStrings(\n        string memory a,\n        string memory b\n    ) external returns (bool);\n    function Activity_1ce26nj(string memory Swap_Hash) external;\n}\n",
     "localStorage": [
       {
         "type": "string",
-        "name": "property_owner"
-      },
-      {
-        "type": "uint",
-        "name": "zone"
-      },
-      {
-        "type": "string",
-        "name": "landID"
+        "name": "Swap_Hash"
       }
     ]
   }

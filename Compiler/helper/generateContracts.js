@@ -27,7 +27,7 @@ async function generateContract(contractParams) {
     lane
   } = contractParams;
 
-  const storageStruct = generateStorage(activities, participant, lane);
+  const { storageStruct, initializationCode } = generateStorage(activities, participant, lane);
   const functions = generateFunctions(activities, process, roles).join('\n');
   const gatewayFunctions = generateGateways(gateways);
   const solidityEvents = generateEvents(events);
@@ -81,6 +81,7 @@ async function generateContract(contractParams) {
 
       constructor() {
           ${stateMappings}
+          ${initializationCode}
       }
 
       function setContracts(address[] memory addresses) public{
@@ -142,7 +143,6 @@ async function generateContract(contractParams) {
     throw('Error formatting or writing Solidity code:', error);
   }
 }
-
 
 /**
  * Generates a Solidity interface for the given contract name and functions.

@@ -1,4 +1,4 @@
-const { extractOutputParameters, findLanesForProcess } = require('./utils.js');
+const { extractOutputParameters } = require('./utils.js');
 
 
 /**
@@ -8,7 +8,7 @@ const { extractOutputParameters, findLanesForProcess } = require('./utils.js');
  */
 function generateStorage(activities, participant, lane) {
     const outputParamsSet = new Set();
-
+    const initialValues = {};
 
     // Extract and add output parameters based on lanes and participant
     if (lane) {
@@ -16,6 +16,9 @@ function generateStorage(activities, participant, lane) {
         outputParameters.forEach(param => {
             if (String(param.transactional).trim().toLowerCase() !== "true") {
                 outputParamsSet.add(`${param.type} ${param.name};`);
+                if (param.value) {
+                    initialValues[param.name] = param.value;
+                }
             }
         });
     } else {
@@ -23,6 +26,9 @@ function generateStorage(activities, participant, lane) {
         participantOutputParameters.forEach(param => {
             if (String(param.transactional).trim().toLowerCase() !== "true") {
                 outputParamsSet.add(`${param.type} ${param.name};`);
+                if (param.value) {
+                    initialValues[param.name] = param.value;
+                }
             }
         });
     }
@@ -33,13 +39,16 @@ function generateStorage(activities, participant, lane) {
         activityOutputParameters.forEach(param => {
             if (String(param.transactional).trim().toLowerCase() !== "true") {
                 outputParamsSet.add(`${param.type} ${param.name};`);
+                if (param.value) {
+                    initialValues[param.name] = param.value;
+                }
             }
         });
     });
 
     // Generate the storage structure
     if (outputParamsSet.size === 0) {
-        return '';
+        return { storageStruct: '', initializationCode: '' };
     }
 
     const storageStruct = `
@@ -49,7 +58,14 @@ function generateStorage(activities, participant, lane) {
     LocalStorage public localStorage;
     `;
 
-    return storageStruct;
+    // Generate initialization code
+    const initializationCode = Object.keys(initialValues).length > 0
+        ? Object.entries(initialValues)
+            .map(([name, value]) => `localStorage.${name} = ${value};`)
+            .join('\n        ')
+        : '';
+
+    return { storageStruct, initializationCode };
 }
 
 
