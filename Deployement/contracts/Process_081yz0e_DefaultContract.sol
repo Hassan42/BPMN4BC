@@ -73,7 +73,7 @@ contract Process_081yz0e_DefaultContract {
 
     function Activity_1ce26nj(
         string memory Swap_Hash
-    ) public isAccessible("Activity_1ce26nj", "Exchanger") {
+    ) public isAccessible("Activity_1ce26nj", "Relayer") {
         localStorage.Swap_Hash = Swap_Hash;
 
         state["Activity_1ce26nj"] = State.Open;

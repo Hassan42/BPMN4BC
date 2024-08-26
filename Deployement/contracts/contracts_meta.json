@@ -13,7 +13,7 @@
         "id": "Activity_0hg1f91",
         "sender": "User",
         "name": "swap tokens",
-        "state": "Open",
+        "state": "Completed",
         "externalParams": [
           {
             "name": "_deadline",
@@ -27,33 +27,39 @@
             "name": "_minAmountOut",
             "type": "uint"
           }
-        ]
+        ],
+        "gasUsed": "44454"
       }
     ],
-    "contractCode": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\ncontract Process_1_DefaultContract {\n    enum State {\n        Closed,\n        Open,\n        Completed\n    }\n\n    mapping(string => State) public state;\n\n    uint receiveFunctionCount = 1;\n\n    mapping(string => address) public contracts;\n\n    mapping(address => string) public addressToRole;\n\n    modifier isAccessible(string memory _activity, string memory _role) {\n        require(state[_activity] == State.Open, \"Activity is not open\");\n        require(\n            compareStrings(addressToRole[msg.sender], _role),\n            \"Caller does not have the required role\"\n        );\n        _;\n    }\n\n    event Event_1d691ho();\n\n    struct LocalStorage {\n        uint ReserveA;\n        uint ReserveB;\n    }\n    LocalStorage public localStorage;\n\n    constructor() {\n        state[\"Activity_0hg1f91\"] = State.Open;\n        localStorage.ReserveA = 100;\n        localStorage.ReserveB = 100;\n    }\n\n    function setContracts(address[] memory addresses) public {}\n\n    function setResources(\n        string[] memory _roles,\n        address[] memory _addresses\n    ) public {\n        require(\n            _roles.length == _addresses.length,\n            \"Roles and addresses arrays must be of the same length\"\n        );\n\n        for (uint i = 0; i < _addresses.length; i++) {\n            addressToRole[_addresses[i]] = _roles[i];\n        }\n    }\n\n    function setResource(string memory _role, address _address) public {\n        addressToRole[_address] = _role;\n    }\n\n    function setState(string memory _activity, uint8 _state) public {\n        require(_state <= 3, \"Not Valid State\");\n        state[_activity] = State(_state);\n    }\n\n    function getState(string memory _activity) public view returns (State) {\n        return state[_activity];\n    }\n\n    //To be replaced with ENUM\n    function compareStrings(\n        string memory a,\n        string memory b\n    ) internal pure returns (bool) {\n        return keccak256(abi.encodePacked(a)) == keccak256(abi.encodePacked(b));\n    }\n\n    function Activity_15dqul7(uint _amountIn) public view returns (uint) {\n        require(_amountIn > 0, \" INSUFFICIENT_INPUT_AMOUNT\");\n\n        uint amountOut;\n\n        amountOut = (_amountIn * localStorage.ReserveB) / localStorage.ReserveA;\n        return (amountOut);\n    }\n\n    function Activity_0hg1f91(\n        uint _deadline,\n        uint _amountIn,\n        uint _minAmountOut\n    ) public isAccessible(\"Activity_0hg1f91\", \"User\") {\n        if (_deadline >= block.timestamp) {\n            uint amountOut;\n            (amountOut) = Activity_15dqul7(_amountIn);\n            if (amountOut > _minAmountOut) {\n                Activity_11u68g6(amountOut, _amountIn);\n                emit Event_1d691ho();\n            } else {\n                revert(\n                    \"End Event reached: Event_0lvec7f, Amount is less than minimum\"\n                );\n            }\n        } else {\n            revert(\"End Event reached: Event_06wt5e1, Deadline reached\");\n        }\n\n        state[\"Activity_0hg1f91\"] = State.Completed;\n    }\n\n    function Activity_11u68g6(uint amountOut, uint _amountIn) public {\n        localStorage.ReserveB -= amountOut;\n        localStorage.ReserveA += _amountIn;\n    }\n}\n",
+    "contractCode": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\ncontract Process_1_DefaultContract {\n    enum State {\n        Closed,\n        Open,\n        Completed\n    }\n\n    mapping(string => State) public state;\n\n    uint receiveFunctionCount = 1;\n\n    mapping(string => address) public contracts;\n\n    mapping(address => string) public addressToRole;\n\n    modifier isAccessible(string memory _activity, string memory _role) {\n        require(state[_activity] == State.Open, \"Activity is not open\");\n        require(\n            compareStrings(addressToRole[msg.sender], _role),\n            \"Caller does not have the required role\"\n        );\n        _;\n    }\n\n    event Event_1d691ho();\n\n    struct LocalStorage {\n        uint ReserveA;\n        uint ReserveB;\n    }\n    LocalStorage public localStorage;\n\n    constructor() {\n        state[\"Activity_0hg1f91\"] = State.Open;\n        localStorage.ReserveA = 100;\n        localStorage.ReserveB = 100;\n    }\n\n    function setContracts(address[] memory addresses) public {}\n\n    function setResources(\n        string[] memory _roles,\n        address[] memory _addresses\n    ) public {\n        require(\n            _roles.length == _addresses.length,\n            \"Roles and addresses arrays must be of the same length\"\n        );\n\n        for (uint i = 0; i < _addresses.length; i++) {\n            addressToRole[_addresses[i]] = _roles[i];\n        }\n    }\n\n    function setResource(string memory _role, address _address) public {\n        addressToRole[_address] = _role;\n    }\n\n    function setState(string memory _activity, uint8 _state) public {\n        require(_state <= 3, \"Not Valid State\");\n        state[_activity] = State(_state);\n    }\n\n    function getState(string memory _activity) public view returns (State) {\n        return state[_activity];\n    }\n\n    //To be replaced with ENUM\n    function compareStrings(\n        string memory a,\n        string memory b\n    ) internal pure returns (bool) {\n        return keccak256(abi.encodePacked(a)) == keccak256(abi.encodePacked(b));\n    }\n\n    function Activity_15dqul7(uint _amountIn) public view returns (uint) {\n        require(_amountIn > 0, \" INSUFFICIENT_INPUT_AMOUNT\");\n\n        uint amountOut;\n\n        amountOut = (_amountIn * localStorage.ReserveB) / localStorage.ReserveA;\n        return (amountOut);\n    }\n\n    function Activity_0hg1f91(\n        uint _deadline,\n        uint _amountIn,\n        uint _minAmountOut\n    ) public isAccessible(\"Activity_0hg1f91\", \"User\") {\n        if (_deadline <= block.timestamp) {\n            uint amountOut;\n            (amountOut) = Activity_15dqul7(_amountIn);\n            if (amountOut >= _minAmountOut) {\n                Activity_11u68g6(amountOut, _amountIn);\n                emit Event_1d691ho();\n            } else {\n                revert(\n                    \"End Event reached: Event_0lvec7f, Amount is less than minimum\"\n                );\n            }\n        } else {\n            revert(\"End Event reached: Event_06wt5e1, Deadline reached\");\n        }\n\n        state[\"Activity_0hg1f91\"] = State.Completed;\n    }\n\n    function Activity_11u68g6(uint amountOut, uint _amountIn) public {\n        localStorage.ReserveB -= amountOut;\n        localStorage.ReserveA += _amountIn;\n    }\n}\n",
     "contractInterface": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\ninterface IProcess_1_DefaultContract {\n    enum State {\n        Closed,\n        Open,\n        Completed\n    }\n    function setContracts(address[] memory addresses) external;\n    function setResources(\n        string[] memory _roles,\n        address[] memory _addresses\n    ) external;\n    function setResource(string memory _role, address _address) external;\n    function setState(string memory _activity, uint8 _state) external;\n    function getState(string memory _activity) external returns (State);\n    function compareStrings(\n        string memory a,\n        string memory b\n    ) external returns (bool);\n    function Activity_15dqul7(uint _amountIn) external returns (uint);\n    function Activity_0hg1f91(\n        uint _deadline,\n        uint _amountIn,\n        uint _minAmountOut\n    ) external;\n    function Activity_11u68g6(uint amountOut, uint _amountIn) external;\n}\n",
     "localStorage": [
       {
         "type": "uint",
         "name": "ReserveA",
-        "value": 100
+        "value": 102
       },
       {
         "type": "uint",
         "name": "ReserveB",
-        "value": 100
+        "value": 98
       }
     ],
-    "address": "0x3537D20aE5f4F958BD245b5777454473b09Fc48A"
+    "address": "0x63AAFE84D499c9eEB71704F69743144903833C8F"
   },
   {
     "contractName": "Process_081yz0e_DefaultContract",
     "networkId": "network-2",
-    "contractRoles": [],
+    "contractRoles": [
+      {
+        "role": "Relayer",
+        "address": "0x73DFAD597060EcB1118eaE0FB1AD1C03E0196019"
+      }
+    ],
     "receiveTasks": [
       {
         "id": "Activity_1ce26nj",
-        "sender": "Exchanger",
+        "sender": "Relayer",
         "name": "swap hashes",
         "state": "Open",
         "externalParams": [
@@ -61,18 +67,19 @@
             "name": "Swap_Hash",
             "type": "string"
           }
-        ]
+        ],
+        "gasUsed": "52583"
       }
     ],
-    "contractCode": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\ncontract Process_081yz0e_DefaultContract {\n    enum State {\n        Closed,\n        Open,\n        Completed\n    }\n\n    mapping(string => State) public state;\n\n    uint receiveFunctionCount = 1;\n\n    mapping(string => address) public contracts;\n\n    mapping(address => string) public addressToRole;\n\n    modifier isAccessible(string memory _activity, string memory _role) {\n        require(state[_activity] == State.Open, \"Activity is not open\");\n        require(\n            compareStrings(addressToRole[msg.sender], _role),\n            \"Caller does not have the required role\"\n        );\n        _;\n    }\n\n    struct LocalStorage {\n        string Swap_Hash;\n    }\n    LocalStorage public localStorage;\n\n    constructor() {\n        state[\"Activity_1ce26nj\"] = State.Open;\n    }\n\n    function setContracts(address[] memory addresses) public {}\n\n    function setResources(\n        string[] memory _roles,\n        address[] memory _addresses\n    ) public {\n        require(\n            _roles.length == _addresses.length,\n            \"Roles and addresses arrays must be of the same length\"\n        );\n\n        for (uint i = 0; i < _addresses.length; i++) {\n            addressToRole[_addresses[i]] = _roles[i];\n        }\n    }\n\n    function setResource(string memory _role, address _address) public {\n        addressToRole[_address] = _role;\n    }\n\n    function setState(string memory _activity, uint8 _state) public {\n        require(_state <= 3, \"Not Valid State\");\n        state[_activity] = State(_state);\n    }\n\n    function getState(string memory _activity) public view returns (State) {\n        return state[_activity];\n    }\n\n    //To be replaced with ENUM\n    function compareStrings(\n        string memory a,\n        string memory b\n    ) internal pure returns (bool) {\n        return keccak256(abi.encodePacked(a)) == keccak256(abi.encodePacked(b));\n    }\n\n    function Activity_1ce26nj(\n        string memory Swap_Hash\n    ) public isAccessible(\"Activity_1ce26nj\", \"Exchanger\") {\n        localStorage.Swap_Hash = Swap_Hash;\n\n        state[\"Activity_1ce26nj\"] = State.Open;\n    }\n}\n",
+    "contractCode": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\ncontract Process_081yz0e_DefaultContract {\n    enum State {\n        Closed,\n        Open,\n        Completed\n    }\n\n    mapping(string => State) public state;\n\n    uint receiveFunctionCount = 1;\n\n    mapping(string => address) public contracts;\n\n    mapping(address => string) public addressToRole;\n\n    modifier isAccessible(string memory _activity, string memory _role) {\n        require(state[_activity] == State.Open, \"Activity is not open\");\n        require(\n            compareStrings(addressToRole[msg.sender], _role),\n            \"Caller does not have the required role\"\n        );\n        _;\n    }\n\n    struct LocalStorage {\n        string Swap_Hash;\n    }\n    LocalStorage public localStorage;\n\n    constructor() {\n        state[\"Activity_1ce26nj\"] = State.Open;\n    }\n\n    function setContracts(address[] memory addresses) public {}\n\n    function setResources(\n        string[] memory _roles,\n        address[] memory _addresses\n    ) public {\n        require(\n            _roles.length == _addresses.length,\n            \"Roles and addresses arrays must be of the same length\"\n        );\n\n        for (uint i = 0; i < _addresses.length; i++) {\n            addressToRole[_addresses[i]] = _roles[i];\n        }\n    }\n\n    function setResource(string memory _role, address _address) public {\n        addressToRole[_address] = _role;\n    }\n\n    function setState(string memory _activity, uint8 _state) public {\n        require(_state <= 3, \"Not Valid State\");\n        state[_activity] = State(_state);\n    }\n\n    function getState(string memory _activity) public view returns (State) {\n        return state[_activity];\n    }\n\n    //To be replaced with ENUM\n    function compareStrings(\n        string memory a,\n        string memory b\n    ) internal pure returns (bool) {\n        return keccak256(abi.encodePacked(a)) == keccak256(abi.encodePacked(b));\n    }\n\n    function Activity_1ce26nj(\n        string memory Swap_Hash\n    ) public isAccessible(\"Activity_1ce26nj\", \"Relayer\") {\n        localStorage.Swap_Hash = Swap_Hash;\n\n        state[\"Activity_1ce26nj\"] = State.Open;\n    }\n}\n",
     "contractInterface": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\ninterface IProcess_081yz0e_DefaultContract {\n    enum State {\n        Closed,\n        Open,\n        Completed\n    }\n    function setContracts(address[] memory addresses) external;\n    function setResources(\n        string[] memory _roles,\n        address[] memory _addresses\n    ) external;\n    function setResource(string memory _role, address _address) external;\n    function setState(string memory _activity, uint8 _state) external;\n    function getState(string memory _activity) external returns (State);\n    function compareStrings(\n        string memory a,\n        string memory b\n    ) external returns (bool);\n    function Activity_1ce26nj(string memory Swap_Hash) external;\n}\n",
     "localStorage": [
       {
         "type": "string",
         "name": "Swap_Hash",
-        "value": ""
+        "value": "someHash"
       }
     ],
-    "address": "0x6ECF865EF743787fac95ba3f4af3c9010c0192dA"
+    "address": "0x97Fc4a305375610B1afABFf4BcC1A56FE5E68A69"
   }
 ]

@@ -90,10 +90,10 @@ contract Process_1_DefaultContract {
         uint _amountIn,
         uint _minAmountOut
     ) public isAccessible("Activity_0hg1f91", "User") {
-        if (_deadline >= block.timestamp) {
+        if (_deadline <= block.timestamp) {
             uint amountOut;
             (amountOut) = Activity_15dqul7(_amountIn);
-            if (amountOut > _minAmountOut) {
+            if (amountOut >= _minAmountOut) {
                 Activity_11u68g6(amountOut, _amountIn);
                 emit Event_1d691ho();
             } else {

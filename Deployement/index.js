@@ -256,7 +256,7 @@ app.post('/executeTask', async (req, res) => {
   } catch (err) {
     // Handle errors and send error response
     console.error('Error executing Hardhat task:', err);
-    res.status(500).json({ message: 'Error executing task.' });
+    res.status(500).json({ message: 'Error executing task.', error: err});
   }
 });
 
