@@ -1,4 +1,4 @@
-const { generateContractMeta, findCollaboration, findProcessForParticipant, findLanesForProcess, findActivitiesForLane, findActivitiesForProcess, findGatewaysForProcess, findGatewaysForLane, formatSolidityCode, findEventsForProcess, findEventsForLane, extractRolesFromCollaboration } = require('./utils.js');
+const { generateContractConfig, findCollaboration, findProcessForParticipant, findLanesForProcess, findActivitiesForLane, findActivitiesForProcess, findGatewaysForProcess, findGatewaysForLane, formatSolidityCode, findEventsForProcess, findEventsForLane, extractRolesFromCollaboration } = require('./utils.js');
 const { generateFunctions, generateFunctionSignatures } = require('./generateFunctions.js');
 const { generateStorage } = require('./generateStorage.js');
 const { generateGateways } = require('./generateGateways.js');
@@ -13,7 +13,20 @@ const path = require('path');
  * @param {Object} process - The process containing the activities.
  * @returns - The generated contract with its interface.
  */
-async function generateContract(contractName, networkId, activities, gateways, lanes, events, process, roles, participant, lane) {
+async function generateContract(contractParams) {
+  const {
+    contractName,
+    networkId,
+    activities,
+    gateways,
+    lanes,
+    events,
+    process,
+    roles,
+    participant,
+    lane
+  } = contractParams;
+
   const storageStruct = generateStorage(activities, participant, lane);
   const functions = generateFunctions(activities, process, roles).join('\n');
   const gatewayFunctions = generateGateways(gateways);
@@ -112,9 +125,18 @@ async function generateContract(contractName, networkId, activities, gateways, l
     fs.writeFileSync(outputPath, formattedSolidityCode, 'utf8');
     console.log(`Generated Solidity contract: ${contractName}`);
     //TODO: refactor contracts meta
-    const contractMeta = generateContractMeta(contractName, networkId, activities, roles, lane, participant, startEventIds, formattedSolidityCode, formattedSolidityInterface);
-    return contractMeta;
-    // return {contractName: contractName, contract: formattedSolidityCode, interface: formattedSolidityInterface, contractRoles: contractRoles, TaskToRole: receiveTaskToRoleMap};
+    const contractConfig = generateContractConfig({
+      contractName,
+      networkId,
+      activities,
+      roles,
+      lane,
+      participant,
+      startEventIds,
+      formattedSolidityCode,
+      formattedSolidityInterface
+    });
+    return contractConfig;
   } catch (error) {
     console.log(solidityCode);
     throw('Error formatting or writing Solidity code:', error);
@@ -173,25 +195,43 @@ async function generateContracts(definitions) {
       } else {
         const lanes = findLanesForProcess(process);
         if (lanes.length === 0) {
-          const defaultContractName = `${process.id.replace(/\s+/g, '')}_DefaultContract`;
-          const activities = findActivitiesForProcess(process);
-          const gateways = findGatewaysForProcess(process);
-          const events = findEventsForProcess(process);
-          const contractDetails = await generateContract(defaultContractName, networkId, activities, gateways, lanes, events, process, roles, participant);
-          contracts.push(contractDetails);
+          const contractParams = {
+            contractName: `${process.id.replace(/\s+/g, '')}_DefaultContract`,
+            networkId,
+            activities: findActivitiesForProcess(process),
+            gateways: findGatewaysForProcess(process),
+            lanes,
+            events: findEventsForProcess(process),
+            process,
+            roles,
+            participant
+          };
+          const contractConfig = await generateContract(contractParams);
+          contracts.push(contractConfig);
         } else {
           for (const lane of lanes) {
-            const contractName = lane.id.replace(/\s+/g, '') + '_Contract';
-            const activities = findActivitiesForLane(lane);
-            const gateways = findGatewaysForLane(lane);
-            const events = findEventsForLane(lane);
-            const contractDetails = await generateContract(contractName, networkId, activities, gateways, lanes, events, process, roles, participant, lane);
-            contracts.push(contractDetails);
+            const contractParams = {
+              contractName: lane.id.replace(/\s+/g, '') + '_Contract',
+              networkId,
+              activities: findActivitiesForLane(lane),
+              gateways: findGatewaysForLane(lane),
+              lanes,
+              events: findEventsForLane(lane),
+              process,
+              roles,
+              participant,
+              lane
+            };
+            const contractConfig = await generateContract(contractParams);
+            contracts.push(contractConfig);
           }
         }
       }
     }
   }
+  const outputPath = path.resolve('./output/contracts.json');
+  fs.writeFileSync(outputPath, JSON.stringify(contracts, null, 2), 'utf8');
+  console.log(`Contracts have been saved to ${outputPath}`);
   
   return contracts;
 }

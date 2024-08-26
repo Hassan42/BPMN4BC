@@ -298,7 +298,17 @@ const extractRolesFromCollaboration = (collaboration) => {
     return roleParameters;
 }
 
-const generateContractMeta = (contractName, networkId, activities, roles, lane, participant, startEventIds, formattedSolidityCode, formattedSolidityInterface) => {
+const generateContractConfig = ({
+    contractName,
+    networkId,
+    activities,
+    roles,
+    lane,
+    participant,
+    startEventIds,
+    formattedSolidityCode,
+    formattedSolidityInterface
+  }) => {
 
     const receiveTasks = activities.filter(activity => activity.$type === 'bpmn:ReceiveTask');
     const receiveTaskRoles = new Set(receiveTasks.map(task => task.bcsender));
@@ -396,5 +406,5 @@ module.exports = {
     findEventsForProcess,
     findEventsForLane,
     extractRolesFromCollaboration,
-    generateContractMeta
+    generateContractConfig
 };

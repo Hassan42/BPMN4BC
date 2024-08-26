@@ -25,11 +25,11 @@ contract Process_1_DefaultContract {
         _;
     }
 
-    event Owner_Registered();
+    event Property_Mint();
 
-    event Event_1n4z8ak();
+    event Property_Transfer_Rejection();
 
-    event Event_1o3n0dt();
+    event Property_Transferred();
 
     struct LocalStorage {
         string property_owner;
@@ -109,7 +109,7 @@ contract Process_1_DefaultContract {
         state["Activity_063mdk6"] = State.Closed;
 
         Activity_1ue8g60(new_owner);
-        emit Event_1o3n0dt();
+        emit Property_Transferred();
         state["Activity_03z2h2j"] = State.Open;
 
         state["Activity_0twj7n8"] = State.Completed;
@@ -120,7 +120,7 @@ contract Process_1_DefaultContract {
         isAccessible("Activity_063mdk6", "Landlord")
     {
         state["Activity_0twj7n8"] = State.Closed;
-        emit Event_1n4z8ak();
+        emit Property_Transfer_Rejection();
         state["Activity_03z2h2j"] = State.Open;
 
         state["Activity_063mdk6"] = State.Completed;
@@ -132,7 +132,7 @@ contract Process_1_DefaultContract {
     ) public isAccessible("Activity_11aq4w4", "Landlord") {
         if (localStorage.zone == request_zone) {
             Activity_0doea6v(owner);
-            emit Owner_Registered();
+            emit Property_Mint();
         } else {
             revert(
                 "End Event reached: Event_15zrmvl, Zone not open for registration."
