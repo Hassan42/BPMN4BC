@@ -43,7 +43,7 @@ export default class CustomRenderer extends BaseRenderer {
     const { bc, bctype } = businessObject;
 
     // ignore labels
-    return is(element, `bpmn:${bctype}`);
+    return is(element, `bpmn:${bctype}`) && !element.labelTarget;
   }
 
   drawShape(parentNode, element) {

@@ -35,11 +35,13 @@
     "localStorage": [
       {
         "type": "uint",
-        "name": "ReserveA"
+        "name": "ReserveA",
+        "value": 100
       },
       {
         "type": "uint",
-        "name": "ReserveB"
+        "name": "ReserveB",
+        "value": 100
       }
     ],
     "address": "0x3537D20aE5f4F958BD245b5777454473b09Fc48A"
@@ -67,7 +69,8 @@
     "localStorage": [
       {
         "type": "string",
-        "name": "Swap_Hash"
+        "name": "Swap_Hash",
+        "value": ""
       }
     ],
     "address": "0x6ECF865EF743787fac95ba3f4af3c9010c0192dA"
