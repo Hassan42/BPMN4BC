@@ -8,6 +8,7 @@ import BCTHROW from '../assets/BC-THROW-EVENT-ICON.svg';
 import BCREVTHROW from '../assets/THROW-REV-ICON.svg';
 import BCREVCATCH from '../assets/CATCH-REV-ICON.svg';
 import BCSCRIPT from '../assets/BC-SCRIPT-icon.svg';
+import BCSTIMER from '../assets/BC-TIMER-ICON.svg';
 
 export default class CustomPalette {
   constructor(bpmnFactory, create, elementFactory, modeling, palette, translate) {
@@ -131,6 +132,16 @@ export default class CustomPalette {
         action: {
           dragstart: createElement("true", "ScriptTask"),
           click: createElement("true", "ScriptTask")
+        },
+        className: 'custom-palette',
+      },
+      'BCTimer': {
+        group: 'BC',
+        imageUrl: BCSTIMER,
+        title: translate('Create BC timer event'),
+        action: {
+          dragstart: createElement("true", "IntermediateCatchEvent", "timerEvent"),
+          click: createElement("true", "IntermediateCatchEvent", "timerEvent")
         },
         className: 'custom-palette',
       }

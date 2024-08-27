@@ -25,8 +25,6 @@ task('setup-contracts', 'Execute the contracts setup')
     for (const contract of contracts) {
       const contractAddress = contract.address;
       const contractName = contract.contractName;
-
-      // Add 'ganache-' prefix to the network ID from contract info
       const contractNetworkId = contract.networkId;
 
       // Check if the contract is intended for the specified network

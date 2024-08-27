@@ -95,8 +95,17 @@ app.post('/stop', async (req, res) => {
     // List all containers
     const containers = await docker.listContainers({ all: true });
 
+    // Load and parse hardhat.config.js
+    const configPath = path.join(__dirname, 'hardhat.config.js');
+    const hardhatConfig = require(configPath);
+
+    // Extract network names
+    const networks = Object.keys(hardhatConfig.networks);
+
     // Filter out containers related to Ganache
-    const ganacheContainers = containers.filter(c => c.Names.some(name => name.startsWith('/ganache-')));
+    const ganacheContainers =  containers.filter(c =>
+      c.Names.some(name => networks.includes(name.replace('/', '')))
+    );
 
     if (ganacheContainers.length === 0) {
       return res.status(400).json({ message: 'No Ganache containers are running.' });

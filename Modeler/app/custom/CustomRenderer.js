@@ -26,6 +26,7 @@ import BCGroup from '../assets/BC.svg';
 import BCRECEIVE from '../assets/BC-RECEIVE.svg';
 import BCREVTHROW from '../assets/THROW-REV.svg';
 import BCREVCATCH from '../assets/CATCH-REV.svg';
+import BCTIMER from '../assets/BC-TIMER.svg';
 
 const HIGH_PRIORITY = 1500;
 
@@ -120,7 +121,7 @@ export default class CustomRenderer extends BaseRenderer {
           case "IntermediateCatchEvent":
             this.bpmnRenderer.drawShape(parentNode, element);
             var href = BCRECEIVE;
-            // if(bcevent=="catchRevertEvent") {href=BCREVCATCH;}
+            if(bcevent=="timerEvent") {href=BCTIMER;}
             bcSvg = svgCreate("image", {
               x: 9,
               y: 8.5,
