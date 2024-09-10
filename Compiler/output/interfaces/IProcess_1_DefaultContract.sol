@@ -19,11 +19,11 @@ interface IProcess_1_DefaultContract {
         string memory a,
         string memory b
     ) external returns (bool);
-    function Activity_15dqul7(uint _amountIn) external returns (uint);
-    function Activity_0hg1f91(
-        uint _deadline,
-        uint _amountIn,
-        uint _minAmountOut
-    ) external;
-    function Activity_11u68g6(uint amountOut, uint _amountIn) external;
+    function Activity_0hnfduf(uint zone) external;
+    function Activity_03z2h2j(string memory landID) external;
+    function Activity_0twj7n8(string memory new_owner) external;
+    function Activity_063mdk6() external;
+    function Activity_11aq4w4(uint request_zone, string memory owner) external;
+    function Activity_0doea6v(string memory owner) external;
+    function Activity_1ue8g60(string memory new_owner) external;
 }

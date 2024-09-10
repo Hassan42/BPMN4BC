@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-interface IProcess_081yz0e_DefaultContract {
+interface IProcess_1_DefaultContract {
     enum State {
         Closed,
         Open,
@@ -19,5 +19,11 @@ interface IProcess_081yz0e_DefaultContract {
         string memory a,
         string memory b
     ) external returns (bool);
-    function Activity_1ce26nj(string memory Swap_Hash) external;
+    function Activity_0hnfduf(uint zone) external;
+    function Activity_03z2h2j(string memory landID) external;
+    function Activity_0twj7n8(string memory new_owner) external;
+    function Activity_063mdk6() external;
+    function Activity_11aq4w4(uint request_zone, string memory owner) external;
+    function Activity_0doea6v(string memory owner) external;
+    function Activity_1ue8g60(string memory new_owner) external;
 }

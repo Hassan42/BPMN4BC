@@ -10,7 +10,7 @@ contract Process_1_DefaultContract {
 
     mapping(string => State) public state;
 
-    uint receiveFunctionCount = 1;
+    uint receiveFunctionCount = 5;
 
     mapping(string => address) public contracts;
 
@@ -25,18 +25,25 @@ contract Process_1_DefaultContract {
         _;
     }
 
-    event Event_1d691ho();
+    event Property_Mint();
+
+    event Property_Transfer_Rejection();
+
+    event Property_Transferred();
 
     struct LocalStorage {
-        uint ReserveA;
-        uint ReserveB;
+        string property_owner;
+        uint zone;
+        string landID;
     }
     LocalStorage public localStorage;
 
     constructor() {
-        state["Activity_0hg1f91"] = State.Open;
-        localStorage.ReserveA = 100;
-        localStorage.ReserveB = 100;
+        state["Activity_0hnfduf"] = State.Open;
+        state["Activity_03z2h2j"] = State.Open;
+        state["Activity_0twj7n8"] = State.Closed;
+        state["Activity_063mdk6"] = State.Closed;
+        state["Activity_11aq4w4"] = State.Open;
     }
 
     function setContracts(address[] memory addresses) public {}
@@ -76,40 +83,70 @@ contract Process_1_DefaultContract {
         return keccak256(abi.encodePacked(a)) == keccak256(abi.encodePacked(b));
     }
 
-    function Activity_15dqul7(uint _amountIn) public view returns (uint) {
-        require(_amountIn > 0, " INSUFFICIENT_INPUT_AMOUNT");
+    function Activity_0hnfduf(
+        uint zone
+    ) public isAccessible("Activity_0hnfduf", "Authority") {
+        localStorage.zone = zone;
 
-        uint amountOut;
-
-        amountOut = (_amountIn * localStorage.ReserveB) / localStorage.ReserveA;
-        return (amountOut);
+        state["Activity_0hnfduf"] = State.Open;
     }
 
-    function Activity_0hg1f91(
-        uint _deadline,
-        uint _amountIn,
-        uint _minAmountOut
-    ) public isAccessible("Activity_0hg1f91", "User") {
-        if (_deadline <= block.timestamp) {
-            uint amountOut;
-            (amountOut) = Activity_15dqul7(_amountIn);
-            if (amountOut >= _minAmountOut) {
-                Activity_11u68g6(amountOut, _amountIn);
-                emit Event_1d691ho();
-            } else {
-                revert(
-                    "End Event reached: Event_0lvec7f, Amount is less than minimum"
-                );
-            }
+    function Activity_03z2h2j(
+        string memory landID
+    ) public isAccessible("Activity_03z2h2j", "Buyer") {
+        localStorage.landID = landID;
+
+        // Logic for Gateway_10wlqkf
+        state["Activity_0twj7n8"] = State.Open;
+        state["Activity_063mdk6"] = State.Open;
+
+        state["Activity_03z2h2j"] = State.Completed;
+    }
+
+    function Activity_0twj7n8(
+        string memory new_owner
+    ) public isAccessible("Activity_0twj7n8", "Landlord") {
+        state["Activity_063mdk6"] = State.Closed;
+
+        Activity_1ue8g60(new_owner);
+        emit Property_Transferred();
+        state["Activity_03z2h2j"] = State.Open;
+
+        state["Activity_0twj7n8"] = State.Completed;
+    }
+
+    function Activity_063mdk6()
+        public
+        isAccessible("Activity_063mdk6", "Landlord")
+    {
+        state["Activity_0twj7n8"] = State.Closed;
+        emit Property_Transfer_Rejection();
+        state["Activity_03z2h2j"] = State.Open;
+
+        state["Activity_063mdk6"] = State.Completed;
+    }
+
+    function Activity_11aq4w4(
+        uint request_zone,
+        string memory owner
+    ) public isAccessible("Activity_11aq4w4", "Landlord") {
+        if (localStorage.zone == request_zone) {
+            Activity_0doea6v(owner);
+            emit Property_Mint();
         } else {
-            revert("End Event reached: Event_06wt5e1, Deadline reached");
+            revert(
+                "End Event reached: Event_15zrmvl, Zone not open for registration."
+            );
         }
 
-        state["Activity_0hg1f91"] = State.Completed;
+        state["Activity_11aq4w4"] = State.Completed;
     }
 
-    function Activity_11u68g6(uint amountOut, uint _amountIn) public {
-        localStorage.ReserveB -= amountOut;
-        localStorage.ReserveA += _amountIn;
+    function Activity_0doea6v(string memory owner) public {
+        localStorage.property_owner = owner;
+    }
+
+    function Activity_1ue8g60(string memory new_owner) public {
+        localStorage.property_owner = new_owner;
     }
 }
