@@ -1,4 +1,4 @@
-const { extractOutputParameters } = require('./utils.js');
+const { extractOutputParameters, capitalize, isValueType } = require('./utils.js');
 
 
 /**
@@ -7,55 +7,57 @@ const { extractOutputParameters } = require('./utils.js');
  * @returns {string} The Solidity code for the LocalStorage struct, or an empty string if there are no non-transactional output parameters.
  */
 function generateStorage(activities, participant, lane) {
-    const outputParamsSet = new Set();
+    const outputParamsArray = [];  // Use an array instead of a Set
     const initialValues = {};
 
-    // Extract and add output parameters based on lanes and participant
+    // Helper function to check if a parameter is not transactional
+    function isNotTransactional(param) {
+        return String(param?.transactional).trim().toLowerCase() !== "true";
+    }
+
+    // Function to add parameters to outputParamsArray
+    function addParams(params) {
+        params.forEach(param => {
+            if (isNotTransactional(param)) {
+                // Add the type and name as an object to the array
+                outputParamsArray.push({ type: param.type, name: param.name });
+                // If there's an initial value, store it
+                if (param.value) {
+                    initialValues[param.name] = param.value;
+                }
+            }
+        });
+    }
+
+    // Extract and add output parameters based on lane or participant
     if (lane) {
-        const outputParameters = extractOutputParameters(lane);
-        outputParameters.forEach(param => {
-            if (String(param.transactional).trim().toLowerCase() !== "true") {
-                outputParamsSet.add(`${param.type} ${param.name};`);
-                if (param.value) {
-                    initialValues[param.name] = param.value;
-                }
-            }
-        });
+        addParams(extractOutputParameters(lane));
     } else {
-        const participantOutputParameters = extractOutputParameters(participant);
-        participantOutputParameters.forEach(param => {
-            if (String(param.transactional).trim().toLowerCase() !== "true") {
-                outputParamsSet.add(`${param.type} ${param.name};`);
-                if (param.value) {
-                    initialValues[param.name] = param.value;
-                }
-            }
-        });
+        addParams(extractOutputParameters(participant));
     }
 
     // Extract and add output parameters from activities
     activities.forEach(activity => {
-        const activityOutputParameters = extractOutputParameters(activity);
-        activityOutputParameters.forEach(param => {
-            if (String(param.transactional).trim().toLowerCase() !== "true") {
-                outputParamsSet.add(`${param.type} ${param.name};`);
-                if (param.value) {
-                    initialValues[param.name] = param.value;
-                }
-            }
-        });
+        addParams(extractOutputParameters(activity));
     });
 
     // Generate the storage structure
-    if (outputParamsSet.size === 0) {
-        return { storageStruct: '', initializationCode: '' };
+    if (outputParamsArray.length === 0) {
+        return { storageStruct: '', initializationCode: '', readFunctions: '' };
     }
+
+    // Generate read functions for each output parameter
+    const readFunctions = outputParamsArray.map(({ type, name }) => `
+    function get${capitalize(name)}() public view returns (${type}${isValueType(type) ? '' : ' memory'}) {
+        return localStorage.${name};
+    }
+    `).join('');
 
     const storageStruct = `
     struct LocalStorage {
-        ${Array.from(outputParamsSet).join('\n        ')}
+        ${outputParamsArray.map(param => `${param.type} ${param.name};`).join('\n        ')}
     }
-    LocalStorage public localStorage;
+    LocalStorage private localStorage;
     `;
 
     // Generate initialization code
@@ -65,8 +67,10 @@ function generateStorage(activities, participant, lane) {
             .join('\n        ')
         : '';
 
-    return { storageStruct, initializationCode };
+    return { storageStruct, initializationCode, readFunctions };
 }
+
+
 
 
 module.exports = { generateStorage };

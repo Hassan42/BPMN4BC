@@ -27,7 +27,7 @@ async function generateContract(contractParams) {
     lane
   } = contractParams;
 
-  const { storageStruct, initializationCode } = generateStorage(activities, participant, lane);
+  const { storageStruct, initializationCode, readFunctions } = generateStorage(activities, participant, lane);
   const functions = generateFunctions(activities, process, roles).join('\n');
   const gatewayFunctions = generateGateways(gateways);
   const solidityEvents = generateEvents(events);
@@ -87,6 +87,8 @@ async function generateContract(contractParams) {
       function setContracts(address[] memory addresses) public{
           ${contractsMapping}
       }
+
+      ${readFunctions}
 
       function setResources(string[] memory _roles, address[] memory _addresses) public {
         require(_roles.length == _addresses.length, "Roles and addresses arrays must be of the same length");

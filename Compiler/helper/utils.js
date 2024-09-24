@@ -388,6 +388,12 @@ const generateContractConfig = ({
     };
 }
 
+// Helper function to capitalize the first letter of a string
+function capitalize(str) {
+    console.log(str)
+    return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
 module.exports = {
     findCollaboration,
     findProcessForParticipant,
@@ -406,5 +412,6 @@ module.exports = {
     findEventsForProcess,
     findEventsForLane,
     extractRolesFromCollaboration,
-    generateContractConfig
+    generateContractConfig,
+    capitalize
 };
