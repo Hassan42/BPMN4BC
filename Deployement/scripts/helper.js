@@ -145,7 +145,7 @@ const queryContracts = async (contractManager) => {
 const executeTask = async (contractManager, contractName, contractInstance, taskId, inputs) => {
     try {
         const { ethers } = require("hardhat");
-        
+
         // Get the task by its ID
         const task = contractManager.getTaskById(contractName, taskId);
 
@@ -167,6 +167,8 @@ const executeTask = async (contractManager, contractName, contractInstance, task
 
         // Unpack inputs and call the function on the contract instance
         if (typeof contractWithSigner[taskId] === 'function') {
+            // const gasEstimate = await contractWithSigner[taskId].estimateGas(...inputs);
+            // console.log(`Estimated gas for ${taskId}: ${gasEstimate.toString()}`);
             const txResponse = await contractWithSigner[taskId](...inputs); // Call the contract function with unpacked inputs
             const receipt = await txResponse.wait();
             const gasUsed = receipt.gasUsed.toString();
@@ -177,12 +179,13 @@ const executeTask = async (contractManager, contractName, contractInstance, task
             throw new Error(`Function "${taskId}" not found on contract instance.`);
         }
     } catch (error) {
-        if(error.data){
-            console.log(error.data)
-        }
-        else{
+        
+        // if(error.data){
+        //     console.log(error.data)
+        // }
+        // else{
             console.log(error)
-        }
+        // }
     }
 }
 

@@ -34,7 +34,7 @@
         "id": "Activity_11aq4w4",
         "sender": "Landlord",
         "name": "Register Property",
-        "state": "Completed",
+        "state": "Open",
         "externalParams": [
           {
             "name": "request_zone",
@@ -57,21 +57,18 @@
     "localStorage": [
       {
         "type": "string",
-        "name": "property_owner",
-        "value": "0x1F7"
+        "name": "property_owner"
       },
       {
         "type": "uint",
-        "name": "property_id",
-        "value": 1
+        "name": "property_id"
       },
       {
         "type": "uint",
-        "name": "zone",
-        "value": 5
+        "name": "zone"
       }
     ],
-    "address": "0xf12C8B232B5b5a213677117C077d51E6D1cA2Dff"
+    "address": "0x8Ffd2502bAc4d6b65Ba700bf44F32870069A8FB1"
   },
   {
     "contractName": "Lane_0id2ilg_Contract",
@@ -95,7 +92,7 @@
         "id": "Activity_03z2h2j",
         "sender": "Buyer",
         "name": "Purchase Request",
-        "state": "Completed",
+        "state": "Open",
         "externalParams": [
           {
             "name": "property_id",
@@ -112,7 +109,7 @@
         "id": "Activity_0twj7n8",
         "sender": "Landlord",
         "name": "Accept Request",
-        "state": "Completed",
+        "state": "Closed",
         "externalParams": [],
         "gasUsed": "47967"
       },
@@ -129,10 +126,9 @@
     "localStorage": [
       {
         "type": "string",
-        "name": "new_owner",
-        "value": "0x1F7"
+        "name": "new_owner"
       }
     ],
-    "address": "0x9AB90F04509C7cC4A6703864166620E57d6B471e"
+    "address": "0xa896bdE6094e9e46A7459401563C9fAc9c5285AD"
   }
 ]
