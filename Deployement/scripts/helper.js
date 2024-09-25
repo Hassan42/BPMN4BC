@@ -1,4 +1,4 @@
-const { ethers } = require("hardhat");
+// const { ethers } = require("hardhat");
 
 const setContracts = async (contractManager, network, contractName, contractInstance) => {
 
@@ -16,6 +16,8 @@ const setContracts = async (contractManager, network, contractName, contractInst
 
 const setResources = async (contractManager, network, contractName, contractInstance) => {
     try {
+        const { ethers } = require("hardhat");
+
         // Fetch all roles used by contracts
         const roles = contractManager.getAllRoles(network);
 
@@ -93,6 +95,8 @@ const queryContract = async (contractManager, contractName, contractInstance) =>
 //Query all contracts
 const queryContracts = async (contractManager) => {
 
+    const { ethers } = require("hardhat");
+
     const contracts = contractManager.getAllContracts();
 
     // Iterate over each contract
@@ -140,6 +144,8 @@ const queryContracts = async (contractManager) => {
 
 const executeTask = async (contractManager, contractName, contractInstance, taskId, inputs) => {
     try {
+        const { ethers } = require("hardhat");
+        
         // Get the task by its ID
         const task = contractManager.getTaskById(contractName, taskId);
 

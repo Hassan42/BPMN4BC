@@ -293,9 +293,6 @@ app.post('/executePropertyExample', async (req, res) => {
   }
 });
 
-
-
-
 //Execute task in contract
 app.post('/executeAll', async (req, res) => {
   try {
@@ -309,7 +306,6 @@ app.post('/executeAll', async (req, res) => {
     res.status(500).json({ message: 'An error occurred.', error: err.message });
   }
 });
-
 
 app.listen(port, () => {
   console.log(`Server listening at http://localhost:${port}`);

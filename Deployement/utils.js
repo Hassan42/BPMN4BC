@@ -99,6 +99,7 @@ const updateHardhatConfig = (networkId, url) => {
   require('./tasks/executeTask');
   require('./tasks/executeAllTask');
   require('./tasks/executePropertyExample');
+
   /** @type import('hardhat/config').HardhatUserConfig */
 
   module.exports = ${JSON.stringify(config, null, 2)};
