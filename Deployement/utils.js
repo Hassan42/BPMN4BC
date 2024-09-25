@@ -33,8 +33,7 @@ const executeHardhatTask = async (taskName, networkName, taskArgs) => {
         return;
       }
       if (stderr) {
-        reject(`stderr: ${stderr}`);
-        return;
+        console.log(`stderr: ${stderr}`);
       }
       resolve(stdout);
     });
@@ -99,6 +98,7 @@ const updateHardhatConfig = (networkId, url) => {
   require('./tasks/setupContractsTask');
   require('./tasks/executeTask');
   require('./tasks/executeAllTask');
+  require('./tasks/executePropertyExample');
   /** @type import('hardhat/config').HardhatUserConfig */
 
   module.exports = ${JSON.stringify(config, null, 2)};

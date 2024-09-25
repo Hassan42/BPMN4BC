@@ -261,6 +261,30 @@ app.post('/executeTask', async (req, res) => {
     const executionResult = await executeHardhatTask("execute-task", network, taskArgs);
     console.log(executionResult)
     // Send successful response
+    res.status(200).json({ message: executionResult });
+  } catch (err) {
+    // Handle errors and send error response
+    console.error('Error executing Hardhat task:', err);
+    res.status(500).json({ message: 'Error executing task.', error: err});
+  }
+});
+
+//Execute task in contract
+app.post('/executePropertyExample', async (req, res) => {
+  try {
+    const taskArgs = req.body;
+
+    // Validate the structure of taskArgs
+    if (typeof taskArgs !== 'object' || !taskArgs.propertyContractName || !taskArgs.purchaseContractName || !taskArgs.network) {
+      return res.status(400).json({ message: 'Invalid request. Please provide taskArgs with taskName, contractName, and inputs.' });
+    }
+
+    const network = taskArgs.network;
+
+    // Execute the Hardhat task
+    const executionResult = await executeHardhatTask("execute-property-example", network, taskArgs);
+    console.log(executionResult)
+    // Send successful response
     res.status(200).json({ message: 'Task executed successfully.' });
   } catch (err) {
     // Handle errors and send error response
@@ -268,6 +292,8 @@ app.post('/executeTask', async (req, res) => {
     res.status(500).json({ message: 'Error executing task.', error: err});
   }
 });
+
+
 
 
 //Execute task in contract

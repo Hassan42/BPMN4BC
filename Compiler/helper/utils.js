@@ -305,10 +305,10 @@ const generateContractConfig = ({
     roles,
     lane,
     participant,
-    startEventIds,
+    startReceiveTaskIds,
     formattedSolidityCode,
     formattedSolidityInterface
-  }) => {
+}) => {
 
     const receiveTasks = activities.filter(activity => activity.$type === 'bpmn:ReceiveTask');
     const receiveTaskRoles = new Set(receiveTasks.map(task => task.bcsender));
@@ -354,7 +354,7 @@ const generateContractConfig = ({
         .filter(role => receiveTaskRoles.has(role.role))
         .map(role => ({ role: role.role }));
 
-        
+
     // Create an array to store receive tasks info
     const receiveTasksInfo = receiveTasks.map(task => {
         const outputParameters = extractOutputParameters(task);
@@ -371,7 +371,7 @@ const generateContractConfig = ({
             id: task.id.replace(/\s+/g, ''), // Remove whitespace from task ID
             sender: task.bcsender,
             name: task.name || '',
-            state: startEventIds.includes(task.id.replace(/\s+/g, '')) ? 'Open' : 'Closed',
+            state: startReceiveTaskIds.includes(task.id.replace(/\s+/g, '')) ? 'Open' : 'Closed',
             externalParams // Add external parameters to task info
         };
     });
@@ -386,6 +386,21 @@ const generateContractConfig = ({
         contractInterface: formattedSolidityInterface,
         localStorage: localStorage
     };
+}
+
+function findReceiveTask(flowElement) {
+    if (flowElement.$type === 'bpmn:ReceiveTask') {
+        return [flowElement.id]; // Return the ReceiveTask id
+    }
+
+    // Continue traversing if the element is not a ReceiveTask
+    if (flowElement.outgoing && flowElement.outgoing.length > 0) {
+        return flowElement.outgoing
+            .map(flow => findReceiveTask(flow.targetRef)) // Recursively follow the outgoing flows
+            .flat();
+    }
+
+    return []; // Return an empty array if no ReceiveTask is found
 }
 
 // Helper function to capitalize the first letter of a string
@@ -413,5 +428,6 @@ module.exports = {
     findEventsForLane,
     extractRolesFromCollaboration,
     generateContractConfig,
-    capitalize
+    capitalize,
+    findReceiveTask
 };

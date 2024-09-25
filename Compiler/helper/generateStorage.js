@@ -57,7 +57,7 @@ function generateStorage(activities, participant, lane) {
     struct LocalStorage {
         ${outputParamsArray.map(param => `${param.type} ${param.name};`).join('\n        ')}
     }
-    LocalStorage private localStorage;
+    LocalStorage public localStorage;
     `;
 
     // Generate initialization code

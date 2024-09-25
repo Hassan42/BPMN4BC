@@ -136,7 +136,7 @@ function parseReturnValues(encodedString) {
 function generateEntryFunction(activity, process, roles) {
   const contractName = getContractNameForElement(activity, process);
   const senderRole = activity.bcsender?.replace(/\s+/g, '') || '';
-  //We assign addresses dynamically on deployment
+  // We assign addresses dynamically on deployment
   // const senderAddress = roles.find(r => r.role === senderRole)?.address.replace(/\s+/g, '') || '';
 
   if (!senderRole) {
@@ -319,7 +319,13 @@ function generateEntryFunction(activity, process, roles) {
       }
       case 'bpmn:IntermediateThrowEvent': {
         const eventName = element.bceventname || element.id.replace(/\s+/g, '');
-        proceedingLogic += `emit ${eventName}();\n`;
+        if (elementContractName !== contractName) {
+          proceedingLogic += `I${elementContractName}(contracts["${elementContractName}"]).emit_${eventName}();\n`;
+        }
+        else{
+          proceedingLogic += `emit_${eventName}();\n`;
+        }
+        
         break;
       }
       case 'bpmn:EndEvent': {

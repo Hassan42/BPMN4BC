@@ -1,3 +1,4 @@
+const { ethers } = require("hardhat");
 
 const setContracts = async (contractManager, network, contractName, contractInstance) => {
 
@@ -150,7 +151,6 @@ const executeTask = async (contractManager, contractName, contractInstance, task
 
         // Find if the roleAddress exists among the signers
         const roleSigner = signers.find(signer => signer.address === roleAddress);
-
         if (!roleSigner) {
             throw new Error(`Role address "${roleAddress}" is not in the list of available signers.`);
         }
@@ -171,7 +171,12 @@ const executeTask = async (contractManager, contractName, contractInstance, task
             throw new Error(`Function "${taskId}" not found on contract instance.`);
         }
     } catch (error) {
-        console.error(`Error executing task ${taskId}:`, error);
+        if(error.data){
+            console.log(error.data)
+        }
+        else{
+            console.log(error)
+        }
     }
 }
 

@@ -151,6 +151,28 @@ const getAllTaskIds = (contractName) => {
     // If the contract has no tasks, return an empty array
     return [];
 };
+// Get the task ID by task name
+const getTaskId = (contractName, taskName) => {
+    // Retrieve all contracts
+    const contracts = getAllContracts();
+
+    // Find the contract by name
+    const contract = contracts.find(c => c.contractName === contractName);
+
+    if (!contract) {
+        throw new Error(`Contract with name "${contractName}" not found.`);
+    }
+
+    // Find the task by name
+    const task = contract.receiveTasks && contract.receiveTasks.find(task => task.name === taskName);
+
+    if (!task) {
+        throw new Error(`Task with name "${taskName}" not found in contract "${contractName}".`);
+    }
+
+    // Return the task ID
+    return task.id;
+};
 // Update the state of a task by its ID
 const updateTaskState = (contractName, taskId, newState) => {
     // Read and parse the existing contracts file
@@ -419,6 +441,7 @@ const createContractManager = () => ({
     updateRoleAddress,
     getAllTasks,
     getAllTaskIds,
+    getTaskId,
     updateTaskState,
     getTaskById,
     getAddressByRole,

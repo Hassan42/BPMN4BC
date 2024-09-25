@@ -1,8 +1,8 @@
-const { generateContractConfig, findCollaboration, findProcessForParticipant, findLanesForProcess, findActivitiesForLane, findActivitiesForProcess, findGatewaysForProcess, findGatewaysForLane, formatSolidityCode, findEventsForProcess, findEventsForLane, extractRolesFromCollaboration } = require('./utils.js');
+const { generateContractConfig, findCollaboration, findProcessForParticipant, findLanesForProcess, findActivitiesForLane, findActivitiesForProcess, findGatewaysForProcess, findGatewaysForLane, formatSolidityCode, findEventsForProcess, findEventsForLane, extractRolesFromCollaboration, findReceiveTask } = require('./utils.js');
 const { generateFunctions, generateFunctionSignatures } = require('./generateFunctions.js');
 const { generateStorage } = require('./generateStorage.js');
 const { generateGateways } = require('./generateGateways.js');
-const { generateEvents } = require('./generateEvents.js');
+const { generateEvents, generateEmitFunctions } = require('./generateEvents.js');
 const fs = require('fs');
 const path = require('path');
 
@@ -31,11 +31,15 @@ async function generateContract(contractParams) {
   const functions = generateFunctions(activities, process, roles).join('\n');
   const gatewayFunctions = generateGateways(gateways);
   const solidityEvents = generateEvents(events);
+  const emitFunctions = generateEmitFunctions(events);
 
   // Identify activities connected to a start event
-  const startEventIds = process.flowElements
-    .filter(element => element.$type === 'bpmn:StartEvent')
-    .map(startEvent => startEvent.outgoing.map(flow => flow.targetRef.id))
+  const startReceiveTaskIds = process.flowElements
+    .filter(element => element.$type === 'bpmn:StartEvent') // Get start events
+    .map(startEvent => startEvent.outgoing
+      .map(flow => findReceiveTask(flow.targetRef)) // Recursively search for ReceiveTasks
+      .flat()
+    )
     .flat();
 
   const receiveTasks = activities.filter(activity => activity.$type === 'bpmn:ReceiveTask');
@@ -44,7 +48,7 @@ async function generateContract(contractParams) {
   const receiveFunctionCount = receiveFunctionNames.length || 0;
 
   const stateMappings = receiveFunctionNames.map(name => {
-    return startEventIds.includes(name) ? `state["${name}"] = State.Open;` : `state["${name}"] = State.Closed;`;
+    return startReceiveTaskIds.includes(name) ? `state["${name}"] = State.Open;` : `state["${name}"] = State.Closed;`;
   }).join('\n');
 
   const contractsMapping = lanes.map((lane, index) => {
@@ -54,7 +58,7 @@ async function generateContract(contractParams) {
   const contractsImports = lanes.map((lane, index) => {
     return `import './I${lane.id}_Contract.sol';`;
   }).join('\n');
-  
+
   const solidityCode = `
   // SPDX-License-Identifier: MIT
   pragma solidity ^0.8.0;
@@ -87,7 +91,8 @@ async function generateContract(contractParams) {
       function setContracts(address[] memory addresses) public{
           ${contractsMapping}
       }
-
+      
+      ${emitFunctions}
       ${readFunctions}
 
       function setResources(string[] memory _roles, address[] memory _addresses) public {
@@ -135,14 +140,14 @@ async function generateContract(contractParams) {
       roles,
       lane,
       participant,
-      startEventIds,
+      startReceiveTaskIds,
       formattedSolidityCode,
       formattedSolidityInterface
     });
     return contractConfig;
   } catch (error) {
     console.log(solidityCode);
-    throw('Error formatting or writing Solidity code:', error);
+    throw ('Error formatting or writing Solidity code:', error);
   }
 }
 
@@ -189,8 +194,8 @@ async function generateContracts(definitions) {
     for (const participant of participants) {
       const process = findProcessForParticipant(definitions, participant);
       const networkId = participant.bcid;
-      if(!networkId){
-        throw("Process has no blockchain ID.")
+      if (!networkId) {
+        throw ("Process has no blockchain ID.")
       }
       if (!process) {
         console.log(`No process found for the participant with id ${participant.id}.`);
@@ -234,7 +239,7 @@ async function generateContracts(definitions) {
   const outputPath = path.resolve('./output/contracts.json');
   fs.writeFileSync(outputPath, JSON.stringify(contracts, null, 2), 'utf8');
   console.log(`Contracts have been saved to ${outputPath}`);
-  
+
   return contracts;
 }
 
