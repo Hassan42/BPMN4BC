@@ -5,15 +5,15 @@
     "contractRoles": [
       {
         "role": "Authority",
-        "address": "0x3E161980A9DC93775ceef27cd86b355534daA885"
+        "address": "0xDdA1191f8426949bf6998AeF6DFD20dF1628746D"
       },
       {
         "role": "Landlord",
-        "address": "0x97144CdD87d75376E0aD6311797d1c3158Cf2DC7"
+        "address": "0x3CD3a17945d461FAe08b48374bFfe3b86e910D5B"
       },
       {
         "role": "Buyer",
-        "address": "0xfD342F60034AF509A9b470Faa3D8b0780B5948Bb"
+        "address": "0xDf585E131818fE7424dCED3e69053c56eD96C547"
       }
     ],
     "receiveTasks": [
@@ -27,8 +27,7 @@
             "name": "zone",
             "type": "uint"
           }
-        ],
-        "gasUsed": "51020"
+        ]
       },
       {
         "id": "Activity_11aq4w4",
@@ -48,8 +47,7 @@
             "name": "property_id",
             "type": "uint"
           }
-        ],
-        "gasUsed": "81044"
+        ]
       }
     ],
     "contractCode": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\nimport \"./ILane_0rg8ox7_Contract.sol\";\nimport \"./ILane_0id2ilg_Contract.sol\";\ncontract Lane_0rg8ox7_Contract {\n    enum State {\n        Closed,\n        Open,\n        Completed\n    }\n\n    mapping(string => State) public state;\n\n    uint receiveFunctionCount = 2;\n\n    mapping(string => address) public contracts;\n\n    mapping(address => string) public addressToRole;\n\n    modifier isAccessible(string memory _activity, string memory _role) {\n        require(state[_activity] == State.Open, \"Activity is not open\");\n        require(\n            compareStrings(addressToRole[msg.sender], _role),\n            \"Caller does not have the required role\"\n        );\n        _;\n    }\n\n    event Property_Mint();\n\n    event Property_Transferred();\n\n    struct LocalStorage {\n        string property_owner;\n        uint property_id;\n        uint zone;\n    }\n    LocalStorage public localStorage;\n\n    constructor() {\n        state[\"Activity_0hnfduf\"] = State.Open;\n        state[\"Activity_11aq4w4\"] = State.Open;\n    }\n\n    function setContracts(address[] memory addresses) public {\n        contracts[\"Lane_0rg8ox7_Contract\"] = addresses[0];\n        contracts[\"Lane_0id2ilg_Contract\"] = addresses[1];\n    }\n\n    function emit_Property_Mint() public {\n        emit Property_Mint();\n    }\n\n    function emit_Property_Transferred() public {\n        emit Property_Transferred();\n    }\n\n    function getProperty_owner() public view returns (string memory) {\n        return localStorage.property_owner;\n    }\n\n    function getProperty_id() public view returns (uint) {\n        return localStorage.property_id;\n    }\n\n    function getZone() public view returns (uint) {\n        return localStorage.zone;\n    }\n\n    function setResources(\n        string[] memory _roles,\n        address[] memory _addresses\n    ) public {\n        require(\n            _roles.length == _addresses.length,\n            \"Roles and addresses arrays must be of the same length\"\n        );\n\n        for (uint i = 0; i < _addresses.length; i++) {\n            addressToRole[_addresses[i]] = _roles[i];\n        }\n    }\n\n    function setResource(string memory _role, address _address) public {\n        addressToRole[_address] = _role;\n    }\n\n    function setState(string memory _activity, uint8 _state) public {\n        require(_state <= 3, \"Not Valid State\");\n        state[_activity] = State(_state);\n    }\n\n    function getState(string memory _activity) public view returns (State) {\n        return state[_activity];\n    }\n\n    //To be replaced with ENUM\n    function compareStrings(\n        string memory a,\n        string memory b\n    ) internal pure returns (bool) {\n        return keccak256(abi.encodePacked(a)) == keccak256(abi.encodePacked(b));\n    }\n\n    function Activity_0hnfduf(\n        uint zone\n    ) public isAccessible(\"Activity_0hnfduf\", \"Authority\") {\n        localStorage.zone = zone;\n\n        state[\"Activity_0hnfduf\"] = State.Open;\n    }\n\n    function Activity_11aq4w4(\n        uint request_zone,\n        string memory property_owner,\n        uint property_id\n    ) public isAccessible(\"Activity_11aq4w4\", \"Landlord\") {\n        if (localStorage.zone == request_zone) {\n            Activity_0doea6v(property_owner, property_id);\n            emit_Property_Mint();\n        } else {\n            revert(\n                \"End Event reached: Event_15zrmvl, Zone not open for registration.\"\n            );\n        }\n\n        state[\"Activity_11aq4w4\"] = State.Completed;\n    }\n\n    function Activity_1ue8g60(string memory new_owner) public {\n        localStorage.property_owner = new_owner;\n    }\n\n    function Activity_0doea6v(\n        string memory property_owner,\n        uint property_id\n    ) public {\n        localStorage.property_owner = property_owner;\n        localStorage.property_id = property_id;\n    }\n}\n",
@@ -68,7 +66,7 @@
         "name": "zone"
       }
     ],
-    "address": "0x8Ffd2502bAc4d6b65Ba700bf44F32870069A8FB1"
+    "address": "0xC34e49263ff2b7E5D89567bf88cde4b65Daec86D"
   },
   {
     "contractName": "Lane_0id2ilg_Contract",
@@ -76,15 +74,15 @@
     "contractRoles": [
       {
         "role": "Buyer",
-        "address": "0xfD342F60034AF509A9b470Faa3D8b0780B5948Bb"
+        "address": "0xDf585E131818fE7424dCED3e69053c56eD96C547"
       },
       {
         "role": "Landlord",
-        "address": "0x97144CdD87d75376E0aD6311797d1c3158Cf2DC7"
+        "address": "0x3CD3a17945d461FAe08b48374bFfe3b86e910D5B"
       },
       {
         "role": "Authority",
-        "address": "0x3E161980A9DC93775ceef27cd86b355534daA885"
+        "address": "0xDdA1191f8426949bf6998AeF6DFD20dF1628746D"
       }
     ],
     "receiveTasks": [
@@ -102,16 +100,14 @@
             "name": "new_owner",
             "type": "string"
           }
-        ],
-        "gasUsed": "109298"
+        ]
       },
       {
         "id": "Activity_0twj7n8",
         "sender": "Landlord",
         "name": "Accept Request",
         "state": "Closed",
-        "externalParams": [],
-        "gasUsed": "47967"
+        "externalParams": []
       },
       {
         "id": "Activity_063mdk6",
@@ -129,6 +125,6 @@
         "name": "new_owner"
       }
     ],
-    "address": "0xa896bdE6094e9e46A7459401563C9fAc9c5285AD"
+    "address": "0x7e5bf2D5CB863E366AB92aC3f3b5F1F92C1DC8C8"
   }
 ]

@@ -53,7 +53,7 @@ task('deploy-contracts', 'Deploys all contracts and updates contracts.json')
             const contract = await factory.deploy();
             await contract.waitForDeployment();
             const contractAddress = await contract.getAddress();
-
+            
             // Output the deployed contract address and transaction details
             console.log(`${contractName} deployed to: ${contractAddress}`);
 
