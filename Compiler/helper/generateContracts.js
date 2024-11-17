@@ -47,6 +47,10 @@ async function generateContract(contractParams) {
 
   const receiveFunctionCount = receiveFunctionNames.length || 0;
 
+  const activityToRoleMappings = activities.map(activity => {
+    return `activitytoRole["${activity.id}"] = "${activity.bcsender}";`;
+  }).join('\n');
+
   const stateMappings = receiveFunctionNames.map(name => {
     return startReceiveTaskIds.includes(name) ? `state["${name}"] = State.Open;` : `state["${name}"] = State.Closed;`;
   }).join('\n');
@@ -74,9 +78,11 @@ async function generateContract(contractParams) {
 
       mapping(address => string) public addressToRole;
 
-      modifier isAccessible(string memory _activity, string memory _role) {
+      mapping(string => string) public activitytoRole;
+
+      modifier isAccessible(string memory _activity) {
         require(state[_activity] == State.Open, "Activity is not open");
-        require(compareStrings(addressToRole[msg.sender], _role), "Caller does not have the required role");
+        require(compareStrings(addressToRole[msg.sender], activitytoRole[_activity]), "Caller does not have the required role");
           _;
       }
 
@@ -85,6 +91,7 @@ async function generateContract(contractParams) {
 
       constructor() {
           ${stateMappings}
+          ${activityToRoleMappings}
           ${initializationCode}
       }
 

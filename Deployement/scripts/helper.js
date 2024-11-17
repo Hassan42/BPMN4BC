@@ -2,12 +2,18 @@
 
 const setContracts = async (contractManager, network, contractName, contractInstance) => {
 
+    const contractInfo = contractManager.getContractByName(contractName);
     const addresses = contractManager.getContractsAddresses(network);
- 
+
     try {
         // Call setContracts function
         const tx = await contractInstance.setContracts(addresses);
-        await tx.wait();
+        const receipt = await tx.wait();
+        // Get the current deploy gas for the contract and increment it
+        const currentDeployGas = contractInfo.deployGas || 0;
+        const incrementedDeployGas = currentDeployGas + Number(receipt.gasUsed);
+        // Update the gas used in the contract manager
+        contractManager.updateDeployGas(contractName, incrementedDeployGas, network);
         console.log(`Contracts addresses successfully set in ${contractName}.`);
     } catch (error) {
         console.error(`Error setting contracts addresses in ${contractName}:`, error);
@@ -17,6 +23,9 @@ const setContracts = async (contractManager, network, contractName, contractInst
 const setResources = async (contractManager, network, contractName, contractInstance) => {
     try {
         const { ethers } = require("hardhat");
+
+        const contractInfo = contractManager.getContractByName(contractName);
+
 
         // Fetch all roles used by contracts
         const roles = contractManager.getAllRoles(network);
@@ -43,7 +52,13 @@ const setResources = async (contractManager, network, contractName, contractInst
 
         // Call setResources function on the contract instance
         const tx = await contractInstance.setResources(roleArray, addressArray);
-        await tx.wait();
+        const receipt = await tx.wait();
+
+        // Get the current deploy gas for the contract and increment it
+        const currentDeployGas = contractInfo.deployGas || 0;
+        const incrementedDeployGas = currentDeployGas + Number(receipt.gasUsed);
+        // Update the gas used in the contract manager
+        contractManager.updateDeployGas(contractName, incrementedDeployGas, network);
 
         console.log(`Roles and addresses successfully set in ${contractName}.`);
     } catch (error) {
@@ -179,12 +194,12 @@ const executeTask = async (contractManager, contractName, contractInstance, task
             throw new Error(`Function "${taskId}" not found on contract instance.`);
         }
     } catch (error) {
-        
+
         // if(error.data){
         //     console.log(error.data)
         // }
         // else{
-            console.log(error)
+        console.log(error)
         // }
     }
 }
@@ -192,12 +207,12 @@ const executeTask = async (contractManager, contractName, contractInstance, task
 // Function to generate a random value based on the type
 const generateRandomValue = (type) => {
     if (type === 'string') {
-      return Math.random().toString(36).substring(2, 15); // Generate a random string
+        return Math.random().toString(36).substring(2, 15); // Generate a random string
     } else if (type === 'uint') {
-      return Math.floor(Math.random() * 1000); // Generate a random uint (integer)
+        return Math.floor(Math.random() * 1000); // Generate a random uint (integer)
     }
     throw new Error('Unknown type');
-  };
+};
 
 module.exports = {
     setContracts,
