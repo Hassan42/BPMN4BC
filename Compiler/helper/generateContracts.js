@@ -29,7 +29,7 @@ async function generateContract(contractParams) {
 
   const { storageStruct, initializationCode, readFunctions } = generateStorage(activities, participant, lane);
   const functions = generateFunctions(activities, process, roles).join('\n');
-  const gatewayFunctions = generateGateways(gateways);
+  const gatewayFunctions = generateGateways(gateways, process);
   const solidityEvents = generateEvents(events);
   const emitFunctions = generateEmitFunctions(events);
 

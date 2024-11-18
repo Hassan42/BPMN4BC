@@ -186,6 +186,37 @@ const getProceedingElementsFromFlow = (flow, process) => {
 }
 
 /**
+ * Gets the preceding elements (activities and gateways) connected to the given flow.
+ * @param {Object} flow - The current flow object.
+ * @param {Object} process - The process object containing flow elements.
+ * @returns {Array} The list of preceding elements.
+ */
+const getPreviousElementsFromFlow = (flow, process) => {
+    const precedingElements = [];
+
+    function traverse(currentFlow) {
+        const sourceElement = process.flowElements.find(element => element.id === currentFlow.sourceRef.id);
+
+        // Stop if no sourceElement is found
+        if (!sourceElement) {
+            return;
+        }
+
+        // Add the element to the list
+        precedingElements.push(sourceElement);
+
+        // Recursively traverse incoming flows
+        const { incoming } = findFlowsForElement(sourceElement);
+        for (const nextFlow of incoming) {
+            traverse(nextFlow);
+        }
+    }
+
+    traverse(flow);
+    return precedingElements;
+};
+
+/**
  * Extracts output parameters from a given activity.
  * @param {Object} activity - The activity object.
  * @returns {Array} The list of output parameters.
@@ -428,5 +459,6 @@ module.exports = {
     extractRolesFromCollaboration,
     generateContractConfig,
     capitalize,
-    findReceiveTask
+    findReceiveTask,
+    getPreviousElementsFromFlow
 };

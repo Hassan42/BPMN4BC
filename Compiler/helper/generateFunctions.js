@@ -271,61 +271,103 @@ function generateEntryFunction(activity, process, roles) {
       }
       case 'bpmn:ExclusiveGateway': {
         const outgoingFlows = element.outgoing;
-
-        // Separate flows with conditions and those without conditions
-        const flowsWithConditions = [];
-        const flowsWithoutConditions = [];
-
-        outgoingFlows.forEach(flow => {
-          if (flow.conditionExpression && flow.conditionExpression.body) {
-            flowsWithConditions.push(flow);
-          } else {
-            flowsWithoutConditions.push(flow);
-          }
-        });
-
-
-        // Merge XOR logic
+        
         if (outgoingFlows.length === 1) {
           const branchProceedingElements = getProceedingElementsFromFlow(outgoingFlows[0], process);
           branchProceedingElements.forEach(branchElement => processElement(branchElement));
-          // Split XOR logic
-        } else {
-          // Process flows with conditions first
-          flowsWithConditions.forEach((flow, index) => {
-            const condition = flow.conditionExpression ? flow.conditionExpression.body : null;
-            const branchProceedingElements = getProceedingElementsFromFlow(flow, process);
-            if (condition) {
-              let conditionExpression = condition.replace(/^\s*=\s*/, '').replace(/\$\{(.+?)\}/g, (match, varName) => {
-                return definedVariables.has(varName) ? varName : `localStorage.${varName}`;
-              });
-              proceedingLogic += index === 0 ? `if (${conditionExpression}) {\n` : `else if (${conditionExpression}) {\n`;
-              branchProceedingElements.forEach(branchElement => processElement(branchElement));
-              proceedingLogic += `}\n`;
-            }
+        }
+        else {
+          const elementContractName = getContractNameForElement(element, process);
+
+          // Define the XOR function name
+          const xorFunctionName = elementContractName !== contractName
+            ? `I${elementContractName}(contracts["${elementContractName}"]).checkXOR_${element.id}`
+            : `checkXOR_${element.id}`;
+
+          // Extract variables from the outgoing flows' condition expressions
+          const variablesInConditions = new Set();
+          element.outgoing.forEach(flow => {
+            const condition = flow.conditionExpression?.body || '';
+            const regex = /\${([^}]+)}/g;
+            const matches = [...condition.matchAll(regex)].map(match => match[1]);
+            matches.forEach(variable => variablesInConditions.add(variable));
           });
 
-          // Process flows without conditions (default case)
-          if (flowsWithoutConditions.length > 0) {
-            proceedingLogic += `else {\n`;
-            flowsWithoutConditions.forEach(flow => {
-              const branchProceedingElements = getProceedingElementsFromFlow(flow, process);
-              branchProceedingElements.forEach(branchElement => processElement(branchElement));
-            });
+          // Collect the parameter list for the XOR function, passing only the variable names
+          const parameters = Array.from(variablesInConditions).join(', ');
+
+          // Invoke the XOR function with the parameter list (variable names)
+          proceedingLogic += `uint256 branch = ${xorFunctionName}(${parameters});\n`;
+
+          // Process the proceeding elements based on the XOR branch result
+          element.outgoing.forEach((flow, index) => {
+            const branchProceedingElements = getProceedingElementsFromFlow(flow, process);
+            proceedingLogic += index === 0
+              ? `if ((branch & (1 << ${index})) != 0) {\n`
+              : `else if ((branch & (1 << ${index})) != 0) {\n`;
+
+            branchProceedingElements.forEach(branchElement => processElement(branchElement));
             proceedingLogic += `}\n`;
-          }
+          });
         }
         break;
       }
+      // case 'bpmn:ExclusiveGateway': {
+      //   const outgoingFlows = element.outgoing;
+
+      //   // Separate flows with conditions and those without conditions
+      //   const flowsWithConditions = [];
+      //   const flowsWithoutConditions = [];
+
+      //   outgoingFlows.forEach(flow => {
+      //     if (flow.conditionExpression && flow.conditionExpression.body) {
+      //       flowsWithConditions.push(flow);
+      //     } else {
+      //       flowsWithoutConditions.push(flow);
+      //     }
+      //   });
+
+      //   // Merge XOR logic
+      //   if (outgoingFlows.length === 1) {
+      //     const branchProceedingElements = getProceedingElementsFromFlow(outgoingFlows[0], process);
+      //     branchProceedingElements.forEach(branchElement => processElement(branchElement));
+      //     // Split XOR logic
+      //   } else {
+      //     // Process flows with conditions first
+      //     flowsWithConditions.forEach((flow, index) => {
+      //       const condition = flow.conditionExpression ? flow.conditionExpression.body : null;
+      //       const branchProceedingElements = getProceedingElementsFromFlow(flow, process);
+      //       if (condition) {
+      //         let conditionExpression = condition.replace(/^\s*=\s*/, '').replace(/\$\{(.+?)\}/g, (match, varName) => {
+      //           return definedVariables.has(varName) ? varName : `localStorage.${varName}`;
+      //         });
+      //         proceedingLogic += index === 0 ? `if (${conditionExpression}) {\n` : `else if (${conditionExpression}) {\n`;
+      //         branchProceedingElements.forEach(branchElement => processElement(branchElement));
+      //         proceedingLogic += `}\n`;
+      //       }
+      //     });
+
+      //     // Process flows without conditions (default case)
+      //     if (flowsWithoutConditions.length > 0) {
+      //       proceedingLogic += `else {\n`;
+      //       flowsWithoutConditions.forEach(flow => {
+      //         const branchProceedingElements = getProceedingElementsFromFlow(flow, process);
+      //         branchProceedingElements.forEach(branchElement => processElement(branchElement));
+      //       });
+      //       proceedingLogic += `}\n`;
+      //     }
+      //   }
+      //   break;
+      // }
       case 'bpmn:IntermediateThrowEvent': {
         const eventName = element.bceventname || element.id.replace(/\s+/g, '');
         if (elementContractName !== contractName) {
           proceedingLogic += `I${elementContractName}(contracts["${elementContractName}"]).emit_${eventName}();\n`;
         }
-        else{
+        else {
           proceedingLogic += `emit_${eventName}();\n`;
         }
-        
+
         break;
       }
       case 'bpmn:EndEvent': {
