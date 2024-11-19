@@ -4,6 +4,7 @@ const {
   extractInputParameters,
   isValueType,
   getContractNameForElement,
+  getEntryFunctions
 } = require('./utils.js');
 
 /**
@@ -38,11 +39,24 @@ function generateFunctionSignatures(solidityCode) {
  * @param {Object} activity - The activity object.
  * @returns {string} The logic for the script function.
  */
-function generateScriptFunction(activity) {
+function generateScriptFunction(activity, process) {
   const solidityScript = activity.solidityscript || '';
   const returnParams = parseReturnValues(activity.returns || '');
   const inputParams = extractInputParameters(activity);
   const outputParams = extractOutputParameters(activity).filter(param => String(param.transactional).trim().toLowerCase() === "true");
+  const entryFunctions = getEntryFunctions(activity, process);
+  const contractName = getContractNameForElement(activity, process);
+
+  const requireState = `require(${entryFunctions.map((entryFunction) => {
+    const entryFunctionContractName = getContractNameForElement(entryFunction, process);
+
+    const entryFunctionState = entryFunctionContractName !== contractName
+    ? `I${entryFunctionContractName}(contracts["${entryFunctionContractName}"]).getState("${entryFunction.id}")`
+    : `state["${entryFunction.id}"]`;
+
+
+    return `uint256(${entryFunctionState}) == uint256(State.Open)`;
+  }).join(' || ')});`;
 
   const inputTypes = inputParams.map(param => {
     const memoryKeyword = isValueType(param.type) ? '' : 'memory ';
@@ -89,7 +103,7 @@ function generateScriptFunction(activity) {
 
   // Check if solidityScript contains "localStorage" and determine visibility
   const hasLocalStorageAssignment = /localStorage\.[\w_]+\s*[\+\-\*\/%]?\s*=[^;]*;/.test(solidityScript);
-  const functionVisibility = hasLocalStorageAssignment ? '' : 'view';
+  const functionVisibility = hasLocalStorageAssignment ? '' : '';
 
   const scriptWithoutReturn = solidityScript.replace(/return\s+.*?;/g, '').trim();
   const returnStatement = combinedReturnParams.length > 0
@@ -98,6 +112,7 @@ function generateScriptFunction(activity) {
 
   return `
     function ${activity.id.replace(/\s+/g, '')}(${inputTypes}) public ${functionVisibility} ${returnClause} {
+        ${requireState}
         ${storageAssignments}
         ${transactionalAssignments}
         ${scriptWithoutReturn}
@@ -271,7 +286,7 @@ function generateEntryFunction(activity, process, roles) {
       }
       case 'bpmn:ExclusiveGateway': {
         const outgoingFlows = element.outgoing;
-        
+
         if (outgoingFlows.length === 1) {
           const branchProceedingElements = getProceedingElementsFromFlow(outgoingFlows[0], process);
           branchProceedingElements.forEach(branchElement => processElement(branchElement));
@@ -312,53 +327,6 @@ function generateEntryFunction(activity, process, roles) {
         }
         break;
       }
-      // case 'bpmn:ExclusiveGateway': {
-      //   const outgoingFlows = element.outgoing;
-
-      //   // Separate flows with conditions and those without conditions
-      //   const flowsWithConditions = [];
-      //   const flowsWithoutConditions = [];
-
-      //   outgoingFlows.forEach(flow => {
-      //     if (flow.conditionExpression && flow.conditionExpression.body) {
-      //       flowsWithConditions.push(flow);
-      //     } else {
-      //       flowsWithoutConditions.push(flow);
-      //     }
-      //   });
-
-      //   // Merge XOR logic
-      //   if (outgoingFlows.length === 1) {
-      //     const branchProceedingElements = getProceedingElementsFromFlow(outgoingFlows[0], process);
-      //     branchProceedingElements.forEach(branchElement => processElement(branchElement));
-      //     // Split XOR logic
-      //   } else {
-      //     // Process flows with conditions first
-      //     flowsWithConditions.forEach((flow, index) => {
-      //       const condition = flow.conditionExpression ? flow.conditionExpression.body : null;
-      //       const branchProceedingElements = getProceedingElementsFromFlow(flow, process);
-      //       if (condition) {
-      //         let conditionExpression = condition.replace(/^\s*=\s*/, '').replace(/\$\{(.+?)\}/g, (match, varName) => {
-      //           return definedVariables.has(varName) ? varName : `localStorage.${varName}`;
-      //         });
-      //         proceedingLogic += index === 0 ? `if (${conditionExpression}) {\n` : `else if (${conditionExpression}) {\n`;
-      //         branchProceedingElements.forEach(branchElement => processElement(branchElement));
-      //         proceedingLogic += `}\n`;
-      //       }
-      //     });
-
-      //     // Process flows without conditions (default case)
-      //     if (flowsWithoutConditions.length > 0) {
-      //       proceedingLogic += `else {\n`;
-      //       flowsWithoutConditions.forEach(flow => {
-      //         const branchProceedingElements = getProceedingElementsFromFlow(flow, process);
-      //         branchProceedingElements.forEach(branchElement => processElement(branchElement));
-      //       });
-      //       proceedingLogic += `}\n`;
-      //     }
-      //   }
-      //   break;
-      // }
       case 'bpmn:IntermediateThrowEvent': {
         const eventName = element.bceventname || element.id.replace(/\s+/g, '');
         if (elementContractName !== contractName) {
@@ -432,7 +400,7 @@ function generateFunctions(activities, process, roles) {
 
     switch (activity.$type) {
       case 'bpmn:ScriptTask':
-        functionLogic = generateScriptFunction(activity);
+        functionLogic = generateScriptFunction(activity, process);
         break;
       case 'bpmn:ReceiveTask':
         functionLogic = generateEntryFunction(activity, process, roles);

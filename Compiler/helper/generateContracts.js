@@ -48,8 +48,10 @@ async function generateContract(contractParams) {
   const receiveFunctionCount = receiveFunctionNames.length || 0;
 
   const activityToRoleMappings = activities.map(activity => {
-    return `activitytoRole["${activity.id}"] = "${activity.bcsender}";`;
-  }).join('\n');
+      // Return the mapping string for non-ScriptTask activities
+      return `activitytoRole["${activity.id}"] = "${activity.bcsender}";`;
+    }
+  ).join('\n');
 
   const stateMappings = receiveFunctionNames.map(name => {
     return startReceiveTaskIds.includes(name) ? `state["${name}"] = State.Open;` : `state["${name}"] = State.Closed;`;
@@ -85,7 +87,6 @@ async function generateContract(contractParams) {
         require(compareStrings(addressToRole[msg.sender], activitytoRole[_activity]), "Caller does not have the required role");
           _;
       }
-
       ${solidityEvents}
       ${storageStruct}
 

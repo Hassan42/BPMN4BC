@@ -26,7 +26,6 @@ const setResources = async (contractManager, network, contractName, contractInst
 
         const contractInfo = contractManager.getContractByName(contractName);
 
-
         // Fetch all roles used by contracts
         const roles = contractManager.getAllRoles(network);
 
