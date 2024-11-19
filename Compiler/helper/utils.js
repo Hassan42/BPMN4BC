@@ -202,6 +202,12 @@ const getPreviousElementsFromFlow = (flow, process) => {
             return;
         }
 
+        // Push and stop if it's a ReceiveTask or XOR gateway
+        if (targetElement.$type === 'bpmn:ReceiveTask') {
+            precedingElements.push(targetElement);
+            return;
+        }
+
         // Add the element to the list
         precedingElements.push(sourceElement);
 
@@ -439,6 +445,29 @@ function capitalize(str) {
     return str.charAt(0).toUpperCase() + str.slice(1);
 }
 
+const getParentLaneOrPool = (element, lanes, participant) => {
+
+    // Check if the element belongs to a lane
+    const parentLane = lanes.find(lane =>
+        lane.flowNodeRef.some(node => node.id === element.id)
+    );
+
+    if (parentLane) {
+        return { type: 'Lane', id: parentLane.id };
+    }
+
+    // If not in a lane, check if it's in the pool's process
+    const poolContainsElement = participant.processRef.flowElements.some(flowElement => flowElement.id === element.id);
+
+    if (poolContainsElement) {
+        return { type: 'Pool', id: participant.id };
+    }
+
+    // Return null if no parent found
+    return null;
+};
+
+
 module.exports = {
     findCollaboration,
     findProcessForParticipant,
@@ -460,5 +489,6 @@ module.exports = {
     generateContractConfig,
     capitalize,
     findReceiveTask,
-    getPreviousElementsFromFlow
+    getPreviousElementsFromFlow,
+    getParentLaneOrPool
 };

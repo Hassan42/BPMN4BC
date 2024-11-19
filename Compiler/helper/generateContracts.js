@@ -1,4 +1,4 @@
-const { generateContractConfig, findCollaboration, findProcessForParticipant, findLanesForProcess, findActivitiesForLane, findActivitiesForProcess, findGatewaysForProcess, findGatewaysForLane, formatSolidityCode, findEventsForProcess, findEventsForLane, extractRolesFromCollaboration, findReceiveTask } = require('./utils.js');
+const { getParentLaneOrPool, generateContractConfig, findCollaboration, findProcessForParticipant, findLanesForProcess, findActivitiesForLane, findActivitiesForProcess, findGatewaysForProcess, findGatewaysForLane, formatSolidityCode, findEventsForProcess, findEventsForLane, extractRolesFromCollaboration, findReceiveTask } = require('./utils.js');
 const { generateFunctions, generateFunctionSignatures } = require('./generateFunctions.js');
 const { generateStorage } = require('./generateStorage.js');
 const { generateGateways } = require('./generateGateways.js');
