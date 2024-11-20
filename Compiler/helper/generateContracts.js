@@ -49,6 +49,7 @@ async function generateContract(contractParams) {
 
   const activityToRoleMappings = activities.map(activity => {
       // Return the mapping string for non-ScriptTask activities
+      if (activity.$type === "bpmn:ScriptTask") { return '';}
       return `activitytoRole["${activity.id}"] = "${activity.bcsender}";`;
     }
   ).join('\n');

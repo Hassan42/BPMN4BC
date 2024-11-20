@@ -53,8 +53,7 @@ contract Lane_0rg8ox7_Contract {
         state["Activity_03z2h2j"] = State.Open;
         activitytoRole["Activity_0twj7n8"] = "PropertyOwner";
         activitytoRole["Activity_063mdk6"] = "PropertyOwner";
-        activitytoRole["Activity_1ue8g60"] = "undefined";
-        activitytoRole["Activity_0doea6v"] = "undefined";
+
         activitytoRole["Activity_0hnfduf"] = "Authority";
         activitytoRole["Activity_11aq4w4"] = "PropertyOwner";
         activitytoRole["Activity_03z2h2j"] = "Buyer";
