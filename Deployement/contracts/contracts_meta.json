@@ -5,15 +5,15 @@
     "contractRoles": [
       {
         "role": "Buyer",
-        "address": "0x83d3d85dbB972560a4e5fe1bDFA7c8F60dDf2c14"
+        "address": "0xd279f3974084D29aF2f3B1b000EB2911b3d62482"
       },
       {
         "role": "Authority",
-        "address": "0x50C4fF022C2b287C514b3FD19aD95fd84327603B"
+        "address": "0xb52a901Ffbae53e03D5757BF46B746c5E3B8B35b"
       },
       {
         "role": "PropertyOwner",
-        "address": "0xeD2b17940502FA56869dA51C83eb9c5b6FD93E1b"
+        "address": "0x99c91139344820A2188381C77D9A5655c8720a90"
       }
     ],
     "receiveTasks": [
@@ -40,20 +40,19 @@
         "id": "Activity_0hnfduf",
         "sender": "Authority",
         "name": "Register Zone",
-        "state": "Completed",
+        "state": "Open",
         "externalParams": [
           {
             "name": "zone",
             "type": "uint"
           }
-        ],
-        "gasUsed": "79473"
+        ]
       },
       {
         "id": "Activity_11aq4w4",
         "sender": "PropertyOwner",
         "name": "Register Property",
-        "state": "Open",
+        "state": "Closed",
         "externalParams": [
           {
             "name": "req_zone",
@@ -67,8 +66,7 @@
             "name": "prop_id",
             "type": "uint"
           }
-        ],
-        "gasUsed": "85317"
+        ]
       },
       {
         "id": "Activity_03z2h2j",
@@ -88,21 +86,18 @@
     "localStorage": [
       {
         "type": "string",
-        "name": "property_owner",
-        "value": ""
+        "name": "property_owner"
       },
       {
         "type": "uint",
-        "name": "property_id",
-        "value": 0
+        "name": "property_id"
       },
       {
         "type": "uint",
-        "name": "zone",
-        "value": 5
+        "name": "zone"
       }
     ],
-    "address": "0x2F7Fed55596EF73240652C5F54a8e33027B4Fe16",
-    "deployGas": 3066942
+    "address": "0x7dE692d103b8b5EDDE5B98d62a2506c6a14dcE10",
+    "deployGas": 3066930
   }
 ]
