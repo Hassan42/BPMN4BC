@@ -156,15 +156,15 @@ const queryContracts = async (contractManager) => {
 }
 
 
-const executeTask = async (contractManager, contractName, contractInstance, taskId, inputs) => {
+const executeTask = async (contractManager, contractName, contractInstance, taskId, sender, inputs) => {
     try {
         const { ethers } = require("hardhat");
 
         // Get the task by its ID
-        const task = contractManager.getTaskById(contractName, taskId);
+        // const task = contractManager.getTaskById(contractName, taskId);
 
         // Get the address of the role associated with this task
-        const roleAddress = contractManager.getAddressByRole(contractName, task.sender);
+        const roleAddress = contractManager.getAddressByRole(contractName, sender);
 
         // Retrieve all available signers
         const signers = await ethers.getSigners();

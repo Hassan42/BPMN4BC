@@ -203,6 +203,7 @@ function generateEntryFunction(activity, process, roles) {
   let proceedingLogic = '';
   const definedVariables = new Set(outputParameters.filter(param => String(param.transactional).trim().toLowerCase() == "true").map(param => param.name));
 
+  let hasLoop = false;
   function processElement(element) {
     const elementContractName = getContractNameForElement(element, process);
 
@@ -212,6 +213,9 @@ function generateEntryFunction(activity, process, roles) {
           proceedingLogic += `I${elementContractName}(contracts["${elementContractName}"]).setState("${element.id.replace(/\s+/g, '')}", 1);\n`;
         } else {
           proceedingLogic += `state["${element.id.replace(/\s+/g, '')}"] = State.Open;\n`;
+          if (element.id.replace(/\s+/g, '') == activity.id.replace(/\s+/g, '')){
+            hasLoop = true;
+          }
         }
         break;
       }
@@ -382,7 +386,7 @@ function generateEntryFunction(activity, process, roles) {
         ${storageAssignments}
         ${transactionalAssignments}
         ${proceedingLogic}
-        ${!hasNextReceiveTask ? `state["${activity.id.replace(/\s+/g, '')}"] = State.Completed;` : ''}
+        ${!hasNextReceiveTask && !hasLoop ? `state["${activity.id.replace(/\s+/g, '')}"] = State.Completed;` : ''}
     }
   `;
 }

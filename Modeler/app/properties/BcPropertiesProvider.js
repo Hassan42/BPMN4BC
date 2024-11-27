@@ -90,6 +90,7 @@ export default function BcPropertiesProvider(propertiesPanel, injector, translat
 
       // Check if the element is a Lane and its parent is a blockchain environment
       if (isLane && (elementParent.bc === "true")) {
+        groups.push(createBcGroup(element, translate));
         groups.push(createBcOutputGroup(element, injector, translate));
       }
 

@@ -14,9 +14,9 @@ task('execute-task', 'Execute a contracts task')
       return;
     }
 
-    const { contractName, taskId, inputs } = args;
+    const { contractName, taskId, sender,  inputs } = args;
 
-    if (!contractName || !taskId || !Array.isArray(inputs)) {
+    if (!contractName || !taskId || !sender || !Array.isArray(inputs)) {
       console.error('Invalid task arguments.');
       return;
     }
@@ -35,7 +35,7 @@ task('execute-task', 'Execute a contracts task')
     // Attach to the contract
     const contractInstance = contractFactory.attach(contractAddress);
 
-    await executeTask(contractManager, contractName, contractInstance, taskId, inputs);
+    await executeTask(contractManager, contractName, contractInstance, taskId, sender, inputs);
 
   });
 

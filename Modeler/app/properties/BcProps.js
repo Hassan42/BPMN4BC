@@ -60,24 +60,16 @@ export default function (element) {
         isEdited: isTextFieldEntryEdited
       }
     );
+  } else if (is(element, 'bpmn:Lane') || is(element, 'bpmn:Participant')) {
+    props.push(
+      {
+        id: 'script',
+        element,
+        component: Script,
+        isEdited: isTextFieldEntryEdited
+      }
+    );
   }
-// else if (is(element, 'bpmn:Lane') || (is(element, 'bpmn:Participant') && (element.children.length == 0))){
-//   props.push({
-//     id: 'shared',
-//     element,
-//     component: Dynamic,
-//   })
-//   props.push({
-//     id: 'address',
-//     element,
-//     component: ContractAddress,
-//   })
-//   props.push({
-//     id: 'shared',
-//     element,
-//     component: Shared,
-//   })
-// }
 return props;
 }
 

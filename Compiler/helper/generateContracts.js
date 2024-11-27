@@ -33,6 +33,13 @@ async function generateContract(contractParams) {
   const solidityEvents = generateEvents(events);
   const emitFunctions = generateEmitFunctions(events);
 
+  let customScript;
+  if (lanes.length == 0){
+    customScript = process.solidityscript || '';
+  } else{
+    customScript = lane.solidityscript || '';
+  }
+
   // Identify activities connected to a start event
   const startReceiveTaskIds = process.flowElements
     .filter(element => element.$type === 'bpmn:StartEvent') // Get start events
@@ -50,7 +57,18 @@ async function generateContract(contractParams) {
   const activityToRoleMappings = activities.map(activity => {
       // Return the mapping string for non-ScriptTask activities
       if (activity.$type === "bpmn:ScriptTask") { return '';}
-      return `activitytoRole["${activity.id}"] = "${activity.bcsender}";`;
+
+      let participantsArray;
+      if (typeof activity.bcsender === 'string' && activity.bcsender.startsWith('[') && activity.bcsender.endsWith(']')) {
+        participantsArray = JSON.parse(activity.bcsender); // Parse the stringified array
+      } else {
+        participantsArray = [activity.bcsender];
+      } 
+
+      const participantsString = participantsArray.map(participant => `"${participant}"`).join(', ');
+
+  
+      return `activitytoRole["${activity.id}"] = [${participantsString}];`;
     }
   ).join('\n');
 
@@ -81,13 +99,28 @@ async function generateContract(contractParams) {
 
       mapping(address => string) public addressToRole;
 
-      mapping(string => string) public activitytoRole;
+      mapping(string => string[]) public activitytoRole;
 
       modifier isAccessible(string memory _activity) {
-        require(state[_activity] == State.Open, "Activity is not open");
-        require(compareStrings(addressToRole[msg.sender], activitytoRole[_activity]), "Caller does not have the required role");
+          require(state[_activity] == State.Open, "Activity is not open");
+
+          string memory userRole = addressToRole[msg.sender];
+          bool hasRequiredRole = false;
+
+          // Iterate through the array of roles for the activity
+          for (uint256 i = 0; i < activitytoRole[_activity].length; i++) {
+              if (compareStrings(userRole, activitytoRole[_activity][i])) {
+                  hasRequiredRole = true;
+                  break;
+              }
+          }
+
+          require(hasRequiredRole, "Caller does not have the required role");
           _;
       }
+      
+      ${customScript}
+
       ${solidityEvents}
       ${storageStruct}
 

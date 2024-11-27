@@ -1,98 +1,28 @@
 [
   {
-    "contractName": "Lane_0rg8ox7_Contract",
+    "contractName": "Lane_13a4k8k_Contract",
     "networkId": "network-1",
     "contractRoles": [
       {
-        "role": "Buyer"
-      },
-      {
-        "role": "Authority"
-      },
-      {
-        "role": "PropertyOwner"
+        "role": "test"
       }
     ],
     "receiveTasks": [
       {
-        "id": "Activity_0twj7n8",
-        "sender": "PropertyOwner",
-        "name": "Accept Request",
-        "state": "Closed",
-        "externalParams": [
-          {
-            "name": "new_owner",
-            "type": "string"
-          }
-        ]
-      },
-      {
-        "id": "Activity_063mdk6",
-        "sender": "PropertyOwner",
-        "name": "Reject Request",
-        "state": "Closed",
-        "externalParams": []
-      },
-      {
-        "id": "Activity_0hnfduf",
-        "sender": "Authority",
-        "name": "Register Zone",
+        "id": "Activity_024v18h",
+        "sender": "test",
+        "name": "",
         "state": "Open",
         "externalParams": [
           {
-            "name": "zone",
-            "type": "uint"
-          }
-        ]
-      },
-      {
-        "id": "Activity_11aq4w4",
-        "sender": "PropertyOwner",
-        "name": "Register Property",
-        "state": "Closed",
-        "externalParams": [
-          {
-            "name": "req_zone",
-            "type": "uint"
-          },
-          {
-            "name": "prop_owner",
-            "type": "string"
-          },
-          {
-            "name": "prop_id",
-            "type": "uint"
-          }
-        ]
-      },
-      {
-        "id": "Activity_03z2h2j",
-        "sender": "Buyer",
-        "name": "Purchase Request",
-        "state": "Open",
-        "externalParams": [
-          {
-            "name": "req_prop_id",
+            "name": "vote",
             "type": "uint"
           }
         ]
       }
     ],
-    "contractCode": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\nimport \"./ILane_0rg8ox7_Contract.sol\";\ncontract Lane_0rg8ox7_Contract {\n    enum State {\n        Closed,\n        Open,\n        Completed\n    }\n\n    mapping(string => State) public state;\n\n    uint receiveFunctionCount = 5;\n\n    mapping(string => address) public contracts;\n\n    mapping(address => string) public addressToRole;\n\n    mapping(string => string) public activitytoRole;\n\n    modifier isAccessible(string memory _activity) {\n        require(state[_activity] == State.Open, \"Activity is not open\");\n        require(\n            compareStrings(\n                addressToRole[msg.sender],\n                activitytoRole[_activity]\n            ),\n            \"Caller does not have the required role\"\n        );\n        _;\n    }\n\n    event Property_Transfer_Rejection();\n\n    event Property_Transferred();\n\n    event Property_Mint();\n\n    event Event_1ay6qvq();\n\n    struct LocalStorage {\n        string property_owner;\n        uint property_id;\n        uint zone;\n    }\n    LocalStorage public localStorage;\n\n    constructor() {\n        state[\"Activity_0twj7n8\"] = State.Closed;\n        state[\"Activity_063mdk6\"] = State.Closed;\n        state[\"Activity_0hnfduf\"] = State.Open;\n        state[\"Activity_11aq4w4\"] = State.Closed;\n        state[\"Activity_03z2h2j\"] = State.Open;\n        activitytoRole[\"Activity_0twj7n8\"] = \"PropertyOwner\";\n        activitytoRole[\"Activity_063mdk6\"] = \"PropertyOwner\";\n\n        activitytoRole[\"Activity_0hnfduf\"] = \"Authority\";\n        activitytoRole[\"Activity_11aq4w4\"] = \"PropertyOwner\";\n        activitytoRole[\"Activity_03z2h2j\"] = \"Buyer\";\n    }\n\n    function setContracts(address[] memory addresses) public {\n        contracts[\"Lane_0rg8ox7_Contract\"] = addresses[0];\n    }\n\n    function emit_Property_Transfer_Rejection() public {\n        emit Property_Transfer_Rejection();\n    }\n\n    function emit_Property_Transferred() public {\n        emit Property_Transferred();\n    }\n\n    function emit_Property_Mint() public {\n        emit Property_Mint();\n    }\n\n    function emit_Event_1ay6qvq() public {\n        emit Event_1ay6qvq();\n    }\n\n    function getProperty_owner() public view returns (string memory) {\n        return localStorage.property_owner;\n    }\n\n    function getProperty_id() public view returns (uint) {\n        return localStorage.property_id;\n    }\n\n    function getZone() public view returns (uint) {\n        return localStorage.zone;\n    }\n\n    function setResources(\n        string[] memory _roles,\n        address[] memory _addresses\n    ) public {\n        require(\n            _roles.length == _addresses.length,\n            \"Roles and addresses arrays must be of the same length\"\n        );\n\n        for (uint i = 0; i < _addresses.length; i++) {\n            addressToRole[_addresses[i]] = _roles[i];\n        }\n    }\n\n    function setResource(string memory _role, address _address) public {\n        addressToRole[_address] = _role;\n    }\n\n    function setState(string memory _activity, uint8 _state) public {\n        require(_state <= 3, \"Not Valid State\");\n        state[_activity] = State(_state);\n    }\n\n    function getState(string memory _activity) public view returns (State) {\n        return state[_activity];\n    }\n\n    //To be replaced with ENUM\n    function compareStrings(\n        string memory a,\n        string memory b\n    ) internal pure returns (bool) {\n        return keccak256(abi.encodePacked(a)) == keccak256(abi.encodePacked(b));\n    }\n\n    function Activity_0twj7n8(\n        string memory new_owner\n    ) public isAccessible(\"Activity_0twj7n8\") {\n        state[\"Activity_063mdk6\"] = State.Closed;\n\n        Activity_1ue8g60(new_owner);\n        emit_Property_Transferred();\n\n        state[\"Activity_0twj7n8\"] = State.Completed;\n    }\n\n    function Activity_063mdk6() public isAccessible(\"Activity_063mdk6\") {\n        state[\"Activity_0twj7n8\"] = State.Closed;\n        emit_Property_Transfer_Rejection();\n\n        state[\"Activity_063mdk6\"] = State.Completed;\n    }\n\n    function Activity_1ue8g60(string memory new_owner) public {\n        require(uint256(state[\"Activity_0twj7n8\"]) == uint256(State.Open));\n\n        localStorage.property_owner = new_owner;\n    }\n\n    function Activity_0doea6v(string memory owner, uint id) public {\n        require(uint256(state[\"Activity_11aq4w4\"]) == uint256(State.Open));\n\n        localStorage.property_owner = owner;\n        localStorage.property_id = id;\n    }\n\n    function Activity_0hnfduf(\n        uint zone\n    ) public isAccessible(\"Activity_0hnfduf\") {\n        localStorage.zone = zone;\n\n        state[\"Activity_11aq4w4\"] = State.Open;\n\n        state[\"Activity_0hnfduf\"] = State.Completed;\n    }\n\n    function Activity_11aq4w4(\n        uint req_zone,\n        string memory prop_owner,\n        uint prop_id\n    ) public isAccessible(\"Activity_11aq4w4\") {\n        uint256 branch = checkXOR_Gateway_0yfeqnu(req_zone);\n        if ((branch & (1 << 0)) != 0) {\n            Activity_0doea6v(prop_owner, prop_id);\n            emit_Property_Mint();\n        } else if ((branch & (1 << 1)) != 0) {\n            revert(\n                \"End Event reached: Event_15zrmvl, Zone not open for registration.\"\n            );\n        }\n\n        state[\"Activity_11aq4w4\"] = State.Completed;\n    }\n\n    function Activity_03z2h2j(\n        uint req_prop_id\n    ) public isAccessible(\"Activity_03z2h2j\") {\n        uint256 branch = checkXOR_Gateway_10zbfi1(req_prop_id);\n        if ((branch & (1 << 0)) != 0) {\n            emit_Event_1ay6qvq();\n            // Logic for Gateway_1jfy03i\n            state[\"Activity_0twj7n8\"] = State.Open;\n            state[\"Activity_063mdk6\"] = State.Open;\n        } else if ((branch & (1 << 1)) != 0) {\n            revert(\"End Event reached: Event_1ojo7cp, Property Not Available\");\n        }\n\n        state[\"Activity_03z2h2j\"] = State.Completed;\n    }\n\n    function checkXOR_Gateway_0yfeqnu(uint req_zone) public returns (uint256) {\n        require(uint256(state[\"Activity_11aq4w4\"]) == uint256(State.Open));\n        return ((localStorage.zone == req_zone) ? (1 << 0) : 0) | (1 << 1);\n    }\n\n    function checkXOR_Gateway_10zbfi1(\n        uint req_prop_id\n    ) public returns (uint256) {\n        require(uint256(state[\"Activity_03z2h2j\"]) == uint256(State.Open));\n        return\n            (\n                (ILane_0rg8ox7_Contract(contracts[\"Lane_0rg8ox7_Contract\"])\n                    .getProperty_id() == req_prop_id)\n                    ? (1 << 0)\n                    : 0\n            ) | (1 << 1);\n    }\n}\n",
-    "contractInterface": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\ninterface ILane_0rg8ox7_Contract {\n    enum State {\n        Closed,\n        Open,\n        Completed\n    }\n    function setContracts(address[] memory addresses) external;\n    function emit_Property_Transfer_Rejection() external;\n    function emit_Property_Transferred() external;\n    function emit_Property_Mint() external;\n    function emit_Event_1ay6qvq() external;\n    function getProperty_owner() external returns (string memory);\n    function getProperty_id() external returns (uint);\n    function getZone() external returns (uint);\n    function setResources(\n        string[] memory _roles,\n        address[] memory _addresses\n    ) external;\n    function setResource(string memory _role, address _address) external;\n    function setState(string memory _activity, uint8 _state) external;\n    function getState(string memory _activity) external returns (State);\n    function compareStrings(\n        string memory a,\n        string memory b\n    ) external returns (bool);\n    function Activity_0twj7n8(string memory new_owner) external;\n    function Activity_063mdk6() external;\n    function Activity_1ue8g60(string memory new_owner) external;\n    function Activity_0doea6v(string memory owner, uint id) external;\n    function Activity_0hnfduf(uint zone) external;\n    function Activity_11aq4w4(\n        uint req_zone,\n        string memory prop_owner,\n        uint prop_id\n    ) external;\n    function Activity_03z2h2j(uint req_prop_id) external;\n    function checkXOR_Gateway_0yfeqnu(uint req_zone) external returns (uint256);\n    function checkXOR_Gateway_10zbfi1(\n        uint req_prop_id\n    ) external returns (uint256);\n}\n",
-    "localStorage": [
-      {
-        "type": "string",
-        "name": "property_owner"
-      },
-      {
-        "type": "uint",
-        "name": "property_id"
-      },
-      {
-        "type": "uint",
-        "name": "zone"
-      }
-    ]
+    "contractCode": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\nimport \"./ILane_13a4k8k_Contract.sol\";\ncontract Lane_13a4k8k_Contract {\n    enum State {\n        Closed,\n        Open,\n        Completed\n    }\n\n    mapping(string => State) public state;\n\n    uint receiveFunctionCount = 1;\n\n    mapping(string => address) public contracts;\n\n    mapping(address => string) public addressToRole;\n\n    mapping(string => string[]) public activitytoRole;\n\n    modifier isAccessible(string memory _activity) {\n        require(state[_activity] == State.Open, \"Activity is not open\");\n\n        string memory userRole = addressToRole[msg.sender];\n        bool hasRequiredRole = false;\n\n        // Iterate through the array of roles for the activity\n        for (uint256 i = 0; i < activitytoRole[_activity].length; i++) {\n            if (compareStrings(userRole, activitytoRole[_activity][i])) {\n                hasRequiredRole = true;\n                break;\n            }\n        }\n\n        require(hasRequiredRole, \"Caller does not have the required role\");\n        _;\n    }\n\n    mapping(address => uint) public votes;\n\n    constructor() {\n        state[\"Activity_024v18h\"] = State.Open;\n\n        activitytoRole[\"Activity_024v18h\"] = [\"test\"];\n    }\n\n    function setContracts(address[] memory addresses) public {\n        contracts[\"Lane_13a4k8k_Contract\"] = addresses[0];\n    }\n\n    function setResources(\n        string[] memory _roles,\n        address[] memory _addresses\n    ) public {\n        require(\n            _roles.length == _addresses.length,\n            \"Roles and addresses arrays must be of the same length\"\n        );\n\n        for (uint i = 0; i < _addresses.length; i++) {\n            addressToRole[_addresses[i]] = _roles[i];\n        }\n    }\n\n    function setResource(string memory _role, address _address) public {\n        addressToRole[_address] = _role;\n    }\n\n    function setState(string memory _activity, uint8 _state) public {\n        require(_state <= 3, \"Not Valid State\");\n        state[_activity] = State(_state);\n    }\n\n    function getState(string memory _activity) public view returns (State) {\n        return state[_activity];\n    }\n\n    //To be replaced with ENUM\n    function compareStrings(\n        string memory a,\n        string memory b\n    ) internal pure returns (bool) {\n        return keccak256(abi.encodePacked(a)) == keccak256(abi.encodePacked(b));\n    }\n\n    function Activity_0eoqjan(uint vote) public {\n        require(uint256(state[\"Activity_024v18h\"]) == uint256(State.Open));\n\n        votes[msg.sender] = vote;\n    }\n\n    function Activity_024v18h(\n        uint vote\n    ) public isAccessible(\"Activity_024v18h\") {\n        uint256 branch = checkXOR_Gateway_059heui();\n        if ((branch & (1 << 0)) != 0) {\n            Activity_0eoqjan(vote);\n            uint256 branch = checkXOR_Gateway_0uaw77k();\n            if ((branch & (1 << 0)) != 0) {\n                revert(\"End Event reached: Event_0istpln, voted false\");\n            } else if ((branch & (1 << 1)) != 0) {\n                state[\"Activity_024v18h\"] = State.Open;\n            }\n        } else if ((branch & (1 << 1)) != 0) {\n            revert(\"End Event reached: Event_1rbks68, already voted\");\n        }\n    }\n\n    function checkXOR_Gateway_0uaw77k() public returns (uint256) {\n        require(uint256(state[\"Activity_024v18h\"]) == uint256(State.Open));\n        return\n            ((votes[msg.sender] == 1) ? (1 << 0) : 0) |\n            ((votes[msg.sender] == 2) ? (1 << 1) : 0);\n    }\n\n    function checkXOR_Gateway_059heui() public returns (uint256) {\n        require(uint256(state[\"Activity_024v18h\"]) == uint256(State.Open));\n        return\n            ((votes[msg.sender] == 0) ? (1 << 0) : 0) |\n            ((votes[msg.sender] != 0) ? (1 << 1) : 0);\n    }\n}\n",
+    "contractInterface": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\ninterface ILane_13a4k8k_Contract {\n    enum State {\n        Closed,\n        Open,\n        Completed\n    }\n    function setContracts(address[] memory addresses) external;\n    function setResources(\n        string[] memory _roles,\n        address[] memory _addresses\n    ) external;\n    function setResource(string memory _role, address _address) external;\n    function setState(string memory _activity, uint8 _state) external;\n    function getState(string memory _activity) external returns (State);\n    function compareStrings(\n        string memory a,\n        string memory b\n    ) external returns (bool);\n    function Activity_0eoqjan(uint vote) external;\n    function Activity_024v18h(uint vote) external;\n    function checkXOR_Gateway_0uaw77k() external returns (uint256);\n    function checkXOR_Gateway_059heui() external returns (uint256);\n}\n",
+    "localStorage": []
   }
 ]

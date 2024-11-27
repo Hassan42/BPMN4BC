@@ -408,7 +408,6 @@ const generateContractConfig = ({
 
     // Filter roles based on those used in ReceiveTasks and format as an array of objects
     const contractRoles = roles
-        .filter(role => receiveTaskRoles.has(role.role))
         .map(role => ({ role: role.role }));
 
 
