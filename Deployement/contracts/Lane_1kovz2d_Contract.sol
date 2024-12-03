@@ -63,7 +63,7 @@ contract Lane_1kovz2d_Contract {
         activitytoRole["Activity_1udilui"] = ["Startupper"];
 
         activitytoRole["Activity_1n5l3yg"] = [""];
-        activitytoRole["Activity_11x0c4m"] = ["Investor"];
+        activitytoRole["Activity_11x0c4m"] = [""];
 
         localStorage.status = 0;
         localStorage.totalAmount = 0;
@@ -203,15 +203,19 @@ contract Lane_1kovz2d_Contract {
         uint256 branch = checkXOR_Gateway_0o9wgik();
         if ((branch & (1 << 0)) != 0) {
             Activity_0uoubyt();
+            state["Activity_11x0c4m"] = State.Open;
         } else if ((branch & (1 << 1)) != 0) {
             revert("End Event reached: Event_1kukr8p, undefined");
         }
-
-        state["Activity_11x0c4m"] = State.Completed;
     }
 
     function Activity_0uoubyt() public payable {
         require(uint256(state["Activity_11x0c4m"]) == uint256(State.Open));
+
+        uint amount = investors[msg.sender];
+        payable(msg.sender).transfer(amount);
+        investors[msg.sender] = 0;
+        localStorage.totalAmount -= amount;
     }
 
     function Activity_1matq2v(uint goal) public payable {
@@ -234,7 +238,9 @@ contract Lane_1kovz2d_Contract {
 
     function checkXOR_Gateway_0o9wgik() public returns (uint256) {
         require(uint256(state["Activity_11x0c4m"]) == uint256(State.Open));
-        return (1 << 0) | (1 << 1);
+        return
+            ((investors[msg.sender] != 0) ? (1 << 0) : 0) |
+            ((investors[msg.sender] == 0) ? (1 << 1) : 0);
     }
 
     function checkXOR_Gateway_0ijdg26() public returns (uint256) {
