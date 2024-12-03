@@ -156,7 +156,7 @@ const queryContracts = async (contractManager) => {
 }
 
 
-const executeTask = async (contractManager, contractName, contractInstance, taskId, sender, inputs) => {
+const executeTask = async (contractManager, contractName, contractInstance, taskId, sender, inputs, value) => {
     try {
         const { ethers } = require("hardhat");
 
@@ -179,11 +179,19 @@ const executeTask = async (contractManager, contractName, contractInstance, task
         // We change the signer in the backend, in a deployment version the sender has to sign on their side
         const contractWithSigner = contractInstance.connect(roleSigner);
 
+        // Create the transaction options object
+        const txOptions = {};
+        if (value !== undefined) {
+            // Convert value from Ether to Wei if it's provided
+            txOptions.value = ethers.parseEther(value.toString());
+            console.log(txOptions);
+        }
+
         // Unpack inputs and call the function on the contract instance
         if (typeof contractWithSigner[taskId] === 'function') {
             // const gasEstimate = await contractWithSigner[taskId].estimateGas(...inputs);
             // console.log(`Estimated gas for ${taskId}: ${gasEstimate.toString()}`);
-            const txResponse = await contractWithSigner[taskId](...inputs); // Call the contract function with unpacked inputs
+            const txResponse = await contractWithSigner[taskId](...inputs, txOptions); // Call the contract function with unpacked inputs
             const receipt = await txResponse.wait();
             const gasUsed = receipt.gasUsed.toString();
             contractManager.updateTaskGas(contractName, taskId, gasUsed);

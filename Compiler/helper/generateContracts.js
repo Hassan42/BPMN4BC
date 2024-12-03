@@ -109,7 +109,7 @@ async function generateContract(contractParams) {
 
           // Iterate through the array of roles for the activity
           for (uint256 i = 0; i < activitytoRole[_activity].length; i++) {
-              if (compareStrings(userRole, activitytoRole[_activity][i])) {
+              if (bytes(activitytoRole[_activity][i]).length == 0 || compareStrings(userRole, activitytoRole[_activity][i])) {
                   hasRequiredRole = true;
                   break;
               }

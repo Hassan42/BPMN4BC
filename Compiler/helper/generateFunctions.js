@@ -111,7 +111,7 @@ function generateScriptFunction(activity, process) {
     : '';
 
   return `
-    function ${activity.id.replace(/\s+/g, '')}(${inputTypes}) public ${functionVisibility} ${returnClause} {
+    function ${activity.id.replace(/\s+/g, '')}(${inputTypes}) public payable ${functionVisibility} ${returnClause} {
         ${requireState}
         ${storageAssignments}
         ${transactionalAssignments}
@@ -382,7 +382,7 @@ function generateEntryFunction(activity, process, roles) {
   const hasNextReceiveTask = proceedingElements.some(element => element.$type === 'bpmn:ReceiveTask' && element.id === activity.id);
 
   return `
-    function ${activity.id.replace(/\s+/g, '')}(${externalParams}) public isAccessible("${activity.id.replace(/\s+/g, '')}") {
+    function ${activity.id.replace(/\s+/g, '')}(${externalParams}) public payable isAccessible("${activity.id.replace(/\s+/g, '')}") {
         ${storageAssignments}
         ${transactionalAssignments}
         ${proceedingLogic}

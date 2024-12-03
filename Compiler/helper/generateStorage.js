@@ -15,10 +15,18 @@ function generateStorage(activities, participant, lane) {
         return String(param?.transactional).trim().toLowerCase() !== "true";
     }
 
+    // Helper function to check if a parameter already exists in the array
+    function paramExists(paramsArray, param) {
+        return paramsArray.some(existingParam =>
+            existingParam.type === param.type && existingParam.name === param.name
+        );
+    }
+
+
     // Function to add parameters to outputParamsArray
     function addParams(params) {
         params.forEach(param => {
-            if (isNotTransactional(param)) {
+            if (isNotTransactional(param) && !paramExists(outputParamsArray, param)) {
                 // Add the type and name as an object to the array
                 outputParamsArray.push({ type: param.type, name: param.name });
                 // If there's an initial value, store it

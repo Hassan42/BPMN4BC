@@ -251,7 +251,8 @@ app.post('/executeTask', async (req, res) => {
     const taskArgs = req.body;
 
     // Validate the structure of taskArgs
-    if (typeof taskArgs !== 'object' || !taskArgs.taskId || !taskArgs.contractName || !taskArgs.network || !Array.isArray(taskArgs.inputs)) {
+    if (typeof taskArgs !== 'object' || !taskArgs.taskId || !taskArgs.contractName || !taskArgs.network || !taskArgs.sender || !Array.isArray(taskArgs.inputs)) {
+      console.log(taskArgs)
       return res.status(400).json({ message: 'Invalid request. Please provide taskArgs with taskName, contractName, and inputs.' });
     }
 
