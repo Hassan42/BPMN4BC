@@ -5,19 +5,19 @@
     "contractRoles": [
       {
         "role": "Startupper",
-        "address": "0xF5000A1564f4E19ed48AFB32772F0478Cc15e059"
+        "address": "0xF3a6689BBA584086e1c77a65e909561EB3D708c1"
       },
       {
         "role": "judge1",
-        "address": "0x91C6b1E849a811b0101163a3e11b6A3935d949A5"
+        "address": "0x62144629835c636031d8D88F070F785B3dB912Ef"
       },
       {
         "role": "judge2",
-        "address": "0xdb22EFdCe12761A3b05C615bcC3f44637708228A"
+        "address": "0xe858F6AC501E0a19b4485245E3B42F5FD45f02fb"
       },
       {
         "role": "judge3",
-        "address": "0x90550f21A88E047e589FB24D41Ac63f21EBC2382"
+        "address": "0xC12fa59D1181A953267dd91DAE54656280DDBEBE"
       }
     ],
     "receiveTasks": [
@@ -55,23 +55,27 @@
     "localStorage": [
       {
         "type": "uint",
-        "name": "voteCount"
+        "name": "voteCount",
+        "value": 0
       },
       {
         "type": "uint",
-        "name": "votePassed"
+        "name": "votePassed",
+        "value": 0
       },
       {
         "type": "uint",
-        "name": "ID"
+        "name": "ID",
+        "value": 0
       },
       {
         "type": "uint",
-        "name": "goal"
+        "name": "goal",
+        "value": 0
       }
     ],
-    "address": "0x0C5ba1204f170c40BbAC75Eb42Fb4a4332403728",
-    "deployGas": 2800762
+    "address": "0x8CDBcDdE51AbdC1481D85662363ceA72c3380215",
+    "deployGas": 2800774
   },
   {
     "contractName": "Lane_1kovz2d_Contract",
@@ -79,19 +83,19 @@
     "contractRoles": [
       {
         "role": "Startupper",
-        "address": "0xF5000A1564f4E19ed48AFB32772F0478Cc15e059"
+        "address": "0xF3a6689BBA584086e1c77a65e909561EB3D708c1"
       },
       {
         "role": "judge1",
-        "address": "0x91C6b1E849a811b0101163a3e11b6A3935d949A5"
+        "address": "0x62144629835c636031d8D88F070F785B3dB912Ef"
       },
       {
         "role": "judge2",
-        "address": "0xdb22EFdCe12761A3b05C615bcC3f44637708228A"
+        "address": "0xe858F6AC501E0a19b4485245E3B42F5FD45f02fb"
       },
       {
         "role": "judge3",
-        "address": "0x90550f21A88E047e589FB24D41Ac63f21EBC2382"
+        "address": "0xC12fa59D1181A953267dd91DAE54656280DDBEBE"
       }
     ],
     "receiveTasks": [
@@ -129,18 +133,21 @@
     "localStorage": [
       {
         "type": "uint",
-        "name": "status"
+        "name": "status",
+        "value": 0
       },
       {
         "type": "uint",
-        "name": "totalAmount"
+        "name": "totalAmount",
+        "value": 0
       },
       {
         "type": "uint",
-        "name": "goal"
+        "name": "goal",
+        "value": 0
       }
     ],
-    "address": "0x693B5799771fd98338BfC336c3421C620e99b7A2",
-    "deployGas": 3338708
+    "address": "0xc3d3c434fE56B81748c86ad240E189447fA91F15",
+    "deployGas": 3338720
   }
 ]

@@ -9,6 +9,8 @@ const createContractManager = require('./contractsManager');
 const { executeHardhatTask, fetchGasPrice, updateHardhatConfig } = require('./utils');
 
 const app = express();
+app.use(cors()); // Enables CORS for all routes
+
 const port = 3000;
 
 const compilerPort = 8000;
@@ -16,7 +18,6 @@ const contractsDir = path.resolve('./contracts');
 
 const docker = new Docker(); // Initialize Docker client
 
-app.use(cors());
 app.use(express.json());
 app.use(express.json());
 

@@ -11,14 +11,17 @@
 
   module.exports = {
   "networks": {
-    "ganache-network-1": {
-      "url": "http://localhost:8545"
+    "network-2": {
+      "url": "http://localhost:8546"
     },
     "network-1": {
       "url": "http://localhost:8545"
     },
-    "network-2": {
-      "url": "http://localhost:8546"
+    "network-4": {
+      "url": "http://localhost:8549"
+    },
+    "network-3": {
+      "url": "http://localhost:8547"
     }
   },
   "solidity": "0.8.24"

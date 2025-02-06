@@ -6,7 +6,7 @@
     "build": "webpack --mode production",
     "build:watch": "webpack --watch",
     "dev": "run-p build:watch serve",
-    "serve": "sirv public --dev --host 0.0.0.0",
+    "serve": "sirv public --dev",
     "lint": "eslint .",
     "start": "run-s build serve"
   },
