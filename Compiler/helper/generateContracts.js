@@ -24,12 +24,13 @@ async function generateContract(contractParams) {
     process,
     roles,
     participant,
-    lane
+    lane,
+    collaborationId
   } = contractParams;
 
   const { storageStruct, initializationCode, readFunctions } = generateStorage(activities, participant, lane);
-  const functions = generateFunctions(activities, process, roles).join('\n');
-  const gatewayFunctions = generateGateways(gateways, process);
+  const functions = generateFunctions(activities, process, roles, collaborationId).join('\n');
+  const gatewayFunctions = generateGateways(gateways, process, collaborationId);
   const solidityEvents = generateEvents(events);
   const emitFunctions = generateEmitFunctions(events);
 
@@ -77,11 +78,11 @@ async function generateContract(contractParams) {
   }).join('\n');
 
   const contractsMapping = lanes.map((lane, index) => {
-    return `contracts["${lane.id}_Contract"] = addresses[${index}];`;
+    return `contracts["${lane.id}_Contract_${collaborationId}"] = addresses[${index}];`;
   }).join('\n');
 
   const contractsImports = lanes.map((lane, index) => {
-    return `import './I${lane.id}_Contract.sol';`;
+    return `import './I${lane.id}_Contract_${collaborationId}.sol';`;
   }).join('\n');
 
   const solidityCode = `
@@ -107,11 +108,16 @@ async function generateContract(contractParams) {
           string memory userRole = addressToRole[msg.sender];
           bool hasRequiredRole = false;
 
-          // Iterate through the array of roles for the activity
-          for (uint256 i = 0; i < activitytoRole[_activity].length; i++) {
-              if (bytes(activitytoRole[_activity][i]).length == 0 || compareStrings(userRole, activitytoRole[_activity][i])) {
-                  hasRequiredRole = true;
-                  break;
+          // If no roles are defined for the activity, grant access
+          if (activitytoRole[_activity].length == 0) {
+              hasRequiredRole = true;
+          } else {
+              // Iterate through the array of roles for the activity
+              for (uint256 i = 0; i < activitytoRole[_activity].length; i++) {
+                  if (bytes(activitytoRole[_activity][i]).length == 0 || compareStrings(userRole, activitytoRole[_activity][i])) {
+                      hasRequiredRole = true;
+                      break;
+                  }
               }
           }
 
@@ -229,7 +235,6 @@ async function generateContracts(definitions) {
   const contracts = [];
   // Filter blockchain pools/participants
   const participants = collaboration.participants.filter((participant) => participant.bc === "true");
-
   if (participants.length === 0) {
     console.log('No blockchain participant found in BPMN XML.');
   } else {
@@ -245,7 +250,7 @@ async function generateContracts(definitions) {
         const lanes = findLanesForProcess(process);
         if (lanes.length === 0) {
           const contractParams = {
-            contractName: `${process.id.replace(/\s+/g, '')}_DefaultContract`,
+            contractName: `${process.id.replace(/\s+/g, '')}_DefaultContract_${participant.id}_${collaboration.id}`,
             networkId,
             activities: findActivitiesForProcess(process),
             gateways: findGatewaysForProcess(process),
@@ -253,14 +258,15 @@ async function generateContracts(definitions) {
             events: findEventsForProcess(process),
             process,
             roles,
-            participant
+            participant,
+            collaborationId:collaboration.id
           };
           const contractConfig = await generateContract(contractParams);
           contracts.push(contractConfig);
         } else {
           for (const lane of lanes) {
             const contractParams = {
-              contractName: lane.id.replace(/\s+/g, '') + '_Contract',
+              contractName: lane.id.replace(/\s+/g, '') + '_Contract' + '_' + collaboration.id,
               networkId,
               activities: findActivitiesForLane(lane),
               gateways: findGatewaysForLane(lane),
@@ -269,7 +275,8 @@ async function generateContracts(definitions) {
               process,
               roles,
               participant,
-              lane
+              lane,
+              collaborationId:collaboration.id
             };
             const contractConfig = await generateContract(contractParams);
             contracts.push(contractConfig);

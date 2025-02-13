@@ -1,12 +1,14 @@
+const path = require('path');
 const CopyWebpackPlugin = require('copy-webpack-plugin');
 
 module.exports = {
   entry: {
-    bundle: ['./app/app.js']
+    app: './app/app.js',                         // Main app entry
+    'execution-panel': './app/scripts/execution-panel.js' // ✅ Corrected path
   },
   output: {
-    path: __dirname + '/public',
-    filename: 'app.js'
+    path: path.resolve(__dirname, 'public'),
+    filename: '[name].js'                        // Will output: public/app.js and public/execution-panel.js
   },
   module: {
     rules: [
@@ -15,19 +17,34 @@ module.exports = {
         use: 'raw-loader'
       },
       {
-        test: /\.(svg)$/i,			
-        type: 'asset/resource'	
+        test: /\.(svg)$/i,
+        type: 'asset/resource'
       },
+      {
+        test: /\.js$/,
+        exclude: /node_modules/,
+        type: 'javascript/auto'
+      }
     ]
   },
   plugins: [
     new CopyWebpackPlugin({
       patterns: [
         { from: 'assets/**', to: 'vendor/bpmn-js', context: 'node_modules/bpmn-js/dist/' },
-        { from: '**/*.{html,css}', context: 'app/' }
+        { from: '**/*.{html,css}', context: 'app/' }  // ✅ Ensure HTML/CSS files are copied
       ]
     })
   ],
   mode: 'development',
-  devtool: 'source-map'
+  devtool: 'source-map',
+  devServer: {
+    static: {
+      directory: path.join(__dirname, 'public'),
+    },
+    compress: true,
+    port: 5000,
+    headers: {
+      'Content-Type': 'application/javascript'
+    }
+  }
 };

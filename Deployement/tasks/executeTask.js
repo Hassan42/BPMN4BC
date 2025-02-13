@@ -38,4 +38,3 @@ task('execute-task', 'Execute a contracts task')
     await executeTask(contractManager, contractName, contractInstance, taskId, sender, inputs, value);
 
   });
-

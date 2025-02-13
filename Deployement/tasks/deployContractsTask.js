@@ -46,22 +46,24 @@ task('deploy-contracts', 'Deploys all contracts and updates contracts.json')
                 continue;
             }
 
+            // Check if the contract is already deployed
+            if (contractInfo.address) {
+                console.log(`Contract ${contractName} is already deployed at address ${contractInfo.address}. Skipping deployment.`);
+                continue;
+            }
+
             console.log(`Deploying ${contractName}...`);
 
             // Compile the contract
             const factory = await ethers.getContractFactory(contractName);
-            // const contract = await factory.deploy();
-            // const deployTransaction = await contract.waitForDeployment();
-            // const contractAddress = await contract.getAddress();
 
-            
             // Create the deployment transaction
             const deployTransaction = await factory.getDeployTransaction();
 
             // Send the deployment transaction
             const txResponse = await deployer.sendTransaction(deployTransaction);
             const receipt = await txResponse.wait();  // Wait for the transaction to be mined
-            
+
             // Output the deployed contract address and transaction details
             console.log(`${contractName} deployed to: ${receipt.contractAddress}`);
 

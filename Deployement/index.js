@@ -32,6 +32,9 @@ app.post('/start', async (req, res) => {
       return res.status(400).json({ message: 'Networks array is required and cannot be empty.' });
     }
 
+
+    await cleanOutputDirectories();
+
     const containerPromises = networks.map(async (network) => {
       const { networkId, port, fork, infuraUrl } = network;
       const containerName = networkId;
@@ -104,7 +107,7 @@ app.post('/stop', async (req, res) => {
     const networks = Object.keys(hardhatConfig.networks);
 
     // Filter out containers related to Ganache
-    const ganacheContainers =  containers.filter(c =>
+    const ganacheContainers = containers.filter(c =>
       c.Names.some(name => networks.includes(name.replace('/', '')))
     );
 
@@ -150,7 +153,7 @@ app.get('/query', async (req, res) => {
     for (const network of networks) {
       try {
         // Execute the Hardhat task for the current network
-        await executeHardhatTask('query-contracts', network, {network: network});
+        await executeHardhatTask('query-contracts', network, { network: network });
 
         // Retrieve and store the contracts state for the current network
         const contractsState = contractManager.getContractsState(network);
@@ -175,7 +178,7 @@ app.get('/query', async (req, res) => {
 app.post('/deploy', async (req, res) => {
   const { xml } = req.body;
 
-  await cleanOutputDirectories();
+  // await cleanOutputDirectories();
 
   try {
     // Call the compile route to generate the contracts
@@ -187,13 +190,41 @@ app.post('/deploy', async (req, res) => {
       fs.mkdirSync(contractsDir, { recursive: true });
     }
 
-    // Convert the object to a JSON string
     const contractsJsonPath = path.join(contractsDir, 'contracts_meta.json');
-    const contractsJson = JSON.stringify(contracts, null, 2);
+
+    // Read existing contracts if the file exists
+    let existingContracts = [];
+    if (fs.existsSync(contractsJsonPath)) {
+      const existingData = fs.readFileSync(contractsJsonPath, 'utf8');
+      existingContracts = JSON.parse(existingData);
+    }
+
+    // Merge the existing contracts with the new contracts
+    const mergedContracts = [...existingContracts];
+    contracts.forEach(newContract => {
+      const existingIndex = mergedContracts.findIndex(
+        contract => contract.contractName === newContract.contractName && contract.networkId === newContract.networkId
+      );
+
+      if (existingIndex !== -1) {
+        // Check if contract code is different before overwriting
+        if (mergedContracts[existingIndex].contractCode !== newContract.contractCode) {
+          mergedContracts[existingIndex] = newContract;
+        } else {
+          console.log(`Contract ${newContract.contractName} on network ${newContract.networkId} has the same code. Skipping update.`);
+        }
+      } else {
+        // Add the new contract
+        mergedContracts.push(newContract);
+      }
+    });
+
+    // Convert the merged contracts object to a JSON string
+    const contractsJson = JSON.stringify(mergedContracts, null, 2);
 
     // Write the JSON string to a file
     fs.writeFileSync(contractsJsonPath, contractsJson, 'utf8');
-    console.log(`Wrote JSON file to ${contractsJsonPath}`);
+    console.log(`Updated JSON file at ${contractsJsonPath}`);
 
     // Save the contracts and interfaces in the specified folder
     contracts.forEach(contract => {
@@ -220,31 +251,29 @@ app.post('/deploy', async (req, res) => {
       console.log('Compile Output:', compileResult);
       networkResults[network] = { compile: compileResult };
 
-
       // Deploy contracts to each network
       console.log(`Deployment started for network ${network}...`);
-      const deployResult = await executeHardhatTask('deploy-contracts', network, {network: network});
+      const deployResult = await executeHardhatTask('deploy-contracts', network, { network: network });
       console.log(`Deployment successful for network ${network}!`);
       console.log('Deploy Output:', deployResult);
       networkResults[network].deploy = deployResult;
 
-
       // Setup contracts for each network
       console.log(`Setup started for network ${network}...`);
-      const setupResult = await executeHardhatTask('setup-contracts', network, {network: network});
+      const contractNames = contracts.map(contract => contract.contractName);
+      const setupResult = await executeHardhatTask('setup-contracts', network, { contractNames, network: network });
       console.log(`Setup successful for network ${network}!`);
       console.log('Setup Output:', setupResult);
       networkResults[network].setup = setupResult;
     }
 
-
-
-    res.status(200).json({ message: 'Contracts deployment successfully', results: networkResults });
+    res.status(200).json({ message: 'Contracts deployment successful', results: networkResults });
   } catch (err) {
     console.error('Error during deployment:', err);
     res.status(500).send('Deployment failed.');
   }
 });
+
 
 //Execute task in contract
 app.post('/executeTask', async (req, res) => {
@@ -261,13 +290,22 @@ app.post('/executeTask', async (req, res) => {
 
     // Execute the Hardhat task
     const executionResult = await executeHardhatTask("execute-task", network, taskArgs);
-    console.log(executionResult)
+    console.log(executionResult);
     // Send successful response
     res.status(200).json({ message: executionResult });
   } catch (err) {
     // Handle errors and send error response
     console.error('Error executing Hardhat task:', err);
-    res.status(500).json({ message: 'Error executing task.', error: err});
+    // Extract the error message
+    let errorMessage = 'Unknown error occurred';
+
+    const match = err.match(/Error: (.*?)(\n|$)/);
+    if (match) {
+      errorMessage = match[1]; // Extract the message after 'Error:'
+    } else {
+      errorMessage = err; // Fallback if regex doesn't match
+    }
+    res.status(500).json({ message: 'Error executing task.', error: errorMessage });
   }
 });
 
@@ -291,7 +329,7 @@ app.post('/executePropertyExample', async (req, res) => {
   } catch (err) {
     // Handle errors and send error response
     console.error('Error executing Hardhat task:', err);
-    res.status(500).json({ message: 'Error executing task.', error: err});
+    res.status(500).json({ message: 'Error executing task.', error: err });
   }
 });
 

@@ -49,6 +49,67 @@ const bpmnModeler = new BpmnModeler({
   }
 });
 
+// Access the event bus
+const eventBus = bpmnModeler.get('eventBus');
+
+const lanes = [];
+
+// Function to process all Participants and Lanes
+function processAllElements() {
+  const definitions = bpmnModeler.getDefinitions();
+  const collaboration = definitions.rootElements.find(el => el.$type === 'bpmn:Collaboration');
+
+  if (!collaboration) {
+    return;
+  }
+
+  // Clear the existing lanes array
+  lanes.length = 0;
+
+  // Loop through all elements in the model
+  const elementRegistry = bpmnModeler.get('elementRegistry');
+  const allElements = elementRegistry.getAll();
+
+  allElements.forEach(element => {
+    const businessObject = element.businessObject;
+
+    // Process Participants
+    if (element.type === 'bpmn:Participant') {
+      if (businessObject && businessObject.bc) {
+        let combinedId = element.id;
+
+        if (businessObject.processRef) {
+          combinedId = `${businessObject.processRef.id}_DefaultContract_${element.id}_${collaboration.id}`;
+        }
+
+        lanes.push(combinedId);
+      }
+    }
+
+    // Process Lanes
+    if (element.type === 'bpmn:Lane') {
+      let parentElement = element.parent;
+
+      while (parentElement && parentElement.type !== 'bpmn:Participant') {
+        parentElement = parentElement.parent;
+      }
+
+      if (parentElement && parentElement.businessObject && parentElement.businessObject.bc) {
+        const parentBusinessObject = parentElement.businessObject;
+        const combinedId = `${element.id}_Contract_${collaboration.id}`;
+
+        lanes.push(combinedId);
+      }
+    }
+  });
+}
+
+// Listen for changes to the Collaboration element
+eventBus.on('element.changed', (event) => {
+    processAllElements();
+});
+
+
 // import XML
 bpmnModeler.importXML(diagramXML).catch((err) => {
   console.error(err);
@@ -180,4 +241,16 @@ $(function () {
       console.error('Error happened during deployment: ', err);
     }
   });
+  $('#js-execute-panel').click(function (e) {
+    e.preventDefault();
+  
+    // Serialize the lanes array
+    const lanesParam = encodeURIComponent(JSON.stringify(lanes));
+  
+    // Open execute-panel.html with lanes as a query parameter
+    const url = `execute-panel.html?lanes=${lanesParam}`;
+  
+    // Open in a new tab
+    window.open(url, '_blank');
+  });  
 });

@@ -1,9 +1,10 @@
 // const { ethers } = require("hardhat");
 
-const setContracts = async (contractManager, network, contractName, contractInstance) => {
+const setContracts = async (contractManager, network, contractName, contractInstance, contractNames) => {
 
     const contractInfo = contractManager.getContractByName(contractName);
-    const addresses = contractManager.getContractsAddresses(network);
+    const addresses = contractNames.map(name => contractManager.getContractAddressByName(name));
+
 
     try {
         // Call setContracts function
@@ -40,9 +41,9 @@ const setResources = async (contractManager, network, contractName, contractInst
         // Create a mapping of roles to signers
         const roleSignerMap = {};
         roles.forEach((role, index) => {
-            roleSignerMap[role] = signers[index].address;
+            roleSignerMap[role] = signers[index+1].address;
             // Update the role address in the contract manager
-            contractManager.updateRoleAddress(contractName, role, signers[index].address);
+            contractManager.updateRoleAddress(contractName, role, signers[index+1].address);
         });
 
         // Convert the roleSignerMap to arrays
@@ -169,11 +170,17 @@ const executeTask = async (contractManager, contractName, contractInstance, task
         // Retrieve all available signers
         const signers = await ethers.getSigners();
 
-        // Find if the roleAddress exists among the signers
-        const roleSigner = signers.find(signer => signer.address === roleAddress);
-        if (!roleSigner) {
-            throw new Error(`Role address "${roleAddress}" is not in the list of available signers.`);
+        let roleSigner = signers.find(signer => signer.address === roleAddress);
+
+        if(!roleSigner){
+            roleSigner = signers[0];
         }
+
+        // Find if the roleAddress exists among the signers
+        
+        // if (!roleSigner) {
+        //     throw new Error(`Role address "${roleAddress}" is not in the list of available signers.`);
+        // }
 
         // Attach to the contract instance with the role address as the signer
         // We change the signer in the backend, in a deployment version the sender has to sign on their side
@@ -206,7 +213,7 @@ const executeTask = async (contractManager, contractName, contractInstance, task
         //     console.log(error.data)
         // }
         // else{
-        console.log(error)
+        throw new Error(`Function "${taskId}" failed to execute:${error}`);
         // }
     }
 }

@@ -6,12 +6,12 @@ const { getPreviousElementsFromFlow, findFlowsForElement, extractOutputParameter
  * @param {Array} gateways - The array of gateway objects.
  * @returns {string} The Solidity functions as a string.
  */
-function generateGateways(gateways, process) {
+function generateGateways(gateways, process, collaborationId) {
     return gateways.map(gateway => {
         if (gateway.$type === 'bpmn:ParallelGateway' && gateway.incoming.length > 1) {
             return generateAndGateway(gateway);
         } else if (gateway.$type === 'bpmn:ExclusiveGateway' && gateway.outgoing.length > 1) {
-            return generateXORGateway(gateway, process);
+            return generateXORGateway(gateway, process, collaborationId);
         }
         return ''; // Unsupported gateway type
     }).join('\n');
@@ -42,7 +42,7 @@ function generateAndGateway(gateway) {
     `;
 }
 
-function generateXORGateway(gateway, process) {
+function generateXORGateway(gateway, process, collaborationId) {
     const functionName = `checkXOR_${gateway.id}`;
 
     // Collect condition expressions and variables from `${}`
@@ -107,10 +107,10 @@ function generateXORGateway(gateway, process) {
         .join(' | ');
 
     const entryFunctions = getEntryFunctions(gateway, process);
-    const contractName = getContractNameForElement(gateway, process);
+    const contractName = getContractNameForElement(gateway, process, collaborationId);
 
     const requireState = `require(${entryFunctions.map((entryFunction) => {
-        const entryFunctionContractName = getContractNameForElement(entryFunction, process);
+        const entryFunctionContractName = getContractNameForElement(entryFunction, process, collaborationId);
 
         const entryFunctionState = entryFunctionContractName !== contractName
             ? `I${entryFunctionContractName}(contracts["${entryFunctionContractName}"]).getState("${entryFunction.id}")`

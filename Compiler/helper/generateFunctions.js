@@ -39,16 +39,16 @@ function generateFunctionSignatures(solidityCode) {
  * @param {Object} activity - The activity object.
  * @returns {string} The logic for the script function.
  */
-function generateScriptFunction(activity, process) {
+function generateScriptFunction(activity, process, collaborationId) {
   const solidityScript = activity.solidityscript || '';
   const returnParams = parseReturnValues(activity.returns || '');
   const inputParams = extractInputParameters(activity);
   const outputParams = extractOutputParameters(activity).filter(param => String(param.transactional).trim().toLowerCase() === "true");
   const entryFunctions = getEntryFunctions(activity, process);
-  const contractName = getContractNameForElement(activity, process);
+  const contractName = getContractNameForElement(activity, process, collaborationId);
 
   const requireState = `require(${entryFunctions.map((entryFunction) => {
-    const entryFunctionContractName = getContractNameForElement(entryFunction, process);
+    const entryFunctionContractName = getContractNameForElement(entryFunction, process, collaborationId);
 
     const entryFunctionState = entryFunctionContractName !== contractName
     ? `I${entryFunctionContractName}(contracts["${entryFunctionContractName}"]).getState("${entryFunction.id}")`
@@ -148,8 +148,8 @@ function parseReturnValues(encodedString) {
  * @param {Object} process - The process object containing flow elements.
  * @returns {string} The logic for the entry function.
  */
-function generateEntryFunction(activity, process, roles) {
-  const contractName = getContractNameForElement(activity, process);
+function generateEntryFunction(activity, process, roles, collaborationId) {
+  const contractName = getContractNameForElement(activity, process, collaborationId);
   const senderRole = activity.bcsender?.replace(/\s+/g, '') || '';
   // We assign addresses dynamically on deployment
   // const senderAddress = roles.find(r => r.role === senderRole)?.address.replace(/\s+/g, '') || '';
@@ -205,7 +205,7 @@ function generateEntryFunction(activity, process, roles) {
 
   let hasLoop = false;
   function processElement(element) {
-    const elementContractName = getContractNameForElement(element, process);
+    const elementContractName = getContractNameForElement(element, process, collaborationId);
 
     switch (element.$type) {
       case 'bpmn:ReceiveTask': {
@@ -275,7 +275,7 @@ function generateEntryFunction(activity, process, roles) {
       case 'bpmn:ParallelGateway': {
         //if join AND gateway
         if (element.incoming.length > 1) {
-          const elementContractName = getContractNameForElement(element, process);
+          const elementContractName = getContractNameForElement(element, process, collaborationId);
           const gatewayFunctionName = elementContractName !== contractName
             ? `I${elementContractName}(contracts["${elementContractName}"]).checkGateway_${element.id}`
             : `checkGateway_${element.id}`;
@@ -296,7 +296,7 @@ function generateEntryFunction(activity, process, roles) {
           branchProceedingElements.forEach(branchElement => processElement(branchElement));
         }
         else {
-          const elementContractName = getContractNameForElement(element, process);
+          const elementContractName = getContractNameForElement(element, process, collaborationId);
 
           // Define the XOR function name
           const xorFunctionName = elementContractName !== contractName
@@ -396,7 +396,7 @@ function generateEntryFunction(activity, process, roles) {
  * @param {Array} activities - The list of activities.
  * @returns {Array} The list of generated Solidity functions.
  */
-function generateFunctions(activities, process, roles) {
+function generateFunctions(activities, process, roles, collaborationId) {
   let functions = [];
 
   activities.forEach(activity => {
@@ -404,10 +404,10 @@ function generateFunctions(activities, process, roles) {
 
     switch (activity.$type) {
       case 'bpmn:ScriptTask':
-        functionLogic = generateScriptFunction(activity, process);
+        functionLogic = generateScriptFunction(activity, process, collaborationId);
         break;
       case 'bpmn:ReceiveTask':
-        functionLogic = generateEntryFunction(activity, process, roles);
+        functionLogic = generateEntryFunction(activity, process, roles, collaborationId);
         break;
       default:
         throw new Error(`Task type ${activity.$type} not supported`);

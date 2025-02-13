@@ -24,13 +24,13 @@ function generateStorage(activities, participant, lane) {
 
 
     // Function to add parameters to outputParamsArray
-    function addParams(params) {
+    function addParams(params, initialValue = true) {
         params.forEach(param => {
             if (isNotTransactional(param) && !paramExists(outputParamsArray, param)) {
                 // Add the type and name as an object to the array
                 outputParamsArray.push({ type: param.type, name: param.name });
                 // If there's an initial value, store it
-                if (param.value) {
+                if (param.value && initialValue) {
                     initialValues[param.name] = param.value;
                 }
             }
@@ -46,7 +46,7 @@ function generateStorage(activities, participant, lane) {
 
     // Extract and add output parameters from activities
     activities.forEach(activity => {
-        addParams(extractOutputParameters(activity));
+        addParams(extractOutputParameters(activity), false);
     });
 
     // Generate the storage structure

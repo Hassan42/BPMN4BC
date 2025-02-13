@@ -316,15 +316,15 @@ const formatSolidityCode = async (code) => {
  * @param {Object} process - The process containing the lanes.
  * @returns {string} The contract name for the given element.
  */
-const getContractNameForElement = (element, process) => {
+const getContractNameForElement = (element, process, collaborationId) => {
     for (const laneSet of process.laneSets || []) {
         for (const lane of laneSet.lanes || []) {
             if (lane.flowNodeRef.some(node => node.id === element.id)) {
-                return lane.id.replace(/\s+/g, '') + '_Contract';
+                return lane.id.replace(/\s+/g, '') + '_Contract' + '_' + collaborationId;
             }
         }
     }
-    return `${process.id.replace(/\s+/g, '')}_DefaultContract`;
+    return `${process.id.replace(/\s+/g, '')}_DefaultContract_${collaborationId}`;
 }
 
 /**

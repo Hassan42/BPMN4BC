@@ -15,6 +15,7 @@ task('setup-contracts', 'Execute the contracts setup')
       return;
     }
     
+    const { contractNames } = args;
     const { network } = args;
     const contractManager = createContractManager();
 
@@ -26,6 +27,11 @@ task('setup-contracts', 'Execute the contracts setup')
       const contractAddress = contract.address;
       const contractName = contract.contractName;
       const contractNetworkId = contract.networkId;
+
+      // Skip if contractName is NOT in contractNames
+      if (!contractNames.includes(contractName)) {
+        continue; 
+      }
 
       // Check if the contract is intended for the specified network
       if (contractNetworkId !== network) {
@@ -43,7 +49,7 @@ task('setup-contracts', 'Execute the contracts setup')
 
       try {
         // Setup contracts and resources
-        await setContracts(contractManager, network, contractName, contractInstance);
+        await setContracts(contractManager, network, contractName, contractInstance, contractNames);
         await setResources(contractManager, network, contractName, contractInstance);
       } catch (error) {
         console.error(`Error setting up ${contractName}:`, error.message);

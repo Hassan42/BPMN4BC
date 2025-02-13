@@ -333,7 +333,7 @@ const getAddressByRole = (contractName, roleName) => {
     const role = contract.contractRoles && contract.contractRoles.find(role => role.role === roleName);
 
     if (!role) {
-        throw new Error(`Role "${roleName}" not found in contract "${contractName}".`);
+        return undefined;
     }
 
     // Return the address associated with the role
