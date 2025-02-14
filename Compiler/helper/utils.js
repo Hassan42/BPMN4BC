@@ -459,6 +459,27 @@ function findReceiveTask(flowElement) {
     return []; // Return an empty array if no ReceiveTask is found
 }
 
+function generateExpression(expression, collaborationId){
+
+        return expression.replace(/\${([^}]+)}/g, (_, varName) => {
+          const parts = varName.split('.');
+         
+          // If parts.length === 2 and the second part is "localStorage", return localStorage.varName
+          if (parts.length === 2 && parts[0] === "localStorage") {
+            return `localStorage.${parts[1]}`;
+          }
+      
+          // If parts.length === 2, handle <string>.varname for contract retrieval
+          if (parts.length === 2) {
+            const [prefix, variable] = parts;
+            return `I${prefix}_Contract_${collaborationId}(contracts["${prefix}_Contract_${collaborationId}"]).get${capitalize(variable)}()`;
+          }
+          
+          // Handle simple ${varname} case
+          return varName;
+        });
+}
+
 // Helper function to capitalize the first letter of a string
 function capitalize(str) {
     return str.charAt(0).toUpperCase() + str.slice(1);
@@ -486,5 +507,6 @@ module.exports = {
     capitalize,
     findReceiveTask,
     getPreviousElementsFromFlow,
-    getEntryFunctions
+    getEntryFunctions,
+    generateExpression
 };

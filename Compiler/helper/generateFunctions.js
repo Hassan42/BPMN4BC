@@ -4,7 +4,9 @@ const {
   extractInputParameters,
   isValueType,
   getContractNameForElement,
-  getEntryFunctions
+  getEntryFunctions,
+  capitalize,
+  generateExpression
 } = require('./utils.js');
 
 /**
@@ -43,7 +45,7 @@ function generateScriptFunction(activity, process, collaborationId) {
   const solidityScript = activity.solidityscript || '';
   const returnParams = parseReturnValues(activity.returns || '');
   const inputParams = extractInputParameters(activity);
-  const outputParams = extractOutputParameters(activity).filter(param => String(param.transactional).trim().toLowerCase() === "true");
+  const outputParams = extractOutputParameters(activity);
   const entryFunctions = getEntryFunctions(activity, process);
   const contractName = getContractNameForElement(activity, process, collaborationId);
 
@@ -51,8 +53,8 @@ function generateScriptFunction(activity, process, collaborationId) {
     const entryFunctionContractName = getContractNameForElement(entryFunction, process, collaborationId);
 
     const entryFunctionState = entryFunctionContractName !== contractName
-    ? `I${entryFunctionContractName}(contracts["${entryFunctionContractName}"]).getState("${entryFunction.id}")`
-    : `state["${entryFunction.id}"]`;
+      ? `I${entryFunctionContractName}(contracts["${entryFunctionContractName}"]).getState("${entryFunction.id}")`
+      : `state["${entryFunction.id}"]`;
 
 
     return `uint256(${entryFunctionState}) == uint256(State.Open)`;
@@ -63,26 +65,23 @@ function generateScriptFunction(activity, process, collaborationId) {
     return `${param.type} ${memoryKeyword}${param.name}`;
   }).join(', ');
 
-  const combinedReturnParams = [...returnParams, ...outputParams];
-  const returnTypes = combinedReturnParams.map(param => {
-    const typeWithMemory = isValueType(param.type) ? param.type : `${param.type} memory`;
-    return typeWithMemory;
-  }).join(', ');
+  const combinedReturnParams = [...returnParams, ...outputParams.filter(param => String(param.transactional).trim().toLowerCase() == "true")];
+  const returnTypes = combinedReturnParams
+    .map(param => {
+      const typeWithMemory = isValueType(param.type) ? param.type : `${param.type} memory`;
+      return typeWithMemory;
+    }).join(', ');
 
   const returnClause = returnTypes ? `returns (${returnTypes})` : '';
 
-  const definedVariables = new Set(inputParams.map(param => param.name));
+  // const definedVariables = new Set(inputParams.map(param => param.name));
 
   // Storage assignments: Assign values to localStorage for non-transactional output parameters
   const storageAssignments = outputParams
     .filter(param => String(param.transactional).trim().toLowerCase() !== "true")
     .map(param => {
       const { name, value } = param;
-      if (value.startsWith('${') && value.endsWith('}')) {
-        const varName = value.slice(2, -1);
-        return `localStorage.${name} = ${definedVariables.has(varName) ? varName : `localStorage.${varName}`};`;
-      }
-      return `localStorage.${name} = ${value};`;
+      return `localStorage.${name} = ${generateExpression(value, collaborationId)};`;
     })
     .join('\n');
 
@@ -92,12 +91,7 @@ function generateScriptFunction(activity, process, collaborationId) {
     .map(param => {
       const { type, name, value } = param;
       const memoryKeyword = isValueType(type) ? '' : 'memory ';
-      if (value.startsWith('${') && value.endsWith('}')) {
-        const varName = value.slice(2, -1);
-        return `${type} ${memoryKeyword}${name} = ${definedVariables.has(varName) ? varName : `localStorage.${varName}`};`;
-      } else {
-        return `${type} ${memoryKeyword}${name} = ${value};`;
-      }
+      return `${type} ${memoryKeyword}${name} = ${generateExpression(value, collaborationId)};`;
     })
     .join('\n');
 
@@ -113,9 +107,9 @@ function generateScriptFunction(activity, process, collaborationId) {
   return `
     function ${activity.id.replace(/\s+/g, '')}(${inputTypes}) public payable ${functionVisibility} ${returnClause} {
         ${requireState}
-        ${storageAssignments}
-        ${transactionalAssignments}
         ${scriptWithoutReturn}
+        ${transactionalAssignments}
+        ${storageAssignments}
         ${returnStatement}
     }
   `;
@@ -174,14 +168,12 @@ function generateEntryFunction(activity, process, roles, collaborationId) {
     .filter(param => String(param.transactional).trim().toLowerCase() !== "true")
     .map(param => {
       const { name, value, external } = param;
-      if (value.startsWith('${') && value.endsWith('}')) {
-        const varName = value.slice(2, -1);
-        return `localStorage.${name} = localStorage.${varName};`;
-      }
+
       if (String(external).trim().toLowerCase() === "true") {
         return `localStorage.${name} = ${name};`;
       }
-      return `localStorage.${name} = ${value};`;
+
+      return `localStorage.${name} = ${generateExpression(value, collaborationId)};`;
     })
     .join('\n');
 
@@ -213,7 +205,7 @@ function generateEntryFunction(activity, process, roles, collaborationId) {
           proceedingLogic += `I${elementContractName}(contracts["${elementContractName}"]).setState("${element.id.replace(/\s+/g, '')}", 1);\n`;
         } else {
           proceedingLogic += `state["${element.id.replace(/\s+/g, '')}"] = State.Open;\n`;
-          if (element.id.replace(/\s+/g, '') == activity.id.replace(/\s+/g, '')){
+          if (element.id.replace(/\s+/g, '') == activity.id.replace(/\s+/g, '')) {
             hasLoop = true;
           }
         }
@@ -221,13 +213,34 @@ function generateEntryFunction(activity, process, roles, collaborationId) {
       }
       case 'bpmn:ScriptTask': {
         const inputParameters = extractInputParameters(element);
+        // const inputs = inputParameters.map(param => {
+        //   // if (param.value.startsWith('${') && param.value.endsWith('}')) {
+        //     // const varName = param.value.slice(2, -1);
+        //     // return definedVariables.has(varName) ? varName : `localStorage.${varName}`;
+        //   // } else {
+        //     return param.value;
+        //   // }
+        // }).join(', ');
+
         const inputs = inputParameters.map(param => {
-          if (param.value.startsWith('${') && param.value.endsWith('}')) {
-            const varName = param.value.slice(2, -1);
-            return definedVariables.has(varName) ? varName : `localStorage.${varName}`;
-          } else {
-            return param.value;
-          }
+          let value = param.value;
+          return value.replace(/\${([^}]+)}/g, (_, varName) => {
+            const parts = varName.split('.');
+
+            // If parts.length === 2 and the second part is "localStorage", return localStorage.varName
+            if (parts.length === 2 && parts[0] === "localStorage") {
+              return `localStorage.${parts[1]}`;
+            }
+
+            // If parts.length === 2, handle <string>.varname for contract retrieval
+            if (parts.length === 2) {
+              const [prefix, variable] = parts;
+              return `I${prefix}_Contract_${collaborationId}(contracts["${prefix}_Contract_${collaborationId}"]).get${capitalize(variable)}()`;
+            }
+
+            // Handle simple ${varname} case
+            return varName;
+          });
         }).join(', ');
 
         const returnParams = parseReturnValues(element.returns || '');
@@ -308,8 +321,32 @@ function generateEntryFunction(activity, process, roles, collaborationId) {
           element.outgoing.forEach(flow => {
             const condition = flow.conditionExpression?.body || '';
             const regex = /\${([^}]+)}/g;
-            const matches = [...condition.matchAll(regex)].map(match => match[1]);
-            matches.forEach(variable => variablesInConditions.add(variable));
+
+
+            const matches = [...condition.matchAll(regex)].map(match => {
+
+              return match[0].replace(/\${([^}]+)}/g, (_, varName) => {
+                const parts = varName.split('.');
+                // If parts.length === 2 and the second part is "localStorage", return localStorage.varName
+                if (parts.length === 2 && parts[0] === "localStorage") {
+                  return `localStorage.${parts[1]}`;
+                }
+                // If parts.length === 2, handle <string>.varname for contract retrieval
+                if (parts.length === 2) {
+                  const [prefix, variable] = parts;
+                  return `I${prefix}_Contract_${collaborationId}(contracts["${prefix}_Contract_${collaborationId}"]).get${capitalize(variable)}()`;
+                }
+
+                // Handle simple ${varname} case
+                return varName;
+              });
+
+
+            });
+
+
+            matches.forEach(variable =>
+              variablesInConditions.add(variable));
           });
 
           // Collect the parameter list for the XOR function, passing only the variable names

@@ -1,0 +1,719 @@
+[
+  {
+    "contractName": "Lane_19y529f_Contract_Collaboration_1glbzuk",
+    "networkId": "network-1",
+    "contractRoles": [
+      {
+        "role": "p1",
+        "address": "0xFD2578154fCf828772318716bD5f513953d80a71"
+      }
+    ],
+    "receiveTasks": [
+      {
+        "id": "Activity_0biddql",
+        "sender": "p1",
+        "name": "",
+        "state": "Completed",
+        "externalParams": [],
+        "gasUsed": "56086"
+      }
+    ],
+    "contractCode": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\nimport \"./ILane_19y529f_Contract_Collaboration_1glbzuk.sol\";\nimport \"./ILane_0qoxvyf_Contract_Collaboration_1glbzuk.sol\";\ncontract Lane_19y529f_Contract_Collaboration_1glbzuk {\n    enum State {\n        Closed,\n        Open,\n        Completed\n    }\n\n    mapping(string => State) public state;\n\n    uint receiveFunctionCount = 1;\n\n    mapping(string => address) public contracts;\n\n    mapping(address => string) public addressToRole;\n\n    mapping(string => string[]) public activitytoRole;\n\n    modifier isAccessible(string memory _activity) {\n        require(state[_activity] == State.Open, \"Activity is not open\");\n\n        string memory userRole = addressToRole[msg.sender];\n        bool hasRequiredRole = false;\n\n        // If no roles are defined for the activity, grant access\n        if (activitytoRole[_activity].length == 0) {\n            hasRequiredRole = true;\n        } else {\n            // Iterate through the array of roles for the activity\n            for (uint256 i = 0; i < activitytoRole[_activity].length; i++) {\n                if (\n                    bytes(activitytoRole[_activity][i]).length == 0 ||\n                    compareStrings(userRole, activitytoRole[_activity][i])\n                ) {\n                    hasRequiredRole = true;\n                    break;\n                }\n            }\n        }\n\n        require(hasRequiredRole, \"Caller does not have the required role\");\n        _;\n    }\n\n    struct LocalStorage {\n        uint x;\n    }\n    LocalStorage public localStorage;\n\n    constructor() {\n        state[\"Activity_0biddql\"] = State.Open;\n        activitytoRole[\"Activity_0biddql\"] = [\"p1\"];\n\n        localStorage.x = 22;\n    }\n\n    function setContracts(address[] memory addresses) public {\n        contracts[\"Lane_19y529f_Contract_Collaboration_1glbzuk\"] = addresses[0];\n        contracts[\"Lane_0qoxvyf_Contract_Collaboration_1glbzuk\"] = addresses[1];\n    }\n\n    function getX() public view returns (uint) {\n        return localStorage.x;\n    }\n\n    function setResources(\n        string[] memory _roles,\n        address[] memory _addresses\n    ) public {\n        require(\n            _roles.length == _addresses.length,\n            \"Roles and addresses arrays must be of the same length\"\n        );\n\n        for (uint i = 0; i < _addresses.length; i++) {\n            addressToRole[_addresses[i]] = _roles[i];\n        }\n    }\n\n    function setResource(string memory _role, address _address) public {\n        addressToRole[_address] = _role;\n    }\n\n    function setState(string memory _activity, uint8 _state) public {\n        require(_state <= 3, \"Not Valid State\");\n        state[_activity] = State(_state);\n    }\n\n    function getState(string memory _activity) public view returns (State) {\n        return state[_activity];\n    }\n\n    //To be replaced with ENUM\n    function compareStrings(\n        string memory a,\n        string memory b\n    ) internal pure returns (bool) {\n        return keccak256(abi.encodePacked(a)) == keccak256(abi.encodePacked(b));\n    }\n\n    function Activity_0biddql()\n        public\n        payable\n        isAccessible(\"Activity_0biddql\")\n    {\n        Activity_1aljlao(localStorage.x + 1);\n\n        ILane_0qoxvyf_Contract_Collaboration_1glbzuk(\n            contracts[\"Lane_0qoxvyf_Contract_Collaboration_1glbzuk\"]\n        ).Activity_1m2pw5d(\n                ILane_19y529f_Contract_Collaboration_1glbzuk(\n                    contracts[\"Lane_19y529f_Contract_Collaboration_1glbzuk\"]\n                ).getX()\n            );\n\n        state[\"Activity_0biddql\"] = State.Completed;\n    }\n\n    function Activity_1aljlao(uint Parameter_1l9pit8) public payable {\n        require(uint256(state[\"Activity_0biddql\"]) == uint256(State.Open));\n    }\n}\n",
+    "contractInterface": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\ninterface ILane_19y529f_Contract_Collaboration_1glbzuk {\n    enum State {\n        Closed,\n        Open,\n        Completed\n    }\n    function setContracts(address[] memory addresses) external;\n    function getX() external returns (uint);\n    function setResources(\n        string[] memory _roles,\n        address[] memory _addresses\n    ) external;\n    function setResource(string memory _role, address _address) external;\n    function setState(string memory _activity, uint8 _state) external;\n    function getState(string memory _activity) external returns (State);\n    function compareStrings(\n        string memory a,\n        string memory b\n    ) external returns (bool);\n    function Activity_0biddql() external;\n    function Activity_1aljlao(uint Parameter_1l9pit8) external;\n}\n",
+    "localStorage": [
+      {
+        "type": "uint",
+        "name": "x",
+        "value": 22
+      }
+    ],
+    "address": "0x995cf602446906E43eBf213896B3f7263E32F823",
+    "deployGas": 1983543
+  },
+  {
+    "contractName": "Lane_0qoxvyf_Contract_Collaboration_1glbzuk",
+    "networkId": "network-1",
+    "contractRoles": [
+      {
+        "role": "p1",
+        "address": "0xFD2578154fCf828772318716bD5f513953d80a71"
+      }
+    ],
+    "receiveTasks": [],
+    "contractCode": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\nimport \"./ILane_19y529f_Contract_Collaboration_1glbzuk.sol\";\nimport \"./ILane_0qoxvyf_Contract_Collaboration_1glbzuk.sol\";\ncontract Lane_0qoxvyf_Contract_Collaboration_1glbzuk {\n    enum State {\n        Closed,\n        Open,\n        Completed\n    }\n\n    mapping(string => State) public state;\n\n    uint receiveFunctionCount = 0;\n\n    mapping(string => address) public contracts;\n\n    mapping(address => string) public addressToRole;\n\n    mapping(string => string[]) public activitytoRole;\n\n    modifier isAccessible(string memory _activity) {\n        require(state[_activity] == State.Open, \"Activity is not open\");\n\n        string memory userRole = addressToRole[msg.sender];\n        bool hasRequiredRole = false;\n\n        // If no roles are defined for the activity, grant access\n        if (activitytoRole[_activity].length == 0) {\n            hasRequiredRole = true;\n        } else {\n            // Iterate through the array of roles for the activity\n            for (uint256 i = 0; i < activitytoRole[_activity].length; i++) {\n                if (\n                    bytes(activitytoRole[_activity][i]).length == 0 ||\n                    compareStrings(userRole, activitytoRole[_activity][i])\n                ) {\n                    hasRequiredRole = true;\n                    break;\n                }\n            }\n        }\n\n        require(hasRequiredRole, \"Caller does not have the required role\");\n        _;\n    }\n\n    struct LocalStorage {\n        uint Parameter_23b2p36;\n    }\n    LocalStorage public localStorage;\n\n    constructor() {}\n\n    function setContracts(address[] memory addresses) public {\n        contracts[\"Lane_19y529f_Contract_Collaboration_1glbzuk\"] = addresses[0];\n        contracts[\"Lane_0qoxvyf_Contract_Collaboration_1glbzuk\"] = addresses[1];\n    }\n\n    function getParameter_23b2p36() public view returns (uint) {\n        return localStorage.Parameter_23b2p36;\n    }\n\n    function setResources(\n        string[] memory _roles,\n        address[] memory _addresses\n    ) public {\n        require(\n            _roles.length == _addresses.length,\n            \"Roles and addresses arrays must be of the same length\"\n        );\n\n        for (uint i = 0; i < _addresses.length; i++) {\n            addressToRole[_addresses[i]] = _roles[i];\n        }\n    }\n\n    function setResource(string memory _role, address _address) public {\n        addressToRole[_address] = _role;\n    }\n\n    function setState(string memory _activity, uint8 _state) public {\n        require(_state <= 3, \"Not Valid State\");\n        state[_activity] = State(_state);\n    }\n\n    function getState(string memory _activity) public view returns (State) {\n        return state[_activity];\n    }\n\n    //To be replaced with ENUM\n    function compareStrings(\n        string memory a,\n        string memory b\n    ) internal pure returns (bool) {\n        return keccak256(abi.encodePacked(a)) == keccak256(abi.encodePacked(b));\n    }\n\n    function Activity_1m2pw5d(uint Parameter_3a93mmd) public payable {\n        require(\n            uint256(\n                ILane_19y529f_Contract_Collaboration_1glbzuk(\n                    contracts[\"Lane_19y529f_Contract_Collaboration_1glbzuk\"]\n                ).getState(\"Activity_0biddql\")\n            ) == uint256(State.Open)\n        );\n\n        localStorage.Parameter_23b2p36 = Parameter_3a93mmd;\n    }\n}\n",
+    "contractInterface": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\ninterface ILane_0qoxvyf_Contract_Collaboration_1glbzuk {\n    enum State {\n        Closed,\n        Open,\n        Completed\n    }\n    function setContracts(address[] memory addresses) external;\n    function getParameter_23b2p36() external returns (uint);\n    function setResources(\n        string[] memory _roles,\n        address[] memory _addresses\n    ) external;\n    function setResource(string memory _role, address _address) external;\n    function setState(string memory _activity, uint8 _state) external;\n    function getState(string memory _activity) external returns (State);\n    function compareStrings(\n        string memory a,\n        string memory b\n    ) external returns (bool);\n    function Activity_1m2pw5d(uint Parameter_3a93mmd) external;\n}\n",
+    "localStorage": [
+      {
+        "type": "uint",
+        "name": "Parameter_23b2p36",
+        "value": 0
+      }
+    ],
+    "address": "0x7E87200c1E567f6614f36a2a08b8d8BAc7A5c08E",
+    "deployGas": 1445970
+  },
+  {
+    "contractName": "Lane_19y529f_Contract_Collaboration_1glbzukx",
+    "networkId": "network-1",
+    "contractRoles": [
+      {
+        "role": "p1",
+        "address": "0xFD2578154fCf828772318716bD5f513953d80a71"
+      }
+    ],
+    "receiveTasks": [
+      {
+        "id": "Activity_0biddql",
+        "sender": "p1",
+        "name": "",
+        "state": "Completed",
+        "externalParams": [],
+        "gasUsed": "58315"
+      }
+    ],
+    "contractCode": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\nimport \"./ILane_19y529f_Contract_Collaboration_1glbzukx.sol\";\nimport \"./ILane_0qoxvyf_Contract_Collaboration_1glbzukx.sol\";\ncontract Lane_19y529f_Contract_Collaboration_1glbzukx {\n    enum State {\n        Closed,\n        Open,\n        Completed\n    }\n\n    mapping(string => State) public state;\n\n    uint receiveFunctionCount = 1;\n\n    mapping(string => address) public contracts;\n\n    mapping(address => string) public addressToRole;\n\n    mapping(string => string[]) public activitytoRole;\n\n    modifier isAccessible(string memory _activity) {\n        require(state[_activity] == State.Open, \"Activity is not open\");\n\n        string memory userRole = addressToRole[msg.sender];\n        bool hasRequiredRole = false;\n\n        // If no roles are defined for the activity, grant access\n        if (activitytoRole[_activity].length == 0) {\n            hasRequiredRole = true;\n        } else {\n            // Iterate through the array of roles for the activity\n            for (uint256 i = 0; i < activitytoRole[_activity].length; i++) {\n                if (\n                    bytes(activitytoRole[_activity][i]).length == 0 ||\n                    compareStrings(userRole, activitytoRole[_activity][i])\n                ) {\n                    hasRequiredRole = true;\n                    break;\n                }\n            }\n        }\n\n        require(hasRequiredRole, \"Caller does not have the required role\");\n        _;\n    }\n\n    struct LocalStorage {\n        uint x;\n    }\n    LocalStorage public localStorage;\n\n    constructor() {\n        state[\"Activity_0biddql\"] = State.Open;\n        activitytoRole[\"Activity_0biddql\"] = [\"p1\"];\n\n        localStorage.x = 22;\n    }\n\n    function setContracts(address[] memory addresses) public {\n        contracts[\"Lane_19y529f_Contract_Collaboration_1glbzukx\"] = addresses[\n            0\n        ];\n        contracts[\"Lane_0qoxvyf_Contract_Collaboration_1glbzukx\"] = addresses[\n            1\n        ];\n    }\n\n    function getX() public view returns (uint) {\n        return localStorage.x;\n    }\n\n    function setResources(\n        string[] memory _roles,\n        address[] memory _addresses\n    ) public {\n        require(\n            _roles.length == _addresses.length,\n            \"Roles and addresses arrays must be of the same length\"\n        );\n\n        for (uint i = 0; i < _addresses.length; i++) {\n            addressToRole[_addresses[i]] = _roles[i];\n        }\n    }\n\n    function setResource(string memory _role, address _address) public {\n        addressToRole[_address] = _role;\n    }\n\n    function setState(string memory _activity, uint8 _state) public {\n        require(_state <= 3, \"Not Valid State\");\n        state[_activity] = State(_state);\n    }\n\n    function getState(string memory _activity) public view returns (State) {\n        return state[_activity];\n    }\n\n    //To be replaced with ENUM\n    function compareStrings(\n        string memory a,\n        string memory b\n    ) internal pure returns (bool) {\n        return keccak256(abi.encodePacked(a)) == keccak256(abi.encodePacked(b));\n    }\n\n    function Activity_0biddql()\n        public\n        payable\n        isAccessible(\"Activity_0biddql\")\n    {\n        Activity_1aljlao();\n\n        ILane_0qoxvyf_Contract_Collaboration_1glbzukx(\n            contracts[\"Lane_0qoxvyf_Contract_Collaboration_1glbzukx\"]\n        ).Activity_1m2pw5d();\n        uint256 branch = ILane_0qoxvyf_Contract_Collaboration_1glbzukx(\n            contracts[\"Lane_0qoxvyf_Contract_Collaboration_1glbzukx\"]\n        ).checkXOR_Gateway_0x9om75(\n                ILane_0qoxvyf_Contract_Collaboration_1glbzukx(\n                    contracts[\"Lane_0qoxvyf_Contract_Collaboration_1glbzukx\"]\n                ).getX()\n            );\n        if ((branch & (1 << 0)) != 0) {} else if ((branch & (1 << 1)) != 0) {\n            ILane_0qoxvyf_Contract_Collaboration_1glbzukx(\n                contracts[\"Lane_0qoxvyf_Contract_Collaboration_1glbzukx\"]\n            ).setState(\"Activity_1puhmwz\", 1);\n        }\n\n        state[\"Activity_0biddql\"] = State.Completed;\n    }\n\n    function Activity_1aljlao() public payable {\n        require(uint256(state[\"Activity_0biddql\"]) == uint256(State.Open));\n    }\n}\n",
+    "contractInterface": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\ninterface ILane_19y529f_Contract_Collaboration_1glbzukx {\n    enum State {\n        Closed,\n        Open,\n        Completed\n    }\n    function setContracts(address[] memory addresses) external;\n    function getX() external returns (uint);\n    function setResources(\n        string[] memory _roles,\n        address[] memory _addresses\n    ) external;\n    function setResource(string memory _role, address _address) external;\n    function setState(string memory _activity, uint8 _state) external;\n    function getState(string memory _activity) external returns (State);\n    function compareStrings(\n        string memory a,\n        string memory b\n    ) external returns (bool);\n    function Activity_0biddql() external;\n    function Activity_1aljlao() external;\n}\n",
+    "localStorage": [
+      {
+        "type": "uint",
+        "name": "x",
+        "value": 22
+      }
+    ],
+    "address": "0x8774d5eF12DB534Ddce3A148dC8Da5cB9fcC5Ed9",
+    "deployGas": 2063758
+  },
+  {
+    "contractName": "Lane_0qoxvyf_Contract_Collaboration_1glbzukx",
+    "networkId": "network-1",
+    "contractRoles": [
+      {
+        "role": "p1",
+        "address": "0xFD2578154fCf828772318716bD5f513953d80a71"
+      }
+    ],
+    "receiveTasks": [
+      {
+        "id": "Activity_1puhmwz",
+        "sender": "p1",
+        "name": "",
+        "state": "Closed",
+        "externalParams": []
+      }
+    ],
+    "contractCode": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\nimport \"./ILane_19y529f_Contract_Collaboration_1glbzukx.sol\";\nimport \"./ILane_0qoxvyf_Contract_Collaboration_1glbzukx.sol\";\ncontract Lane_0qoxvyf_Contract_Collaboration_1glbzukx {\n    enum State {\n        Closed,\n        Open,\n        Completed\n    }\n\n    mapping(string => State) public state;\n\n    uint receiveFunctionCount = 1;\n\n    mapping(string => address) public contracts;\n\n    mapping(address => string) public addressToRole;\n\n    mapping(string => string[]) public activitytoRole;\n\n    modifier isAccessible(string memory _activity) {\n        require(state[_activity] == State.Open, \"Activity is not open\");\n\n        string memory userRole = addressToRole[msg.sender];\n        bool hasRequiredRole = false;\n\n        // If no roles are defined for the activity, grant access\n        if (activitytoRole[_activity].length == 0) {\n            hasRequiredRole = true;\n        } else {\n            // Iterate through the array of roles for the activity\n            for (uint256 i = 0; i < activitytoRole[_activity].length; i++) {\n                if (\n                    bytes(activitytoRole[_activity][i]).length == 0 ||\n                    compareStrings(userRole, activitytoRole[_activity][i])\n                ) {\n                    hasRequiredRole = true;\n                    break;\n                }\n            }\n        }\n\n        require(hasRequiredRole, \"Caller does not have the required role\");\n        _;\n    }\n\n    struct LocalStorage {\n        uint x;\n    }\n    LocalStorage public localStorage;\n\n    constructor() {\n        state[\"Activity_1puhmwz\"] = State.Closed;\n\n        activitytoRole[\"Activity_1puhmwz\"] = [\"p1\"];\n        localStorage.x = 1;\n    }\n\n    function setContracts(address[] memory addresses) public {\n        contracts[\"Lane_19y529f_Contract_Collaboration_1glbzukx\"] = addresses[\n            0\n        ];\n        contracts[\"Lane_0qoxvyf_Contract_Collaboration_1glbzukx\"] = addresses[\n            1\n        ];\n    }\n\n    function getX() public view returns (uint) {\n        return localStorage.x;\n    }\n\n    function setResources(\n        string[] memory _roles,\n        address[] memory _addresses\n    ) public {\n        require(\n            _roles.length == _addresses.length,\n            \"Roles and addresses arrays must be of the same length\"\n        );\n\n        for (uint i = 0; i < _addresses.length; i++) {\n            addressToRole[_addresses[i]] = _roles[i];\n        }\n    }\n\n    function setResource(string memory _role, address _address) public {\n        addressToRole[_address] = _role;\n    }\n\n    function setState(string memory _activity, uint8 _state) public {\n        require(_state <= 3, \"Not Valid State\");\n        state[_activity] = State(_state);\n    }\n\n    function getState(string memory _activity) public view returns (State) {\n        return state[_activity];\n    }\n\n    //To be replaced with ENUM\n    function compareStrings(\n        string memory a,\n        string memory b\n    ) internal pure returns (bool) {\n        return keccak256(abi.encodePacked(a)) == keccak256(abi.encodePacked(b));\n    }\n\n    function Activity_1m2pw5d() public payable {\n        require(\n            uint256(\n                ILane_19y529f_Contract_Collaboration_1glbzukx(\n                    contracts[\"Lane_19y529f_Contract_Collaboration_1glbzukx\"]\n                ).getState(\"Activity_0biddql\")\n            ) == uint256(State.Open)\n        );\n    }\n\n    function Activity_1puhmwz()\n        public\n        payable\n        isAccessible(\"Activity_1puhmwz\")\n    {\n        state[\"Activity_1puhmwz\"] = State.Completed;\n    }\n\n    function checkXOR_Gateway_0x9om75(uint256 x) public returns (uint256) {\n        require(\n            uint256(\n                ILane_19y529f_Contract_Collaboration_1glbzukx(\n                    contracts[\"Lane_19y529f_Contract_Collaboration_1glbzukx\"]\n                ).getState(\"Activity_0biddql\")\n            ) == uint256(State.Open)\n        );\n        return ((x == 1) ? (1 << 0) : 0) | ((x == 1) ? (1 << 1) : 0);\n    }\n}\n",
+    "contractInterface": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\ninterface ILane_0qoxvyf_Contract_Collaboration_1glbzukx {\n    enum State {\n        Closed,\n        Open,\n        Completed\n    }\n    function setContracts(address[] memory addresses) external;\n    function getX() external returns (uint);\n    function setResources(\n        string[] memory _roles,\n        address[] memory _addresses\n    ) external;\n    function setResource(string memory _role, address _address) external;\n    function setState(string memory _activity, uint8 _state) external;\n    function getState(string memory _activity) external returns (State);\n    function compareStrings(\n        string memory a,\n        string memory b\n    ) external returns (bool);\n    function Activity_1m2pw5d() external;\n    function Activity_1puhmwz() external;\n    function checkXOR_Gateway_0x9om75(uint256 x) external returns (uint256);\n}\n",
+    "localStorage": [
+      {
+        "type": "uint",
+        "name": "x",
+        "value": 1
+      }
+    ],
+    "address": "0x732AF05573c629ec94eb4b64e0735a33cb841B66",
+    "deployGas": 1936245
+  },
+  {
+    "contractName": "Lane_19y529f_Contract_Collaboration_1glbzukxx",
+    "networkId": "network-1",
+    "contractRoles": [
+      {
+        "role": "p1",
+        "address": "0xFD2578154fCf828772318716bD5f513953d80a71"
+      }
+    ],
+    "receiveTasks": [
+      {
+        "id": "Activity_0biddql",
+        "sender": "p1",
+        "name": "",
+        "state": "Open",
+        "externalParams": []
+      }
+    ],
+    "contractCode": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\nimport \"./ILane_19y529f_Contract_Collaboration_1glbzukxx.sol\";\nimport \"./ILane_0qoxvyf_Contract_Collaboration_1glbzukxx.sol\";\ncontract Lane_19y529f_Contract_Collaboration_1glbzukxx {\n    enum State {\n        Closed,\n        Open,\n        Completed\n    }\n\n    mapping(string => State) public state;\n\n    uint receiveFunctionCount = 1;\n\n    mapping(string => address) public contracts;\n\n    mapping(address => string) public addressToRole;\n\n    mapping(string => string[]) public activitytoRole;\n\n    modifier isAccessible(string memory _activity) {\n        require(state[_activity] == State.Open, \"Activity is not open\");\n\n        string memory userRole = addressToRole[msg.sender];\n        bool hasRequiredRole = false;\n\n        // If no roles are defined for the activity, grant access\n        if (activitytoRole[_activity].length == 0) {\n            hasRequiredRole = true;\n        } else {\n            // Iterate through the array of roles for the activity\n            for (uint256 i = 0; i < activitytoRole[_activity].length; i++) {\n                if (\n                    bytes(activitytoRole[_activity][i]).length == 0 ||\n                    compareStrings(userRole, activitytoRole[_activity][i])\n                ) {\n                    hasRequiredRole = true;\n                    break;\n                }\n            }\n        }\n\n        require(hasRequiredRole, \"Caller does not have the required role\");\n        _;\n    }\n\n    struct LocalStorage {\n        uint x;\n    }\n    LocalStorage public localStorage;\n\n    constructor() {\n        state[\"Activity_0biddql\"] = State.Open;\n        activitytoRole[\"Activity_0biddql\"] = [\"p1\"];\n\n        localStorage.x = 22;\n    }\n\n    function setContracts(address[] memory addresses) public {\n        contracts[\"Lane_19y529f_Contract_Collaboration_1glbzukxx\"] = addresses[\n            0\n        ];\n        contracts[\"Lane_0qoxvyf_Contract_Collaboration_1glbzukxx\"] = addresses[\n            1\n        ];\n    }\n\n    function getX() public view returns (uint) {\n        return localStorage.x;\n    }\n\n    function setResources(\n        string[] memory _roles,\n        address[] memory _addresses\n    ) public {\n        require(\n            _roles.length == _addresses.length,\n            \"Roles and addresses arrays must be of the same length\"\n        );\n\n        for (uint i = 0; i < _addresses.length; i++) {\n            addressToRole[_addresses[i]] = _roles[i];\n        }\n    }\n\n    function setResource(string memory _role, address _address) public {\n        addressToRole[_address] = _role;\n    }\n\n    function setState(string memory _activity, uint8 _state) public {\n        require(_state <= 3, \"Not Valid State\");\n        state[_activity] = State(_state);\n    }\n\n    function getState(string memory _activity) public view returns (State) {\n        return state[_activity];\n    }\n\n    //To be replaced with ENUM\n    function compareStrings(\n        string memory a,\n        string memory b\n    ) internal pure returns (bool) {\n        return keccak256(abi.encodePacked(a)) == keccak256(abi.encodePacked(b));\n    }\n\n    function Activity_0biddql()\n        public\n        payable\n        isAccessible(\"Activity_0biddql\")\n    {\n        Activity_1aljlao();\n\n        ILane_0qoxvyf_Contract_Collaboration_1glbzukxx(\n            contracts[\"Lane_0qoxvyf_Contract_Collaboration_1glbzukxx\"]\n        ).Activity_1m2pw5d();\n        uint256 branch = ILane_0qoxvyf_Contract_Collaboration_1glbzukxx(\n            contracts[\"Lane_0qoxvyf_Contract_Collaboration_1glbzukxx\"]\n        ).checkXOR_Gateway_0x9om75(\n                ILane_0qoxvyf_Contract_Collaboration_1glbzukxx(\n                    contracts[\"Lane_0qoxvyf_Contract_Collaboration_1glbzukxx\"]\n                ).getX()\n            );\n        if ((branch & (1 << 0)) != 0) {\n            ILane_0qoxvyf_Contract_Collaboration_1glbzukxx(\n                contracts[\"Lane_0qoxvyf_Contract_Collaboration_1glbzukxx\"]\n            ).setState(\"Activity_1puhmwz\", 1);\n        } else if ((branch & (1 << 1)) != 0) {\n            ILane_0qoxvyf_Contract_Collaboration_1glbzukxx(\n                contracts[\"Lane_0qoxvyf_Contract_Collaboration_1glbzukxx\"]\n            ).setState(\"Activity_0ks6o1c\", 1);\n        }\n\n        state[\"Activity_0biddql\"] = State.Completed;\n    }\n\n    function Activity_1aljlao() public payable {\n        require(uint256(state[\"Activity_0biddql\"]) == uint256(State.Open));\n    }\n}\n",
+    "contractInterface": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\ninterface ILane_19y529f_Contract_Collaboration_1glbzukxx {\n    enum State {\n        Closed,\n        Open,\n        Completed\n    }\n    function setContracts(address[] memory addresses) external;\n    function getX() external returns (uint);\n    function setResources(\n        string[] memory _roles,\n        address[] memory _addresses\n    ) external;\n    function setResource(string memory _role, address _address) external;\n    function setState(string memory _activity, uint8 _state) external;\n    function getState(string memory _activity) external returns (State);\n    function compareStrings(\n        string memory a,\n        string memory b\n    ) external returns (bool);\n    function Activity_0biddql() external;\n    function Activity_1aljlao() external;\n}\n",
+    "localStorage": [
+      {
+        "type": "uint",
+        "name": "x",
+        "value": 22
+      }
+    ],
+    "address": "0x5a3eDcc3760413f2bE3cCa9c2840070E0AF828FF",
+    "deployGas": 2067375
+  },
+  {
+    "contractName": "Lane_0qoxvyf_Contract_Collaboration_1glbzukxx",
+    "networkId": "network-1",
+    "contractRoles": [
+      {
+        "role": "p1",
+        "address": "0xFD2578154fCf828772318716bD5f513953d80a71"
+      }
+    ],
+    "receiveTasks": [
+      {
+        "id": "Activity_1puhmwz",
+        "sender": "p1",
+        "name": "",
+        "state": "Closed",
+        "externalParams": []
+      },
+      {
+        "id": "Activity_0ks6o1c",
+        "sender": "p1",
+        "name": "",
+        "state": "Closed",
+        "externalParams": []
+      }
+    ],
+    "contractCode": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\nimport \"./ILane_19y529f_Contract_Collaboration_1glbzukxx.sol\";\nimport \"./ILane_0qoxvyf_Contract_Collaboration_1glbzukxx.sol\";\ncontract Lane_0qoxvyf_Contract_Collaboration_1glbzukxx {\n    enum State {\n        Closed,\n        Open,\n        Completed\n    }\n\n    mapping(string => State) public state;\n\n    uint receiveFunctionCount = 2;\n\n    mapping(string => address) public contracts;\n\n    mapping(address => string) public addressToRole;\n\n    mapping(string => string[]) public activitytoRole;\n\n    modifier isAccessible(string memory _activity) {\n        require(state[_activity] == State.Open, \"Activity is not open\");\n\n        string memory userRole = addressToRole[msg.sender];\n        bool hasRequiredRole = false;\n\n        // If no roles are defined for the activity, grant access\n        if (activitytoRole[_activity].length == 0) {\n            hasRequiredRole = true;\n        } else {\n            // Iterate through the array of roles for the activity\n            for (uint256 i = 0; i < activitytoRole[_activity].length; i++) {\n                if (\n                    bytes(activitytoRole[_activity][i]).length == 0 ||\n                    compareStrings(userRole, activitytoRole[_activity][i])\n                ) {\n                    hasRequiredRole = true;\n                    break;\n                }\n            }\n        }\n\n        require(hasRequiredRole, \"Caller does not have the required role\");\n        _;\n    }\n\n    struct LocalStorage {\n        uint x;\n    }\n    LocalStorage public localStorage;\n\n    constructor() {\n        state[\"Activity_1puhmwz\"] = State.Closed;\n        state[\"Activity_0ks6o1c\"] = State.Closed;\n\n        activitytoRole[\"Activity_1puhmwz\"] = [\"p1\"];\n        activitytoRole[\"Activity_0ks6o1c\"] = [\"p1\"];\n        localStorage.x = 1;\n    }\n\n    function setContracts(address[] memory addresses) public {\n        contracts[\"Lane_19y529f_Contract_Collaboration_1glbzukxx\"] = addresses[\n            0\n        ];\n        contracts[\"Lane_0qoxvyf_Contract_Collaboration_1glbzukxx\"] = addresses[\n            1\n        ];\n    }\n\n    function getX() public view returns (uint) {\n        return localStorage.x;\n    }\n\n    function setResources(\n        string[] memory _roles,\n        address[] memory _addresses\n    ) public {\n        require(\n            _roles.length == _addresses.length,\n            \"Roles and addresses arrays must be of the same length\"\n        );\n\n        for (uint i = 0; i < _addresses.length; i++) {\n            addressToRole[_addresses[i]] = _roles[i];\n        }\n    }\n\n    function setResource(string memory _role, address _address) public {\n        addressToRole[_address] = _role;\n    }\n\n    function setState(string memory _activity, uint8 _state) public {\n        require(_state <= 3, \"Not Valid State\");\n        state[_activity] = State(_state);\n    }\n\n    function getState(string memory _activity) public view returns (State) {\n        return state[_activity];\n    }\n\n    //To be replaced with ENUM\n    function compareStrings(\n        string memory a,\n        string memory b\n    ) internal pure returns (bool) {\n        return keccak256(abi.encodePacked(a)) == keccak256(abi.encodePacked(b));\n    }\n\n    function Activity_1m2pw5d() public payable {\n        require(\n            uint256(\n                ILane_19y529f_Contract_Collaboration_1glbzukxx(\n                    contracts[\"Lane_19y529f_Contract_Collaboration_1glbzukxx\"]\n                ).getState(\"Activity_0biddql\")\n            ) == uint256(State.Open)\n        );\n    }\n\n    function Activity_1puhmwz()\n        public\n        payable\n        isAccessible(\"Activity_1puhmwz\")\n    {\n        state[\"Activity_1puhmwz\"] = State.Completed;\n    }\n\n    function Activity_0ks6o1c()\n        public\n        payable\n        isAccessible(\"Activity_0ks6o1c\")\n    {\n        state[\"Activity_0ks6o1c\"] = State.Completed;\n    }\n\n    function checkXOR_Gateway_0x9om75(uint256 x) public returns (uint256) {\n        require(\n            uint256(\n                ILane_19y529f_Contract_Collaboration_1glbzukxx(\n                    contracts[\"Lane_19y529f_Contract_Collaboration_1glbzukxx\"]\n                ).getState(\"Activity_0biddql\")\n            ) == uint256(State.Open)\n        );\n        return ((x == 1) ? (1 << 0) : 0) | (1 << 1);\n    }\n}\n",
+    "contractInterface": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\ninterface ILane_0qoxvyf_Contract_Collaboration_1glbzukxx {\n    enum State {\n        Closed,\n        Open,\n        Completed\n    }\n    function setContracts(address[] memory addresses) external;\n    function getX() external returns (uint);\n    function setResources(\n        string[] memory _roles,\n        address[] memory _addresses\n    ) external;\n    function setResource(string memory _role, address _address) external;\n    function setState(string memory _activity, uint8 _state) external;\n    function getState(string memory _activity) external returns (State);\n    function compareStrings(\n        string memory a,\n        string memory b\n    ) external returns (bool);\n    function Activity_1m2pw5d() external;\n    function Activity_1puhmwz() external;\n    function Activity_0ks6o1c() external;\n    function checkXOR_Gateway_0x9om75(uint256 x) external returns (uint256);\n}\n",
+    "localStorage": [
+      {
+        "type": "uint",
+        "name": "x",
+        "value": 1
+      }
+    ],
+    "address": "0x532e4D8B1C553A268687762167CB75F3E79bcd35",
+    "deployGas": 2214566
+  },
+  {
+    "contractName": "Lane_19y529f_Contract_Collaboration_1glbzukxz",
+    "networkId": "network-1",
+    "contractRoles": [
+      {
+        "role": "p1",
+        "address": "0xFD2578154fCf828772318716bD5f513953d80a71"
+      }
+    ],
+    "receiveTasks": [
+      {
+        "id": "Activity_0biddql",
+        "sender": "p1",
+        "name": "",
+        "state": "Completed",
+        "externalParams": [],
+        "gasUsed": "83526"
+      }
+    ],
+    "contractCode": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\nimport \"./ILane_19y529f_Contract_Collaboration_1glbzukxz.sol\";\nimport \"./ILane_0qoxvyf_Contract_Collaboration_1glbzukxz.sol\";\ncontract Lane_19y529f_Contract_Collaboration_1glbzukxz {\n    enum State {\n        Closed,\n        Open,\n        Completed\n    }\n\n    mapping(string => State) public state;\n\n    uint receiveFunctionCount = 1;\n\n    mapping(string => address) public contracts;\n\n    mapping(address => string) public addressToRole;\n\n    mapping(string => string[]) public activitytoRole;\n\n    modifier isAccessible(string memory _activity) {\n        require(state[_activity] == State.Open, \"Activity is not open\");\n\n        string memory userRole = addressToRole[msg.sender];\n        bool hasRequiredRole = false;\n\n        // If no roles are defined for the activity, grant access\n        if (activitytoRole[_activity].length == 0) {\n            hasRequiredRole = true;\n        } else {\n            // Iterate through the array of roles for the activity\n            for (uint256 i = 0; i < activitytoRole[_activity].length; i++) {\n                if (\n                    bytes(activitytoRole[_activity][i]).length == 0 ||\n                    compareStrings(userRole, activitytoRole[_activity][i])\n                ) {\n                    hasRequiredRole = true;\n                    break;\n                }\n            }\n        }\n\n        require(hasRequiredRole, \"Caller does not have the required role\");\n        _;\n    }\n\n    struct LocalStorage {\n        uint x;\n    }\n    LocalStorage public localStorage;\n\n    constructor() {\n        state[\"Activity_0biddql\"] = State.Open;\n        activitytoRole[\"Activity_0biddql\"] = [\"p1\"];\n\n        localStorage.x = 22;\n    }\n\n    function setContracts(address[] memory addresses) public {\n        contracts[\"Lane_19y529f_Contract_Collaboration_1glbzukxz\"] = addresses[\n            0\n        ];\n        contracts[\"Lane_0qoxvyf_Contract_Collaboration_1glbzukxz\"] = addresses[\n            1\n        ];\n    }\n\n    function getX() public view returns (uint) {\n        return localStorage.x;\n    }\n\n    function setResources(\n        string[] memory _roles,\n        address[] memory _addresses\n    ) public {\n        require(\n            _roles.length == _addresses.length,\n            \"Roles and addresses arrays must be of the same length\"\n        );\n\n        for (uint i = 0; i < _addresses.length; i++) {\n            addressToRole[_addresses[i]] = _roles[i];\n        }\n    }\n\n    function setResource(string memory _role, address _address) public {\n        addressToRole[_address] = _role;\n    }\n\n    function setState(string memory _activity, uint8 _state) public {\n        require(_state <= 3, \"Not Valid State\");\n        state[_activity] = State(_state);\n    }\n\n    function getState(string memory _activity) public view returns (State) {\n        return state[_activity];\n    }\n\n    //To be replaced with ENUM\n    function compareStrings(\n        string memory a,\n        string memory b\n    ) internal pure returns (bool) {\n        return keccak256(abi.encodePacked(a)) == keccak256(abi.encodePacked(b));\n    }\n\n    function Activity_0biddql()\n        public\n        payable\n        isAccessible(\"Activity_0biddql\")\n    {\n        Activity_1aljlao();\n\n        ILane_0qoxvyf_Contract_Collaboration_1glbzukxz(\n            contracts[\"Lane_0qoxvyf_Contract_Collaboration_1glbzukxz\"]\n        ).Activity_1m2pw5d();\n        uint256 branch = ILane_0qoxvyf_Contract_Collaboration_1glbzukxz(\n            contracts[\"Lane_0qoxvyf_Contract_Collaboration_1glbzukxz\"]\n        ).checkXOR_Gateway_0x9om75(\n                ILane_0qoxvyf_Contract_Collaboration_1glbzukxz(\n                    contracts[\"Lane_0qoxvyf_Contract_Collaboration_1glbzukxz\"]\n                ).getX()\n            );\n        if ((branch & (1 << 0)) != 0) {\n            ILane_0qoxvyf_Contract_Collaboration_1glbzukxz(\n                contracts[\"Lane_0qoxvyf_Contract_Collaboration_1glbzukxz\"]\n            ).setState(\"Activity_1puhmwz\", 1);\n        } else if ((branch & (1 << 1)) != 0) {\n            ILane_0qoxvyf_Contract_Collaboration_1glbzukxz(\n                contracts[\"Lane_0qoxvyf_Contract_Collaboration_1glbzukxz\"]\n            ).setState(\"Activity_0ks6o1c\", 1);\n        }\n\n        state[\"Activity_0biddql\"] = State.Completed;\n    }\n\n    function Activity_1aljlao() public payable {\n        require(uint256(state[\"Activity_0biddql\"]) == uint256(State.Open));\n    }\n}\n",
+    "contractInterface": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\ninterface ILane_19y529f_Contract_Collaboration_1glbzukxz {\n    enum State {\n        Closed,\n        Open,\n        Completed\n    }\n    function setContracts(address[] memory addresses) external;\n    function getX() external returns (uint);\n    function setResources(\n        string[] memory _roles,\n        address[] memory _addresses\n    ) external;\n    function setResource(string memory _role, address _address) external;\n    function setState(string memory _activity, uint8 _state) external;\n    function getState(string memory _activity) external returns (State);\n    function compareStrings(\n        string memory a,\n        string memory b\n    ) external returns (bool);\n    function Activity_0biddql() external;\n    function Activity_1aljlao() external;\n}\n",
+    "localStorage": [
+      {
+        "type": "uint",
+        "name": "x",
+        "value": 22
+      }
+    ],
+    "address": "0x77f970cD33A39a58dDF281Ea9CDB75bCEa79894c",
+    "deployGas": 2067387
+  },
+  {
+    "contractName": "Lane_0qoxvyf_Contract_Collaboration_1glbzukxz",
+    "networkId": "network-1",
+    "contractRoles": [
+      {
+        "role": "p1",
+        "address": "0xFD2578154fCf828772318716bD5f513953d80a71"
+      }
+    ],
+    "receiveTasks": [
+      {
+        "id": "Activity_1puhmwz",
+        "sender": "p1",
+        "name": "",
+        "state": "Open",
+        "externalParams": []
+      },
+      {
+        "id": "Activity_0ks6o1c",
+        "sender": "p1",
+        "name": "",
+        "state": "Closed",
+        "externalParams": []
+      }
+    ],
+    "contractCode": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\nimport \"./ILane_19y529f_Contract_Collaboration_1glbzukxz.sol\";\nimport \"./ILane_0qoxvyf_Contract_Collaboration_1glbzukxz.sol\";\ncontract Lane_0qoxvyf_Contract_Collaboration_1glbzukxz {\n    enum State {\n        Closed,\n        Open,\n        Completed\n    }\n\n    mapping(string => State) public state;\n\n    uint receiveFunctionCount = 2;\n\n    mapping(string => address) public contracts;\n\n    mapping(address => string) public addressToRole;\n\n    mapping(string => string[]) public activitytoRole;\n\n    modifier isAccessible(string memory _activity) {\n        require(state[_activity] == State.Open, \"Activity is not open\");\n\n        string memory userRole = addressToRole[msg.sender];\n        bool hasRequiredRole = false;\n\n        // If no roles are defined for the activity, grant access\n        if (activitytoRole[_activity].length == 0) {\n            hasRequiredRole = true;\n        } else {\n            // Iterate through the array of roles for the activity\n            for (uint256 i = 0; i < activitytoRole[_activity].length; i++) {\n                if (\n                    bytes(activitytoRole[_activity][i]).length == 0 ||\n                    compareStrings(userRole, activitytoRole[_activity][i])\n                ) {\n                    hasRequiredRole = true;\n                    break;\n                }\n            }\n        }\n\n        require(hasRequiredRole, \"Caller does not have the required role\");\n        _;\n    }\n\n    struct LocalStorage {\n        uint x;\n    }\n    LocalStorage public localStorage;\n\n    constructor() {\n        state[\"Activity_1puhmwz\"] = State.Closed;\n        state[\"Activity_0ks6o1c\"] = State.Closed;\n\n        activitytoRole[\"Activity_1puhmwz\"] = [\"p1\"];\n        activitytoRole[\"Activity_0ks6o1c\"] = [\"p1\"];\n        localStorage.x = 1;\n    }\n\n    function setContracts(address[] memory addresses) public {\n        contracts[\"Lane_19y529f_Contract_Collaboration_1glbzukxz\"] = addresses[\n            0\n        ];\n        contracts[\"Lane_0qoxvyf_Contract_Collaboration_1glbzukxz\"] = addresses[\n            1\n        ];\n    }\n\n    function getX() public view returns (uint) {\n        return localStorage.x;\n    }\n\n    function setResources(\n        string[] memory _roles,\n        address[] memory _addresses\n    ) public {\n        require(\n            _roles.length == _addresses.length,\n            \"Roles and addresses arrays must be of the same length\"\n        );\n\n        for (uint i = 0; i < _addresses.length; i++) {\n            addressToRole[_addresses[i]] = _roles[i];\n        }\n    }\n\n    function setResource(string memory _role, address _address) public {\n        addressToRole[_address] = _role;\n    }\n\n    function setState(string memory _activity, uint8 _state) public {\n        require(_state <= 3, \"Not Valid State\");\n        state[_activity] = State(_state);\n    }\n\n    function getState(string memory _activity) public view returns (State) {\n        return state[_activity];\n    }\n\n    //To be replaced with ENUM\n    function compareStrings(\n        string memory a,\n        string memory b\n    ) internal pure returns (bool) {\n        return keccak256(abi.encodePacked(a)) == keccak256(abi.encodePacked(b));\n    }\n\n    function Activity_1m2pw5d() public payable {\n        require(\n            uint256(\n                ILane_19y529f_Contract_Collaboration_1glbzukxz(\n                    contracts[\"Lane_19y529f_Contract_Collaboration_1glbzukxz\"]\n                ).getState(\"Activity_0biddql\")\n            ) == uint256(State.Open)\n        );\n    }\n\n    function Activity_1puhmwz()\n        public\n        payable\n        isAccessible(\"Activity_1puhmwz\")\n    {\n        state[\"Activity_1puhmwz\"] = State.Completed;\n    }\n\n    function Activity_0ks6o1c()\n        public\n        payable\n        isAccessible(\"Activity_0ks6o1c\")\n    {\n        state[\"Activity_0ks6o1c\"] = State.Completed;\n    }\n\n    function checkXOR_Gateway_0x9om75(uint256 x) public returns (uint256) {\n        require(\n            uint256(\n                ILane_19y529f_Contract_Collaboration_1glbzukxz(\n                    contracts[\"Lane_19y529f_Contract_Collaboration_1glbzukxz\"]\n                ).getState(\"Activity_0biddql\")\n            ) == uint256(State.Open)\n        );\n        return ((x == 1) ? (1 << 0) : 0) | (1 << 1);\n    }\n}\n",
+    "contractInterface": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\ninterface ILane_0qoxvyf_Contract_Collaboration_1glbzukxz {\n    enum State {\n        Closed,\n        Open,\n        Completed\n    }\n    function setContracts(address[] memory addresses) external;\n    function getX() external returns (uint);\n    function setResources(\n        string[] memory _roles,\n        address[] memory _addresses\n    ) external;\n    function setResource(string memory _role, address _address) external;\n    function setState(string memory _activity, uint8 _state) external;\n    function getState(string memory _activity) external returns (State);\n    function compareStrings(\n        string memory a,\n        string memory b\n    ) external returns (bool);\n    function Activity_1m2pw5d() external;\n    function Activity_1puhmwz() external;\n    function Activity_0ks6o1c() external;\n    function checkXOR_Gateway_0x9om75(uint256 x) external returns (uint256);\n}\n",
+    "localStorage": [
+      {
+        "type": "uint",
+        "name": "x",
+        "value": 1
+      }
+    ],
+    "address": "0x9d861e5C7C0412Dd19E551cDd4a57AA908E0a37B",
+    "deployGas": 2214554
+  },
+  {
+    "contractName": "Lane_19y529f_Contract_Collaboration_1glbzukaa",
+    "networkId": "network-1",
+    "contractRoles": [
+      {
+        "role": "p1",
+        "address": "0xFD2578154fCf828772318716bD5f513953d80a71"
+      }
+    ],
+    "receiveTasks": [
+      {
+        "id": "Activity_0biddql",
+        "sender": "p1",
+        "name": "",
+        "state": "Open",
+        "externalParams": []
+      }
+    ],
+    "contractCode": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\nimport \"./ILane_19y529f_Contract_Collaboration_1glbzukaa.sol\";\nimport \"./ILane_0qoxvyf_Contract_Collaboration_1glbzukaa.sol\";\ncontract Lane_19y529f_Contract_Collaboration_1glbzukaa {\n    enum State {\n        Closed,\n        Open,\n        Completed\n    }\n\n    mapping(string => State) public state;\n\n    uint receiveFunctionCount = 1;\n\n    mapping(string => address) public contracts;\n\n    mapping(address => string) public addressToRole;\n\n    mapping(string => string[]) public activitytoRole;\n\n    modifier isAccessible(string memory _activity) {\n        require(state[_activity] == State.Open, \"Activity is not open\");\n\n        string memory userRole = addressToRole[msg.sender];\n        bool hasRequiredRole = false;\n\n        // If no roles are defined for the activity, grant access\n        if (activitytoRole[_activity].length == 0) {\n            hasRequiredRole = true;\n        } else {\n            // Iterate through the array of roles for the activity\n            for (uint256 i = 0; i < activitytoRole[_activity].length; i++) {\n                if (\n                    bytes(activitytoRole[_activity][i]).length == 0 ||\n                    compareStrings(userRole, activitytoRole[_activity][i])\n                ) {\n                    hasRequiredRole = true;\n                    break;\n                }\n            }\n        }\n\n        require(hasRequiredRole, \"Caller does not have the required role\");\n        _;\n    }\n\n    struct LocalStorage {\n        uint x;\n    }\n    LocalStorage public localStorage;\n\n    constructor() {\n        state[\"Activity_0biddql\"] = State.Open;\n        activitytoRole[\"Activity_0biddql\"] = [\"p1\"];\n\n        localStorage.x = 22;\n    }\n\n    function setContracts(address[] memory addresses) public {\n        contracts[\"Lane_19y529f_Contract_Collaboration_1glbzukaa\"] = addresses[\n            0\n        ];\n        contracts[\"Lane_0qoxvyf_Contract_Collaboration_1glbzukaa\"] = addresses[\n            1\n        ];\n    }\n\n    function getX() public view returns (uint) {\n        return localStorage.x;\n    }\n\n    function setResources(\n        string[] memory _roles,\n        address[] memory _addresses\n    ) public {\n        require(\n            _roles.length == _addresses.length,\n            \"Roles and addresses arrays must be of the same length\"\n        );\n\n        for (uint i = 0; i < _addresses.length; i++) {\n            addressToRole[_addresses[i]] = _roles[i];\n        }\n    }\n\n    function setResource(string memory _role, address _address) public {\n        addressToRole[_address] = _role;\n    }\n\n    function setState(string memory _activity, uint8 _state) public {\n        require(_state <= 3, \"Not Valid State\");\n        state[_activity] = State(_state);\n    }\n\n    function getState(string memory _activity) public view returns (State) {\n        return state[_activity];\n    }\n\n    //To be replaced with ENUM\n    function compareStrings(\n        string memory a,\n        string memory b\n    ) internal pure returns (bool) {\n        return keccak256(abi.encodePacked(a)) == keccak256(abi.encodePacked(b));\n    }\n\n    function Activity_0biddql()\n        public\n        payable\n        isAccessible(\"Activity_0biddql\")\n    {\n        Activity_1aljlao();\n\n        ILane_0qoxvyf_Contract_Collaboration_1glbzukaa(\n            contracts[\"Lane_0qoxvyf_Contract_Collaboration_1glbzukaa\"]\n        ).Activity_1m2pw5d();\n        uint256 branch = ILane_0qoxvyf_Contract_Collaboration_1glbzukaa(\n            contracts[\"Lane_0qoxvyf_Contract_Collaboration_1glbzukaa\"]\n        ).checkXOR_Gateway_0x9om75(\n                ILane_0qoxvyf_Contract_Collaboration_1glbzukaa(\n                    contracts[\"Lane_0qoxvyf_Contract_Collaboration_1glbzukaa\"]\n                ).getX()\n            );\n        if ((branch & (1 << 0)) != 0) {} else if ((branch & (1 << 1)) != 0) {\n            ILane_0qoxvyf_Contract_Collaboration_1glbzukaa(\n                contracts[\"Lane_0qoxvyf_Contract_Collaboration_1glbzukaa\"]\n            ).setState(\"Activity_0i3wqng\", 1);\n        }\n\n        state[\"Activity_0biddql\"] = State.Completed;\n    }\n\n    function Activity_1aljlao() public payable {\n        require(uint256(state[\"Activity_0biddql\"]) == uint256(State.Open));\n    }\n}\n",
+    "contractInterface": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\ninterface ILane_19y529f_Contract_Collaboration_1glbzukaa {\n    enum State {\n        Closed,\n        Open,\n        Completed\n    }\n    function setContracts(address[] memory addresses) external;\n    function getX() external returns (uint);\n    function setResources(\n        string[] memory _roles,\n        address[] memory _addresses\n    ) external;\n    function setResource(string memory _role, address _address) external;\n    function setState(string memory _activity, uint8 _state) external;\n    function getState(string memory _activity) external returns (State);\n    function compareStrings(\n        string memory a,\n        string memory b\n    ) external returns (bool);\n    function Activity_0biddql() external;\n    function Activity_1aljlao() external;\n}\n",
+    "localStorage": [
+      {
+        "type": "uint",
+        "name": "x",
+        "value": 22
+      }
+    ],
+    "address": "0xe632Dad7534AcEC69A41Bf24b0efbC22856fbd59",
+    "deployGas": 2004009
+  },
+  {
+    "contractName": "Lane_0qoxvyf_Contract_Collaboration_1glbzukaa",
+    "networkId": "network-1",
+    "contractRoles": [
+      {
+        "role": "p1",
+        "address": "0xFD2578154fCf828772318716bD5f513953d80a71"
+      }
+    ],
+    "receiveTasks": [
+      {
+        "id": "Activity_0i3wqng",
+        "sender": "p1",
+        "name": "",
+        "state": "Closed",
+        "externalParams": []
+      }
+    ],
+    "contractCode": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\nimport \"./ILane_19y529f_Contract_Collaboration_1glbzukaa.sol\";\nimport \"./ILane_0qoxvyf_Contract_Collaboration_1glbzukaa.sol\";\ncontract Lane_0qoxvyf_Contract_Collaboration_1glbzukaa {\n    enum State {\n        Closed,\n        Open,\n        Completed\n    }\n\n    mapping(string => State) public state;\n\n    uint receiveFunctionCount = 1;\n\n    mapping(string => address) public contracts;\n\n    mapping(address => string) public addressToRole;\n\n    mapping(string => string[]) public activitytoRole;\n\n    modifier isAccessible(string memory _activity) {\n        require(state[_activity] == State.Open, \"Activity is not open\");\n\n        string memory userRole = addressToRole[msg.sender];\n        bool hasRequiredRole = false;\n\n        // If no roles are defined for the activity, grant access\n        if (activitytoRole[_activity].length == 0) {\n            hasRequiredRole = true;\n        } else {\n            // Iterate through the array of roles for the activity\n            for (uint256 i = 0; i < activitytoRole[_activity].length; i++) {\n                if (\n                    bytes(activitytoRole[_activity][i]).length == 0 ||\n                    compareStrings(userRole, activitytoRole[_activity][i])\n                ) {\n                    hasRequiredRole = true;\n                    break;\n                }\n            }\n        }\n\n        require(hasRequiredRole, \"Caller does not have the required role\");\n        _;\n    }\n\n    struct LocalStorage {\n        uint x;\n    }\n    LocalStorage public localStorage;\n\n    constructor() {\n        state[\"Activity_0i3wqng\"] = State.Closed;\n\n        activitytoRole[\"Activity_0i3wqng\"] = [\"p1\"];\n        localStorage.x = 1;\n    }\n\n    function setContracts(address[] memory addresses) public {\n        contracts[\"Lane_19y529f_Contract_Collaboration_1glbzukaa\"] = addresses[\n            0\n        ];\n        contracts[\"Lane_0qoxvyf_Contract_Collaboration_1glbzukaa\"] = addresses[\n            1\n        ];\n    }\n\n    function getX() public view returns (uint) {\n        return localStorage.x;\n    }\n\n    function setResources(\n        string[] memory _roles,\n        address[] memory _addresses\n    ) public {\n        require(\n            _roles.length == _addresses.length,\n            \"Roles and addresses arrays must be of the same length\"\n        );\n\n        for (uint i = 0; i < _addresses.length; i++) {\n            addressToRole[_addresses[i]] = _roles[i];\n        }\n    }\n\n    function setResource(string memory _role, address _address) public {\n        addressToRole[_address] = _role;\n    }\n\n    function setState(string memory _activity, uint8 _state) public {\n        require(_state <= 3, \"Not Valid State\");\n        state[_activity] = State(_state);\n    }\n\n    function getState(string memory _activity) public view returns (State) {\n        return state[_activity];\n    }\n\n    //To be replaced with ENUM\n    function compareStrings(\n        string memory a,\n        string memory b\n    ) internal pure returns (bool) {\n        return keccak256(abi.encodePacked(a)) == keccak256(abi.encodePacked(b));\n    }\n\n    function Activity_1m2pw5d() public payable {\n        require(\n            uint256(\n                ILane_19y529f_Contract_Collaboration_1glbzukaa(\n                    contracts[\"Lane_19y529f_Contract_Collaboration_1glbzukaa\"]\n                ).getState(\"Activity_0biddql\")\n            ) == uint256(State.Open)\n        );\n\n        localStorage.x = 3;\n    }\n\n    function Activity_0i3wqng()\n        public\n        payable\n        isAccessible(\"Activity_0i3wqng\")\n    {\n        state[\"Activity_0i3wqng\"] = State.Completed;\n    }\n\n    function checkXOR_Gateway_0x9om75(uint256 x) public returns (uint256) {\n        require(\n            uint256(\n                ILane_19y529f_Contract_Collaboration_1glbzukaa(\n                    contracts[\"Lane_19y529f_Contract_Collaboration_1glbzukaa\"]\n                ).getState(\"Activity_0biddql\")\n            ) == uint256(State.Open)\n        );\n        return ((x == 1) ? (1 << 0) : 0) | (1 << 1);\n    }\n}\n",
+    "contractInterface": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\ninterface ILane_0qoxvyf_Contract_Collaboration_1glbzukaa {\n    enum State {\n        Closed,\n        Open,\n        Completed\n    }\n    function setContracts(address[] memory addresses) external;\n    function getX() external returns (uint);\n    function setResources(\n        string[] memory _roles,\n        address[] memory _addresses\n    ) external;\n    function setResource(string memory _role, address _address) external;\n    function setState(string memory _activity, uint8 _state) external;\n    function getState(string memory _activity) external returns (State);\n    function compareStrings(\n        string memory a,\n        string memory b\n    ) external returns (bool);\n    function Activity_1m2pw5d() external;\n    function Activity_0i3wqng() external;\n    function checkXOR_Gateway_0x9om75(uint256 x) external returns (uint256);\n}\n",
+    "localStorage": [
+      {
+        "type": "uint",
+        "name": "x",
+        "value": 1
+      }
+    ],
+    "address": "0x232d85d8B33831437eC0057D5F494a9F930f293e",
+    "deployGas": 1935187
+  },
+  {
+    "contractName": "Lane_19y529f_Contract_Collaboration_1glbzukaax",
+    "networkId": "network-1",
+    "contractRoles": [
+      {
+        "role": "p1",
+        "address": "0xFD2578154fCf828772318716bD5f513953d80a71"
+      }
+    ],
+    "receiveTasks": [
+      {
+        "id": "Activity_0biddql",
+        "sender": "p1",
+        "name": "",
+        "state": "Completed",
+        "externalParams": [],
+        "gasUsed": "86530"
+      }
+    ],
+    "contractCode": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\nimport \"./ILane_19y529f_Contract_Collaboration_1glbzukaax.sol\";\nimport \"./ILane_0qoxvyf_Contract_Collaboration_1glbzukaax.sol\";\ncontract Lane_19y529f_Contract_Collaboration_1glbzukaax {\n    enum State {\n        Closed,\n        Open,\n        Completed\n    }\n\n    mapping(string => State) public state;\n\n    uint receiveFunctionCount = 1;\n\n    mapping(string => address) public contracts;\n\n    mapping(address => string) public addressToRole;\n\n    mapping(string => string[]) public activitytoRole;\n\n    modifier isAccessible(string memory _activity) {\n        require(state[_activity] == State.Open, \"Activity is not open\");\n\n        string memory userRole = addressToRole[msg.sender];\n        bool hasRequiredRole = false;\n\n        // If no roles are defined for the activity, grant access\n        if (activitytoRole[_activity].length == 0) {\n            hasRequiredRole = true;\n        } else {\n            // Iterate through the array of roles for the activity\n            for (uint256 i = 0; i < activitytoRole[_activity].length; i++) {\n                if (\n                    bytes(activitytoRole[_activity][i]).length == 0 ||\n                    compareStrings(userRole, activitytoRole[_activity][i])\n                ) {\n                    hasRequiredRole = true;\n                    break;\n                }\n            }\n        }\n\n        require(hasRequiredRole, \"Caller does not have the required role\");\n        _;\n    }\n\n    struct LocalStorage {\n        uint x;\n    }\n    LocalStorage public localStorage;\n\n    constructor() {\n        state[\"Activity_0biddql\"] = State.Open;\n        activitytoRole[\"Activity_0biddql\"] = [\"p1\"];\n\n        localStorage.x = 22;\n    }\n\n    function setContracts(address[] memory addresses) public {\n        contracts[\"Lane_19y529f_Contract_Collaboration_1glbzukaax\"] = addresses[\n            0\n        ];\n        contracts[\"Lane_0qoxvyf_Contract_Collaboration_1glbzukaax\"] = addresses[\n            1\n        ];\n    }\n\n    function getX() public view returns (uint) {\n        return localStorage.x;\n    }\n\n    function setResources(\n        string[] memory _roles,\n        address[] memory _addresses\n    ) public {\n        require(\n            _roles.length == _addresses.length,\n            \"Roles and addresses arrays must be of the same length\"\n        );\n\n        for (uint i = 0; i < _addresses.length; i++) {\n            addressToRole[_addresses[i]] = _roles[i];\n        }\n    }\n\n    function setResource(string memory _role, address _address) public {\n        addressToRole[_address] = _role;\n    }\n\n    function setState(string memory _activity, uint8 _state) public {\n        require(_state <= 3, \"Not Valid State\");\n        state[_activity] = State(_state);\n    }\n\n    function getState(string memory _activity) public view returns (State) {\n        return state[_activity];\n    }\n\n    //To be replaced with ENUM\n    function compareStrings(\n        string memory a,\n        string memory b\n    ) internal pure returns (bool) {\n        return keccak256(abi.encodePacked(a)) == keccak256(abi.encodePacked(b));\n    }\n\n    function Activity_0biddql()\n        public\n        payable\n        isAccessible(\"Activity_0biddql\")\n    {\n        Activity_1aljlao();\n\n        ILane_0qoxvyf_Contract_Collaboration_1glbzukaax(\n            contracts[\"Lane_0qoxvyf_Contract_Collaboration_1glbzukaax\"]\n        ).Activity_1m2pw5d();\n        uint256 branch = ILane_0qoxvyf_Contract_Collaboration_1glbzukaax(\n            contracts[\"Lane_0qoxvyf_Contract_Collaboration_1glbzukaax\"]\n        ).checkXOR_Gateway_0x9om75(\n                ILane_0qoxvyf_Contract_Collaboration_1glbzukaax(\n                    contracts[\"Lane_0qoxvyf_Contract_Collaboration_1glbzukaax\"]\n                ).getX()\n            );\n        if ((branch & (1 << 0)) != 0) {} else if ((branch & (1 << 1)) != 0) {\n            ILane_0qoxvyf_Contract_Collaboration_1glbzukaax(\n                contracts[\"Lane_0qoxvyf_Contract_Collaboration_1glbzukaax\"]\n            ).setState(\"Activity_0i3wqng\", 1);\n        }\n\n        state[\"Activity_0biddql\"] = State.Completed;\n    }\n\n    function Activity_1aljlao() public payable {\n        require(uint256(state[\"Activity_0biddql\"]) == uint256(State.Open));\n    }\n}\n",
+    "contractInterface": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\ninterface ILane_19y529f_Contract_Collaboration_1glbzukaax {\n    enum State {\n        Closed,\n        Open,\n        Completed\n    }\n    function setContracts(address[] memory addresses) external;\n    function getX() external returns (uint);\n    function setResources(\n        string[] memory _roles,\n        address[] memory _addresses\n    ) external;\n    function setResource(string memory _role, address _address) external;\n    function setState(string memory _activity, uint8 _state) external;\n    function getState(string memory _activity) external returns (State);\n    function compareStrings(\n        string memory a,\n        string memory b\n    ) external returns (bool);\n    function Activity_0biddql() external;\n    function Activity_1aljlao() external;\n}\n",
+    "localStorage": [
+      {
+        "type": "uint",
+        "name": "x",
+        "value": 22
+      }
+    ],
+    "address": "0xdB7605EBF71dc04e7D03e5FB8d5F373bb369c7A5",
+    "deployGas": 2004021
+  },
+  {
+    "contractName": "Lane_0qoxvyf_Contract_Collaboration_1glbzukaax",
+    "networkId": "network-1",
+    "contractRoles": [
+      {
+        "role": "p1",
+        "address": "0xFD2578154fCf828772318716bD5f513953d80a71"
+      }
+    ],
+    "receiveTasks": [
+      {
+        "id": "Activity_0i3wqng",
+        "sender": "p1",
+        "name": "",
+        "state": "Open",
+        "externalParams": []
+      }
+    ],
+    "contractCode": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\nimport \"./ILane_19y529f_Contract_Collaboration_1glbzukaax.sol\";\nimport \"./ILane_0qoxvyf_Contract_Collaboration_1glbzukaax.sol\";\ncontract Lane_0qoxvyf_Contract_Collaboration_1glbzukaax {\n    enum State {\n        Closed,\n        Open,\n        Completed\n    }\n\n    mapping(string => State) public state;\n\n    uint receiveFunctionCount = 1;\n\n    mapping(string => address) public contracts;\n\n    mapping(address => string) public addressToRole;\n\n    mapping(string => string[]) public activitytoRole;\n\n    modifier isAccessible(string memory _activity) {\n        require(state[_activity] == State.Open, \"Activity is not open\");\n\n        string memory userRole = addressToRole[msg.sender];\n        bool hasRequiredRole = false;\n\n        // If no roles are defined for the activity, grant access\n        if (activitytoRole[_activity].length == 0) {\n            hasRequiredRole = true;\n        } else {\n            // Iterate through the array of roles for the activity\n            for (uint256 i = 0; i < activitytoRole[_activity].length; i++) {\n                if (\n                    bytes(activitytoRole[_activity][i]).length == 0 ||\n                    compareStrings(userRole, activitytoRole[_activity][i])\n                ) {\n                    hasRequiredRole = true;\n                    break;\n                }\n            }\n        }\n\n        require(hasRequiredRole, \"Caller does not have the required role\");\n        _;\n    }\n\n    struct LocalStorage {\n        uint x;\n    }\n    LocalStorage public localStorage;\n\n    constructor() {\n        state[\"Activity_0i3wqng\"] = State.Closed;\n\n        activitytoRole[\"Activity_0i3wqng\"] = [\"p1\"];\n        localStorage.x = 1;\n    }\n\n    function setContracts(address[] memory addresses) public {\n        contracts[\"Lane_19y529f_Contract_Collaboration_1glbzukaax\"] = addresses[\n            0\n        ];\n        contracts[\"Lane_0qoxvyf_Contract_Collaboration_1glbzukaax\"] = addresses[\n            1\n        ];\n    }\n\n    function getX() public view returns (uint) {\n        return localStorage.x;\n    }\n\n    function setResources(\n        string[] memory _roles,\n        address[] memory _addresses\n    ) public {\n        require(\n            _roles.length == _addresses.length,\n            \"Roles and addresses arrays must be of the same length\"\n        );\n\n        for (uint i = 0; i < _addresses.length; i++) {\n            addressToRole[_addresses[i]] = _roles[i];\n        }\n    }\n\n    function setResource(string memory _role, address _address) public {\n        addressToRole[_address] = _role;\n    }\n\n    function setState(string memory _activity, uint8 _state) public {\n        require(_state <= 3, \"Not Valid State\");\n        state[_activity] = State(_state);\n    }\n\n    function getState(string memory _activity) public view returns (State) {\n        return state[_activity];\n    }\n\n    //To be replaced with ENUM\n    function compareStrings(\n        string memory a,\n        string memory b\n    ) internal pure returns (bool) {\n        return keccak256(abi.encodePacked(a)) == keccak256(abi.encodePacked(b));\n    }\n\n    function Activity_1m2pw5d() public payable {\n        require(\n            uint256(\n                ILane_19y529f_Contract_Collaboration_1glbzukaax(\n                    contracts[\"Lane_19y529f_Contract_Collaboration_1glbzukaax\"]\n                ).getState(\"Activity_0biddql\")\n            ) == uint256(State.Open)\n        );\n\n        localStorage.x = 3;\n    }\n\n    function Activity_0i3wqng()\n        public\n        payable\n        isAccessible(\"Activity_0i3wqng\")\n    {\n        state[\"Activity_0i3wqng\"] = State.Completed;\n    }\n\n    function checkXOR_Gateway_0x9om75(uint256 x) public returns (uint256) {\n        require(\n            uint256(\n                ILane_19y529f_Contract_Collaboration_1glbzukaax(\n                    contracts[\"Lane_19y529f_Contract_Collaboration_1glbzukaax\"]\n                ).getState(\"Activity_0biddql\")\n            ) == uint256(State.Open)\n        );\n        return ((x == 1) ? (1 << 0) : 0) | (1 << 1);\n    }\n}\n",
+    "contractInterface": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\ninterface ILane_0qoxvyf_Contract_Collaboration_1glbzukaax {\n    enum State {\n        Closed,\n        Open,\n        Completed\n    }\n    function setContracts(address[] memory addresses) external;\n    function getX() external returns (uint);\n    function setResources(\n        string[] memory _roles,\n        address[] memory _addresses\n    ) external;\n    function setResource(string memory _role, address _address) external;\n    function setState(string memory _activity, uint8 _state) external;\n    function getState(string memory _activity) external returns (State);\n    function compareStrings(\n        string memory a,\n        string memory b\n    ) external returns (bool);\n    function Activity_1m2pw5d() external;\n    function Activity_0i3wqng() external;\n    function checkXOR_Gateway_0x9om75(uint256 x) external returns (uint256);\n}\n",
+    "localStorage": [
+      {
+        "type": "uint",
+        "name": "x",
+        "value": 3
+      }
+    ],
+    "address": "0x0021CAf66e09f31E5133775396e68FD023012033",
+    "deployGas": 1935199
+  },
+  {
+    "contractName": "Lane_19y529f_Contract_Collaboration_1glbzukaaxrt",
+    "networkId": "network-1",
+    "contractRoles": [
+      {
+        "role": "p1",
+        "address": "0xFD2578154fCf828772318716bD5f513953d80a71"
+      }
+    ],
+    "receiveTasks": [
+      {
+        "id": "Activity_0biddql",
+        "sender": "p1",
+        "name": "",
+        "state": "Completed",
+        "externalParams": [],
+        "gasUsed": "61367"
+      }
+    ],
+    "contractCode": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\nimport \"./ILane_19y529f_Contract_Collaboration_1glbzukaaxrt.sol\";\nimport \"./ILane_0qoxvyf_Contract_Collaboration_1glbzukaaxrt.sol\";\ncontract Lane_19y529f_Contract_Collaboration_1glbzukaaxrt {\n    enum State {\n        Closed,\n        Open,\n        Completed\n    }\n\n    mapping(string => State) public state;\n\n    uint receiveFunctionCount = 1;\n\n    mapping(string => address) public contracts;\n\n    mapping(address => string) public addressToRole;\n\n    mapping(string => string[]) public activitytoRole;\n\n    modifier isAccessible(string memory _activity) {\n        require(state[_activity] == State.Open, \"Activity is not open\");\n\n        string memory userRole = addressToRole[msg.sender];\n        bool hasRequiredRole = false;\n\n        // If no roles are defined for the activity, grant access\n        if (activitytoRole[_activity].length == 0) {\n            hasRequiredRole = true;\n        } else {\n            // Iterate through the array of roles for the activity\n            for (uint256 i = 0; i < activitytoRole[_activity].length; i++) {\n                if (\n                    bytes(activitytoRole[_activity][i]).length == 0 ||\n                    compareStrings(userRole, activitytoRole[_activity][i])\n                ) {\n                    hasRequiredRole = true;\n                    break;\n                }\n            }\n        }\n\n        require(hasRequiredRole, \"Caller does not have the required role\");\n        _;\n    }\n\n    struct LocalStorage {\n        uint x;\n    }\n    LocalStorage public localStorage;\n\n    constructor() {\n        state[\"Activity_0biddql\"] = State.Open;\n        activitytoRole[\"Activity_0biddql\"] = [\"p1\"];\n\n        localStorage.x = 22;\n    }\n\n    function setContracts(address[] memory addresses) public {\n        contracts[\n            \"Lane_19y529f_Contract_Collaboration_1glbzukaaxrt\"\n        ] = addresses[0];\n        contracts[\n            \"Lane_0qoxvyf_Contract_Collaboration_1glbzukaaxrt\"\n        ] = addresses[1];\n    }\n\n    function getX() public view returns (uint) {\n        return localStorage.x;\n    }\n\n    function setResources(\n        string[] memory _roles,\n        address[] memory _addresses\n    ) public {\n        require(\n            _roles.length == _addresses.length,\n            \"Roles and addresses arrays must be of the same length\"\n        );\n\n        for (uint i = 0; i < _addresses.length; i++) {\n            addressToRole[_addresses[i]] = _roles[i];\n        }\n    }\n\n    function setResource(string memory _role, address _address) public {\n        addressToRole[_address] = _role;\n    }\n\n    function setState(string memory _activity, uint8 _state) public {\n        require(_state <= 3, \"Not Valid State\");\n        state[_activity] = State(_state);\n    }\n\n    function getState(string memory _activity) public view returns (State) {\n        return state[_activity];\n    }\n\n    //To be replaced with ENUM\n    function compareStrings(\n        string memory a,\n        string memory b\n    ) internal pure returns (bool) {\n        return keccak256(abi.encodePacked(a)) == keccak256(abi.encodePacked(b));\n    }\n\n    function Activity_0biddql()\n        public\n        payable\n        isAccessible(\"Activity_0biddql\")\n    {\n        Activity_1aljlao();\n\n        ILane_0qoxvyf_Contract_Collaboration_1glbzukaaxrt(\n            contracts[\"Lane_0qoxvyf_Contract_Collaboration_1glbzukaaxrt\"]\n        ).Activity_1m2pw5d();\n        uint256 branch = ILane_0qoxvyf_Contract_Collaboration_1glbzukaaxrt(\n            contracts[\"Lane_0qoxvyf_Contract_Collaboration_1glbzukaaxrt\"]\n        ).checkXOR_Gateway_0x9om75(\n                ILane_0qoxvyf_Contract_Collaboration_1glbzukaaxrt(\n                    contracts[\n                        \"Lane_0qoxvyf_Contract_Collaboration_1glbzukaaxrt\"\n                    ]\n                ).getX()\n            );\n        if ((branch & (1 << 0)) != 0) {} else if ((branch & (1 << 1)) != 0) {\n            ILane_0qoxvyf_Contract_Collaboration_1glbzukaaxrt(\n                contracts[\"Lane_0qoxvyf_Contract_Collaboration_1glbzukaaxrt\"]\n            ).setState(\"Activity_0i3wqng\", 1);\n        }\n\n        state[\"Activity_0biddql\"] = State.Completed;\n    }\n\n    function Activity_1aljlao() public payable {\n        require(uint256(state[\"Activity_0biddql\"]) == uint256(State.Open));\n    }\n}\n",
+    "contractInterface": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\ninterface ILane_19y529f_Contract_Collaboration_1glbzukaaxrt {\n    enum State {\n        Closed,\n        Open,\n        Completed\n    }\n    function setContracts(address[] memory addresses) external;\n    function getX() external returns (uint);\n    function setResources(\n        string[] memory _roles,\n        address[] memory _addresses\n    ) external;\n    function setResource(string memory _role, address _address) external;\n    function setState(string memory _activity, uint8 _state) external;\n    function getState(string memory _activity) external returns (State);\n    function compareStrings(\n        string memory a,\n        string memory b\n    ) external returns (bool);\n    function Activity_0biddql() external;\n    function Activity_1aljlao() external;\n}\n",
+    "localStorage": [
+      {
+        "type": "uint",
+        "name": "x",
+        "value": 22
+      }
+    ],
+    "address": "0x30b2E9587C1cD6D6385EA53A8e595781DbfbeCCe",
+    "deployGas": 2004069
+  },
+  {
+    "contractName": "Lane_0qoxvyf_Contract_Collaboration_1glbzukaaxrt",
+    "networkId": "network-1",
+    "contractRoles": [
+      {
+        "role": "p1",
+        "address": "0xFD2578154fCf828772318716bD5f513953d80a71"
+      }
+    ],
+    "receiveTasks": [
+      {
+        "id": "Activity_0i3wqng",
+        "sender": "p1",
+        "name": "",
+        "state": "Closed",
+        "externalParams": []
+      }
+    ],
+    "contractCode": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\nimport \"./ILane_19y529f_Contract_Collaboration_1glbzukaaxrt.sol\";\nimport \"./ILane_0qoxvyf_Contract_Collaboration_1glbzukaaxrt.sol\";\ncontract Lane_0qoxvyf_Contract_Collaboration_1glbzukaaxrt {\n    enum State {\n        Closed,\n        Open,\n        Completed\n    }\n\n    mapping(string => State) public state;\n\n    uint receiveFunctionCount = 1;\n\n    mapping(string => address) public contracts;\n\n    mapping(address => string) public addressToRole;\n\n    mapping(string => string[]) public activitytoRole;\n\n    modifier isAccessible(string memory _activity) {\n        require(state[_activity] == State.Open, \"Activity is not open\");\n\n        string memory userRole = addressToRole[msg.sender];\n        bool hasRequiredRole = false;\n\n        // If no roles are defined for the activity, grant access\n        if (activitytoRole[_activity].length == 0) {\n            hasRequiredRole = true;\n        } else {\n            // Iterate through the array of roles for the activity\n            for (uint256 i = 0; i < activitytoRole[_activity].length; i++) {\n                if (\n                    bytes(activitytoRole[_activity][i]).length == 0 ||\n                    compareStrings(userRole, activitytoRole[_activity][i])\n                ) {\n                    hasRequiredRole = true;\n                    break;\n                }\n            }\n        }\n\n        require(hasRequiredRole, \"Caller does not have the required role\");\n        _;\n    }\n\n    struct LocalStorage {\n        uint x;\n    }\n    LocalStorage public localStorage;\n\n    constructor() {\n        state[\"Activity_0i3wqng\"] = State.Closed;\n\n        activitytoRole[\"Activity_0i3wqng\"] = [\"p1\"];\n        localStorage.x = 1;\n    }\n\n    function setContracts(address[] memory addresses) public {\n        contracts[\n            \"Lane_19y529f_Contract_Collaboration_1glbzukaaxrt\"\n        ] = addresses[0];\n        contracts[\n            \"Lane_0qoxvyf_Contract_Collaboration_1glbzukaaxrt\"\n        ] = addresses[1];\n    }\n\n    function getX() public view returns (uint) {\n        return localStorage.x;\n    }\n\n    function setResources(\n        string[] memory _roles,\n        address[] memory _addresses\n    ) public {\n        require(\n            _roles.length == _addresses.length,\n            \"Roles and addresses arrays must be of the same length\"\n        );\n\n        for (uint i = 0; i < _addresses.length; i++) {\n            addressToRole[_addresses[i]] = _roles[i];\n        }\n    }\n\n    function setResource(string memory _role, address _address) public {\n        addressToRole[_address] = _role;\n    }\n\n    function setState(string memory _activity, uint8 _state) public {\n        require(_state <= 3, \"Not Valid State\");\n        state[_activity] = State(_state);\n    }\n\n    function getState(string memory _activity) public view returns (State) {\n        return state[_activity];\n    }\n\n    //To be replaced with ENUM\n    function compareStrings(\n        string memory a,\n        string memory b\n    ) internal pure returns (bool) {\n        return keccak256(abi.encodePacked(a)) == keccak256(abi.encodePacked(b));\n    }\n\n    function Activity_1m2pw5d() public payable {\n        require(\n            uint256(\n                ILane_19y529f_Contract_Collaboration_1glbzukaaxrt(\n                    contracts[\n                        \"Lane_19y529f_Contract_Collaboration_1glbzukaaxrt\"\n                    ]\n                ).getState(\"Activity_0biddql\")\n            ) == uint256(State.Open)\n        );\n\n        localStorage.x = 3;\n    }\n\n    function Activity_0i3wqng()\n        public\n        payable\n        isAccessible(\"Activity_0i3wqng\")\n    {\n        state[\"Activity_0i3wqng\"] = State.Completed;\n    }\n\n    function checkXOR_Gateway_0x9om75(uint256 x) public returns (uint256) {\n        require(\n            uint256(\n                ILane_19y529f_Contract_Collaboration_1glbzukaaxrt(\n                    contracts[\n                        \"Lane_19y529f_Contract_Collaboration_1glbzukaaxrt\"\n                    ]\n                ).getState(\"Activity_0biddql\")\n            ) == uint256(State.Open)\n        );\n        return (1 << 0) | ((x == 1) ? (1 << 1) : 0);\n    }\n}\n",
+    "contractInterface": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\ninterface ILane_0qoxvyf_Contract_Collaboration_1glbzukaaxrt {\n    enum State {\n        Closed,\n        Open,\n        Completed\n    }\n    function setContracts(address[] memory addresses) external;\n    function getX() external returns (uint);\n    function setResources(\n        string[] memory _roles,\n        address[] memory _addresses\n    ) external;\n    function setResource(string memory _role, address _address) external;\n    function setState(string memory _activity, uint8 _state) external;\n    function getState(string memory _activity) external returns (State);\n    function compareStrings(\n        string memory a,\n        string memory b\n    ) external returns (bool);\n    function Activity_1m2pw5d() external;\n    function Activity_0i3wqng() external;\n    function checkXOR_Gateway_0x9om75(uint256 x) external returns (uint256);\n}\n",
+    "localStorage": [
+      {
+        "type": "uint",
+        "name": "x",
+        "value": 3
+      }
+    ],
+    "address": "0x705bACd41038aFD49aD0a0fD520035680530FDf5",
+    "deployGas": 1935235
+  },
+  {
+    "contractName": "Lane_19y529f_Contract_Collaboration_1glbzukaaxrtx",
+    "networkId": "network-1",
+    "contractRoles": [
+      {
+        "role": "p1",
+        "address": "0xFD2578154fCf828772318716bD5f513953d80a71"
+      }
+    ],
+    "receiveTasks": [
+      {
+        "id": "Activity_0biddql",
+        "sender": "p1",
+        "name": "",
+        "state": "Completed",
+        "externalParams": [],
+        "gasUsed": "58557"
+      }
+    ],
+    "contractCode": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\nimport \"./ILane_19y529f_Contract_Collaboration_1glbzukaaxrtx.sol\";\nimport \"./ILane_0qoxvyf_Contract_Collaboration_1glbzukaaxrtx.sol\";\ncontract Lane_19y529f_Contract_Collaboration_1glbzukaaxrtx {\n    enum State {\n        Closed,\n        Open,\n        Completed\n    }\n\n    mapping(string => State) public state;\n\n    uint receiveFunctionCount = 1;\n\n    mapping(string => address) public contracts;\n\n    mapping(address => string) public addressToRole;\n\n    mapping(string => string[]) public activitytoRole;\n\n    modifier isAccessible(string memory _activity) {\n        require(state[_activity] == State.Open, \"Activity is not open\");\n\n        string memory userRole = addressToRole[msg.sender];\n        bool hasRequiredRole = false;\n\n        // If no roles are defined for the activity, grant access\n        if (activitytoRole[_activity].length == 0) {\n            hasRequiredRole = true;\n        } else {\n            // Iterate through the array of roles for the activity\n            for (uint256 i = 0; i < activitytoRole[_activity].length; i++) {\n                if (\n                    bytes(activitytoRole[_activity][i]).length == 0 ||\n                    compareStrings(userRole, activitytoRole[_activity][i])\n                ) {\n                    hasRequiredRole = true;\n                    break;\n                }\n            }\n        }\n\n        require(hasRequiredRole, \"Caller does not have the required role\");\n        _;\n    }\n\n    struct LocalStorage {\n        uint x;\n    }\n    LocalStorage public localStorage;\n\n    constructor() {\n        state[\"Activity_0biddql\"] = State.Open;\n        activitytoRole[\"Activity_0biddql\"] = [\"p1\"];\n\n        localStorage.x = 22;\n    }\n\n    function setContracts(address[] memory addresses) public {\n        contracts[\n            \"Lane_19y529f_Contract_Collaboration_1glbzukaaxrtx\"\n        ] = addresses[0];\n        contracts[\n            \"Lane_0qoxvyf_Contract_Collaboration_1glbzukaaxrtx\"\n        ] = addresses[1];\n    }\n\n    function getX() public view returns (uint) {\n        return localStorage.x;\n    }\n\n    function setResources(\n        string[] memory _roles,\n        address[] memory _addresses\n    ) public {\n        require(\n            _roles.length == _addresses.length,\n            \"Roles and addresses arrays must be of the same length\"\n        );\n\n        for (uint i = 0; i < _addresses.length; i++) {\n            addressToRole[_addresses[i]] = _roles[i];\n        }\n    }\n\n    function setResource(string memory _role, address _address) public {\n        addressToRole[_address] = _role;\n    }\n\n    function setState(string memory _activity, uint8 _state) public {\n        require(_state <= 3, \"Not Valid State\");\n        state[_activity] = State(_state);\n    }\n\n    function getState(string memory _activity) public view returns (State) {\n        return state[_activity];\n    }\n\n    //To be replaced with ENUM\n    function compareStrings(\n        string memory a,\n        string memory b\n    ) internal pure returns (bool) {\n        return keccak256(abi.encodePacked(a)) == keccak256(abi.encodePacked(b));\n    }\n\n    function Activity_0biddql()\n        public\n        payable\n        isAccessible(\"Activity_0biddql\")\n    {\n        Activity_1aljlao();\n\n        ILane_0qoxvyf_Contract_Collaboration_1glbzukaaxrtx(\n            contracts[\"Lane_0qoxvyf_Contract_Collaboration_1glbzukaaxrtx\"]\n        ).Activity_1m2pw5d();\n        uint256 branch = ILane_0qoxvyf_Contract_Collaboration_1glbzukaaxrtx(\n            contracts[\"Lane_0qoxvyf_Contract_Collaboration_1glbzukaaxrtx\"]\n        ).checkXOR_Gateway_0x9om75(\n                ILane_0qoxvyf_Contract_Collaboration_1glbzukaaxrtx(\n                    contracts[\n                        \"Lane_0qoxvyf_Contract_Collaboration_1glbzukaaxrtx\"\n                    ]\n                ).getX()\n            );\n        if ((branch & (1 << 0)) != 0) {} else if ((branch & (1 << 1)) != 0) {\n            ILane_0qoxvyf_Contract_Collaboration_1glbzukaaxrtx(\n                contracts[\"Lane_0qoxvyf_Contract_Collaboration_1glbzukaaxrtx\"]\n            ).setState(\"Activity_0i3wqng\", 1);\n        }\n\n        state[\"Activity_0biddql\"] = State.Completed;\n    }\n\n    function Activity_1aljlao() public payable {\n        require(uint256(state[\"Activity_0biddql\"]) == uint256(State.Open));\n    }\n}\n",
+    "contractInterface": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\ninterface ILane_19y529f_Contract_Collaboration_1glbzukaaxrtx {\n    enum State {\n        Closed,\n        Open,\n        Completed\n    }\n    function setContracts(address[] memory addresses) external;\n    function getX() external returns (uint);\n    function setResources(\n        string[] memory _roles,\n        address[] memory _addresses\n    ) external;\n    function setResource(string memory _role, address _address) external;\n    function setState(string memory _activity, uint8 _state) external;\n    function getState(string memory _activity) external returns (State);\n    function compareStrings(\n        string memory a,\n        string memory b\n    ) external returns (bool);\n    function Activity_0biddql() external;\n    function Activity_1aljlao() external;\n}\n",
+    "localStorage": [
+      {
+        "type": "uint",
+        "name": "x",
+        "value": 22
+      }
+    ],
+    "address": "0xDBD1178ce4a9EA1192B6edbF1342538144dd9AF1",
+    "deployGas": 2004105
+  },
+  {
+    "contractName": "Lane_0qoxvyf_Contract_Collaboration_1glbzukaaxrtx",
+    "networkId": "network-1",
+    "contractRoles": [
+      {
+        "role": "p1",
+        "address": "0xFD2578154fCf828772318716bD5f513953d80a71"
+      }
+    ],
+    "receiveTasks": [
+      {
+        "id": "Activity_0i3wqng",
+        "sender": "p1",
+        "name": "",
+        "state": "Closed",
+        "externalParams": []
+      }
+    ],
+    "contractCode": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\nimport \"./ILane_19y529f_Contract_Collaboration_1glbzukaaxrtx.sol\";\nimport \"./ILane_0qoxvyf_Contract_Collaboration_1glbzukaaxrtx.sol\";\ncontract Lane_0qoxvyf_Contract_Collaboration_1glbzukaaxrtx {\n    enum State {\n        Closed,\n        Open,\n        Completed\n    }\n\n    mapping(string => State) public state;\n\n    uint receiveFunctionCount = 1;\n\n    mapping(string => address) public contracts;\n\n    mapping(address => string) public addressToRole;\n\n    mapping(string => string[]) public activitytoRole;\n\n    modifier isAccessible(string memory _activity) {\n        require(state[_activity] == State.Open, \"Activity is not open\");\n\n        string memory userRole = addressToRole[msg.sender];\n        bool hasRequiredRole = false;\n\n        // If no roles are defined for the activity, grant access\n        if (activitytoRole[_activity].length == 0) {\n            hasRequiredRole = true;\n        } else {\n            // Iterate through the array of roles for the activity\n            for (uint256 i = 0; i < activitytoRole[_activity].length; i++) {\n                if (\n                    bytes(activitytoRole[_activity][i]).length == 0 ||\n                    compareStrings(userRole, activitytoRole[_activity][i])\n                ) {\n                    hasRequiredRole = true;\n                    break;\n                }\n            }\n        }\n\n        require(hasRequiredRole, \"Caller does not have the required role\");\n        _;\n    }\n\n    struct LocalStorage {\n        uint x;\n    }\n    LocalStorage public localStorage;\n\n    constructor() {\n        state[\"Activity_0i3wqng\"] = State.Closed;\n\n        activitytoRole[\"Activity_0i3wqng\"] = [\"p1\"];\n        localStorage.x = 1;\n    }\n\n    function setContracts(address[] memory addresses) public {\n        contracts[\n            \"Lane_19y529f_Contract_Collaboration_1glbzukaaxrtx\"\n        ] = addresses[0];\n        contracts[\n            \"Lane_0qoxvyf_Contract_Collaboration_1glbzukaaxrtx\"\n        ] = addresses[1];\n    }\n\n    function getX() public view returns (uint) {\n        return localStorage.x;\n    }\n\n    function setResources(\n        string[] memory _roles,\n        address[] memory _addresses\n    ) public {\n        require(\n            _roles.length == _addresses.length,\n            \"Roles and addresses arrays must be of the same length\"\n        );\n\n        for (uint i = 0; i < _addresses.length; i++) {\n            addressToRole[_addresses[i]] = _roles[i];\n        }\n    }\n\n    function setResource(string memory _role, address _address) public {\n        addressToRole[_address] = _role;\n    }\n\n    function setState(string memory _activity, uint8 _state) public {\n        require(_state <= 3, \"Not Valid State\");\n        state[_activity] = State(_state);\n    }\n\n    function getState(string memory _activity) public view returns (State) {\n        return state[_activity];\n    }\n\n    //To be replaced with ENUM\n    function compareStrings(\n        string memory a,\n        string memory b\n    ) internal pure returns (bool) {\n        return keccak256(abi.encodePacked(a)) == keccak256(abi.encodePacked(b));\n    }\n\n    function Activity_1m2pw5d() public payable {\n        require(\n            uint256(\n                ILane_19y529f_Contract_Collaboration_1glbzukaaxrtx(\n                    contracts[\n                        \"Lane_19y529f_Contract_Collaboration_1glbzukaaxrtx\"\n                    ]\n                ).getState(\"Activity_0biddql\")\n            ) == uint256(State.Open)\n        );\n\n        localStorage.x = 1;\n    }\n\n    function Activity_0i3wqng()\n        public\n        payable\n        isAccessible(\"Activity_0i3wqng\")\n    {\n        state[\"Activity_0i3wqng\"] = State.Completed;\n    }\n\n    function checkXOR_Gateway_0x9om75(uint256 x) public returns (uint256) {\n        require(\n            uint256(\n                ILane_19y529f_Contract_Collaboration_1glbzukaaxrtx(\n                    contracts[\n                        \"Lane_19y529f_Contract_Collaboration_1glbzukaaxrtx\"\n                    ]\n                ).getState(\"Activity_0biddql\")\n            ) == uint256(State.Open)\n        );\n        return (1 << 0) | ((x == 1) ? (1 << 1) : 0);\n    }\n}\n",
+    "contractInterface": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\ninterface ILane_0qoxvyf_Contract_Collaboration_1glbzukaaxrtx {\n    enum State {\n        Closed,\n        Open,\n        Completed\n    }\n    function setContracts(address[] memory addresses) external;\n    function getX() external returns (uint);\n    function setResources(\n        string[] memory _roles,\n        address[] memory _addresses\n    ) external;\n    function setResource(string memory _role, address _address) external;\n    function setState(string memory _activity, uint8 _state) external;\n    function getState(string memory _activity) external returns (State);\n    function compareStrings(\n        string memory a,\n        string memory b\n    ) external returns (bool);\n    function Activity_1m2pw5d() external;\n    function Activity_0i3wqng() external;\n    function checkXOR_Gateway_0x9om75(uint256 x) external returns (uint256);\n}\n",
+    "localStorage": [
+      {
+        "type": "uint",
+        "name": "x",
+        "value": 1
+      }
+    ],
+    "address": "0x8fd25Cf9Ab3e2aB34AFfF78B13f2A63E57e8d8ac",
+    "deployGas": 1935271
+  },
+  {
+    "contractName": "Lane_19y529f_Contract_Collaboration_1glbzukaaxrtxt",
+    "networkId": "network-1",
+    "contractRoles": [
+      {
+        "role": "p1",
+        "address": "0xFD2578154fCf828772318716bD5f513953d80a71"
+      }
+    ],
+    "receiveTasks": [
+      {
+        "id": "Activity_0biddql",
+        "sender": "p1",
+        "name": "",
+        "state": "Completed",
+        "externalParams": [],
+        "gasUsed": "83754"
+      }
+    ],
+    "contractCode": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\nimport \"./ILane_19y529f_Contract_Collaboration_1glbzukaaxrtxt.sol\";\nimport \"./ILane_0qoxvyf_Contract_Collaboration_1glbzukaaxrtxt.sol\";\ncontract Lane_19y529f_Contract_Collaboration_1glbzukaaxrtxt {\n    enum State {\n        Closed,\n        Open,\n        Completed\n    }\n\n    mapping(string => State) public state;\n\n    uint receiveFunctionCount = 1;\n\n    mapping(string => address) public contracts;\n\n    mapping(address => string) public addressToRole;\n\n    mapping(string => string[]) public activitytoRole;\n\n    modifier isAccessible(string memory _activity) {\n        require(state[_activity] == State.Open, \"Activity is not open\");\n\n        string memory userRole = addressToRole[msg.sender];\n        bool hasRequiredRole = false;\n\n        // If no roles are defined for the activity, grant access\n        if (activitytoRole[_activity].length == 0) {\n            hasRequiredRole = true;\n        } else {\n            // Iterate through the array of roles for the activity\n            for (uint256 i = 0; i < activitytoRole[_activity].length; i++) {\n                if (\n                    bytes(activitytoRole[_activity][i]).length == 0 ||\n                    compareStrings(userRole, activitytoRole[_activity][i])\n                ) {\n                    hasRequiredRole = true;\n                    break;\n                }\n            }\n        }\n\n        require(hasRequiredRole, \"Caller does not have the required role\");\n        _;\n    }\n\n    struct LocalStorage {\n        uint x;\n    }\n    LocalStorage public localStorage;\n\n    constructor() {\n        state[\"Activity_0biddql\"] = State.Open;\n        activitytoRole[\"Activity_0biddql\"] = [\"p1\"];\n\n        localStorage.x = 22;\n    }\n\n    function setContracts(address[] memory addresses) public {\n        contracts[\n            \"Lane_19y529f_Contract_Collaboration_1glbzukaaxrtxt\"\n        ] = addresses[0];\n        contracts[\n            \"Lane_0qoxvyf_Contract_Collaboration_1glbzukaaxrtxt\"\n        ] = addresses[1];\n    }\n\n    function getX() public view returns (uint) {\n        return localStorage.x;\n    }\n\n    function setResources(\n        string[] memory _roles,\n        address[] memory _addresses\n    ) public {\n        require(\n            _roles.length == _addresses.length,\n            \"Roles and addresses arrays must be of the same length\"\n        );\n\n        for (uint i = 0; i < _addresses.length; i++) {\n            addressToRole[_addresses[i]] = _roles[i];\n        }\n    }\n\n    function setResource(string memory _role, address _address) public {\n        addressToRole[_address] = _role;\n    }\n\n    function setState(string memory _activity, uint8 _state) public {\n        require(_state <= 3, \"Not Valid State\");\n        state[_activity] = State(_state);\n    }\n\n    function getState(string memory _activity) public view returns (State) {\n        return state[_activity];\n    }\n\n    //To be replaced with ENUM\n    function compareStrings(\n        string memory a,\n        string memory b\n    ) internal pure returns (bool) {\n        return keccak256(abi.encodePacked(a)) == keccak256(abi.encodePacked(b));\n    }\n\n    function Activity_0biddql()\n        public\n        payable\n        isAccessible(\"Activity_0biddql\")\n    {\n        Activity_1aljlao();\n\n        ILane_0qoxvyf_Contract_Collaboration_1glbzukaaxrtxt(\n            contracts[\"Lane_0qoxvyf_Contract_Collaboration_1glbzukaaxrtxt\"]\n        ).Activity_1m2pw5d();\n        uint256 branch = ILane_0qoxvyf_Contract_Collaboration_1glbzukaaxrtxt(\n            contracts[\"Lane_0qoxvyf_Contract_Collaboration_1glbzukaaxrtxt\"]\n        ).checkXOR_Gateway_0x9om75(\n                ILane_0qoxvyf_Contract_Collaboration_1glbzukaaxrtxt(\n                    contracts[\n                        \"Lane_0qoxvyf_Contract_Collaboration_1glbzukaaxrtxt\"\n                    ]\n                ).getX()\n            );\n        if ((branch & (1 << 0)) != 0) {} else if ((branch & (1 << 1)) != 0) {\n            ILane_0qoxvyf_Contract_Collaboration_1glbzukaaxrtxt(\n                contracts[\"Lane_0qoxvyf_Contract_Collaboration_1glbzukaaxrtxt\"]\n            ).setState(\"Activity_0i3wqng\", 1);\n        }\n\n        state[\"Activity_0biddql\"] = State.Completed;\n    }\n\n    function Activity_1aljlao() public payable {\n        require(uint256(state[\"Activity_0biddql\"]) == uint256(State.Open));\n    }\n}\n",
+    "contractInterface": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\ninterface ILane_19y529f_Contract_Collaboration_1glbzukaaxrtxt {\n    enum State {\n        Closed,\n        Open,\n        Completed\n    }\n    function setContracts(address[] memory addresses) external;\n    function getX() external returns (uint);\n    function setResources(\n        string[] memory _roles,\n        address[] memory _addresses\n    ) external;\n    function setResource(string memory _role, address _address) external;\n    function setState(string memory _activity, uint8 _state) external;\n    function getState(string memory _activity) external returns (State);\n    function compareStrings(\n        string memory a,\n        string memory b\n    ) external returns (bool);\n    function Activity_0biddql() external;\n    function Activity_1aljlao() external;\n}\n",
+    "localStorage": [
+      {
+        "type": "uint",
+        "name": "x",
+        "value": 22
+      }
+    ],
+    "address": "0x7bffbd49ba23d0F5F550DC26cc6bce8769738c4A",
+    "deployGas": 2004129
+  },
+  {
+    "contractName": "Lane_0qoxvyf_Contract_Collaboration_1glbzukaaxrtxt",
+    "networkId": "network-1",
+    "contractRoles": [
+      {
+        "role": "p1",
+        "address": "0xFD2578154fCf828772318716bD5f513953d80a71"
+      }
+    ],
+    "receiveTasks": [
+      {
+        "id": "Activity_0i3wqng",
+        "sender": "p1",
+        "name": "",
+        "state": "Open",
+        "externalParams": []
+      }
+    ],
+    "contractCode": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\nimport \"./ILane_19y529f_Contract_Collaboration_1glbzukaaxrtxt.sol\";\nimport \"./ILane_0qoxvyf_Contract_Collaboration_1glbzukaaxrtxt.sol\";\ncontract Lane_0qoxvyf_Contract_Collaboration_1glbzukaaxrtxt {\n    enum State {\n        Closed,\n        Open,\n        Completed\n    }\n\n    mapping(string => State) public state;\n\n    uint receiveFunctionCount = 1;\n\n    mapping(string => address) public contracts;\n\n    mapping(address => string) public addressToRole;\n\n    mapping(string => string[]) public activitytoRole;\n\n    modifier isAccessible(string memory _activity) {\n        require(state[_activity] == State.Open, \"Activity is not open\");\n\n        string memory userRole = addressToRole[msg.sender];\n        bool hasRequiredRole = false;\n\n        // If no roles are defined for the activity, grant access\n        if (activitytoRole[_activity].length == 0) {\n            hasRequiredRole = true;\n        } else {\n            // Iterate through the array of roles for the activity\n            for (uint256 i = 0; i < activitytoRole[_activity].length; i++) {\n                if (\n                    bytes(activitytoRole[_activity][i]).length == 0 ||\n                    compareStrings(userRole, activitytoRole[_activity][i])\n                ) {\n                    hasRequiredRole = true;\n                    break;\n                }\n            }\n        }\n\n        require(hasRequiredRole, \"Caller does not have the required role\");\n        _;\n    }\n\n    struct LocalStorage {\n        uint x;\n    }\n    LocalStorage public localStorage;\n\n    constructor() {\n        state[\"Activity_0i3wqng\"] = State.Closed;\n\n        activitytoRole[\"Activity_0i3wqng\"] = [\"p1\"];\n        localStorage.x = 1;\n    }\n\n    function setContracts(address[] memory addresses) public {\n        contracts[\n            \"Lane_19y529f_Contract_Collaboration_1glbzukaaxrtxt\"\n        ] = addresses[0];\n        contracts[\n            \"Lane_0qoxvyf_Contract_Collaboration_1glbzukaaxrtxt\"\n        ] = addresses[1];\n    }\n\n    function getX() public view returns (uint) {\n        return localStorage.x;\n    }\n\n    function setResources(\n        string[] memory _roles,\n        address[] memory _addresses\n    ) public {\n        require(\n            _roles.length == _addresses.length,\n            \"Roles and addresses arrays must be of the same length\"\n        );\n\n        for (uint i = 0; i < _addresses.length; i++) {\n            addressToRole[_addresses[i]] = _roles[i];\n        }\n    }\n\n    function setResource(string memory _role, address _address) public {\n        addressToRole[_address] = _role;\n    }\n\n    function setState(string memory _activity, uint8 _state) public {\n        require(_state <= 3, \"Not Valid State\");\n        state[_activity] = State(_state);\n    }\n\n    function getState(string memory _activity) public view returns (State) {\n        return state[_activity];\n    }\n\n    //To be replaced with ENUM\n    function compareStrings(\n        string memory a,\n        string memory b\n    ) internal pure returns (bool) {\n        return keccak256(abi.encodePacked(a)) == keccak256(abi.encodePacked(b));\n    }\n\n    function Activity_1m2pw5d() public payable {\n        require(\n            uint256(\n                ILane_19y529f_Contract_Collaboration_1glbzukaaxrtxt(\n                    contracts[\n                        \"Lane_19y529f_Contract_Collaboration_1glbzukaaxrtxt\"\n                    ]\n                ).getState(\"Activity_0biddql\")\n            ) == uint256(State.Open)\n        );\n\n        localStorage.x = 1;\n    }\n\n    function Activity_0i3wqng()\n        public\n        payable\n        isAccessible(\"Activity_0i3wqng\")\n    {\n        state[\"Activity_0i3wqng\"] = State.Completed;\n    }\n\n    function checkXOR_Gateway_0x9om75(uint256 x) public returns (uint256) {\n        require(\n            uint256(\n                ILane_19y529f_Contract_Collaboration_1glbzukaaxrtxt(\n                    contracts[\n                        \"Lane_19y529f_Contract_Collaboration_1glbzukaaxrtxt\"\n                    ]\n                ).getState(\"Activity_0biddql\")\n            ) == uint256(State.Open)\n        );\n        return ((x == 2) ? (1 << 0) : 0) | ((x == 1) ? (1 << 1) : 0);\n    }\n}\n",
+    "contractInterface": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\ninterface ILane_0qoxvyf_Contract_Collaboration_1glbzukaaxrtxt {\n    enum State {\n        Closed,\n        Open,\n        Completed\n    }\n    function setContracts(address[] memory addresses) external;\n    function getX() external returns (uint);\n    function setResources(\n        string[] memory _roles,\n        address[] memory _addresses\n    ) external;\n    function setResource(string memory _role, address _address) external;\n    function setState(string memory _activity, uint8 _state) external;\n    function getState(string memory _activity) external returns (State);\n    function compareStrings(\n        string memory a,\n        string memory b\n    ) external returns (bool);\n    function Activity_1m2pw5d() external;\n    function Activity_0i3wqng() external;\n    function checkXOR_Gateway_0x9om75(uint256 x) external returns (uint256);\n}\n",
+    "localStorage": [
+      {
+        "type": "uint",
+        "name": "x",
+        "value": 1
+      }
+    ],
+    "address": "0x09D66C9bcBcf796FA4b6B26c8d4FDDF16F2BdEfc",
+    "deployGas": 1938784
+  },
+  {
+    "contractName": "Lane_0w29kx0_Contract_Collaboration_0pb2pqk",
+    "networkId": "network-1",
+    "contractRoles": [
+      {
+        "role": "p1",
+        "address": "0xFD2578154fCf828772318716bD5f513953d80a71"
+      }
+    ],
+    "receiveTasks": [
+      {
+        "id": "Activity_0d2uaqj",
+        "sender": "p1",
+        "name": "",
+        "state": "Open",
+        "externalParams": []
+      }
+    ],
+    "contractCode": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\nimport \"./ILane_0w29kx0_Contract_Collaboration_0pb2pqk.sol\";\nimport \"./ILane_1js0enj_Contract_Collaboration_0pb2pqk.sol\";\ncontract Lane_0w29kx0_Contract_Collaboration_0pb2pqk {\n    enum State {\n        Closed,\n        Open,\n        Completed\n    }\n\n    mapping(string => State) public state;\n\n    uint receiveFunctionCount = 1;\n\n    mapping(string => address) public contracts;\n\n    mapping(address => string) public addressToRole;\n\n    mapping(string => string[]) public activitytoRole;\n\n    modifier isAccessible(string memory _activity) {\n        require(state[_activity] == State.Open, \"Activity is not open\");\n\n        string memory userRole = addressToRole[msg.sender];\n        bool hasRequiredRole = false;\n\n        // If no roles are defined for the activity, grant access\n        if (activitytoRole[_activity].length == 0) {\n            hasRequiredRole = true;\n        } else {\n            // Iterate through the array of roles for the activity\n            for (uint256 i = 0; i < activitytoRole[_activity].length; i++) {\n                if (\n                    bytes(activitytoRole[_activity][i]).length == 0 ||\n                    compareStrings(userRole, activitytoRole[_activity][i])\n                ) {\n                    hasRequiredRole = true;\n                    break;\n                }\n            }\n        }\n\n        require(hasRequiredRole, \"Caller does not have the required role\");\n        _;\n    }\n\n    constructor() {\n        state[\"Activity_0d2uaqj\"] = State.Open;\n        activitytoRole[\"Activity_0d2uaqj\"] = [\"p1\"];\n    }\n\n    function setContracts(address[] memory addresses) public {\n        contracts[\"Lane_0w29kx0_Contract_Collaboration_0pb2pqk\"] = addresses[0];\n        contracts[\"Lane_1js0enj_Contract_Collaboration_0pb2pqk\"] = addresses[1];\n    }\n\n    function setResources(\n        string[] memory _roles,\n        address[] memory _addresses\n    ) public {\n        require(\n            _roles.length == _addresses.length,\n            \"Roles and addresses arrays must be of the same length\"\n        );\n\n        for (uint i = 0; i < _addresses.length; i++) {\n            addressToRole[_addresses[i]] = _roles[i];\n        }\n    }\n\n    function setResource(string memory _role, address _address) public {\n        addressToRole[_address] = _role;\n    }\n\n    function setState(string memory _activity, uint8 _state) public {\n        require(_state <= 3, \"Not Valid State\");\n        state[_activity] = State(_state);\n    }\n\n    function getState(string memory _activity) public view returns (State) {\n        return state[_activity];\n    }\n\n    //To be replaced with ENUM\n    function compareStrings(\n        string memory a,\n        string memory b\n    ) internal pure returns (bool) {\n        return keccak256(abi.encodePacked(a)) == keccak256(abi.encodePacked(b));\n    }\n\n    function Activity_0d2uaqj()\n        public\n        payable\n        isAccessible(\"Activity_0d2uaqj\")\n    {\n        uint256 branch = ILane_1js0enj_Contract_Collaboration_0pb2pqk(\n            contracts[\"Lane_1js0enj_Contract_Collaboration_0pb2pqk\"]\n        ).checkXOR_Gateway_051yoek(\n                ILane_1js0enj_Contract_Collaboration_0pb2pqk(\n                    contracts[\"Lane_1js0enj_Contract_Collaboration_0pb2pqk\"]\n                ).getY()\n            );\n        if ((branch & (1 << 0)) != 0) {} else if ((branch & (1 << 1)) != 0) {\n            ILane_1js0enj_Contract_Collaboration_0pb2pqk(\n                contracts[\"Lane_1js0enj_Contract_Collaboration_0pb2pqk\"]\n            ).setState(\"Activity_1w1utp5\", 1);\n        }\n\n        state[\"Activity_0d2uaqj\"] = State.Completed;\n    }\n}\n",
+    "contractInterface": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\ninterface ILane_0w29kx0_Contract_Collaboration_0pb2pqk {\n    enum State {\n        Closed,\n        Open,\n        Completed\n    }\n    function setContracts(address[] memory addresses) external;\n    function setResources(\n        string[] memory _roles,\n        address[] memory _addresses\n    ) external;\n    function setResource(string memory _role, address _address) external;\n    function setState(string memory _activity, uint8 _state) external;\n    function getState(string memory _activity) external returns (State);\n    function compareStrings(\n        string memory a,\n        string memory b\n    ) external returns (bool);\n    function Activity_0d2uaqj() external;\n}\n",
+    "localStorage": [],
+    "address": "0x660f1d16925D55c289b6811af36f3d171B85A184",
+    "deployGas": 1889633
+  },
+  {
+    "contractName": "Lane_1js0enj_Contract_Collaboration_0pb2pqk",
+    "networkId": "network-1",
+    "contractRoles": [
+      {
+        "role": "p1",
+        "address": "0xFD2578154fCf828772318716bD5f513953d80a71"
+      }
+    ],
+    "receiveTasks": [
+      {
+        "id": "Activity_1w1utp5",
+        "sender": "p1",
+        "name": "",
+        "state": "Closed",
+        "externalParams": []
+      }
+    ],
+    "contractCode": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\nimport \"./ILane_0w29kx0_Contract_Collaboration_0pb2pqk.sol\";\nimport \"./ILane_1js0enj_Contract_Collaboration_0pb2pqk.sol\";\ncontract Lane_1js0enj_Contract_Collaboration_0pb2pqk {\n    enum State {\n        Closed,\n        Open,\n        Completed\n    }\n\n    mapping(string => State) public state;\n\n    uint receiveFunctionCount = 1;\n\n    mapping(string => address) public contracts;\n\n    mapping(address => string) public addressToRole;\n\n    mapping(string => string[]) public activitytoRole;\n\n    modifier isAccessible(string memory _activity) {\n        require(state[_activity] == State.Open, \"Activity is not open\");\n\n        string memory userRole = addressToRole[msg.sender];\n        bool hasRequiredRole = false;\n\n        // If no roles are defined for the activity, grant access\n        if (activitytoRole[_activity].length == 0) {\n            hasRequiredRole = true;\n        } else {\n            // Iterate through the array of roles for the activity\n            for (uint256 i = 0; i < activitytoRole[_activity].length; i++) {\n                if (\n                    bytes(activitytoRole[_activity][i]).length == 0 ||\n                    compareStrings(userRole, activitytoRole[_activity][i])\n                ) {\n                    hasRequiredRole = true;\n                    break;\n                }\n            }\n        }\n\n        require(hasRequiredRole, \"Caller does not have the required role\");\n        _;\n    }\n\n    struct LocalStorage {\n        uint y;\n    }\n    LocalStorage public localStorage;\n\n    constructor() {\n        state[\"Activity_1w1utp5\"] = State.Closed;\n        activitytoRole[\"Activity_1w1utp5\"] = [\"p1\"];\n        localStorage.y = 1;\n    }\n\n    function setContracts(address[] memory addresses) public {\n        contracts[\"Lane_0w29kx0_Contract_Collaboration_0pb2pqk\"] = addresses[0];\n        contracts[\"Lane_1js0enj_Contract_Collaboration_0pb2pqk\"] = addresses[1];\n    }\n\n    function getY() public view returns (uint) {\n        return localStorage.y;\n    }\n\n    function setResources(\n        string[] memory _roles,\n        address[] memory _addresses\n    ) public {\n        require(\n            _roles.length == _addresses.length,\n            \"Roles and addresses arrays must be of the same length\"\n        );\n\n        for (uint i = 0; i < _addresses.length; i++) {\n            addressToRole[_addresses[i]] = _roles[i];\n        }\n    }\n\n    function setResource(string memory _role, address _address) public {\n        addressToRole[_address] = _role;\n    }\n\n    function setState(string memory _activity, uint8 _state) public {\n        require(_state <= 3, \"Not Valid State\");\n        state[_activity] = State(_state);\n    }\n\n    function getState(string memory _activity) public view returns (State) {\n        return state[_activity];\n    }\n\n    //To be replaced with ENUM\n    function compareStrings(\n        string memory a,\n        string memory b\n    ) internal pure returns (bool) {\n        return keccak256(abi.encodePacked(a)) == keccak256(abi.encodePacked(b));\n    }\n\n    function Activity_1w1utp5()\n        public\n        payable\n        isAccessible(\"Activity_1w1utp5\")\n    {\n        state[\"Activity_1w1utp5\"] = State.Completed;\n    }\n\n    function checkXOR_Gateway_051yoek(uint256 y) public returns (uint256) {\n        require(\n            uint256(\n                ILane_0w29kx0_Contract_Collaboration_0pb2pqk(\n                    contracts[\"Lane_0w29kx0_Contract_Collaboration_0pb2pqk\"]\n                ).getState(\"Activity_0d2uaqj\")\n            ) == uint256(State.Open)\n        );\n        return (1 << 0) | ((y == 1) ? (1 << 1) : 0);\n    }\n}\n",
+    "contractInterface": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\ninterface ILane_1js0enj_Contract_Collaboration_0pb2pqk {\n    enum State {\n        Closed,\n        Open,\n        Completed\n    }\n    function setContracts(address[] memory addresses) external;\n    function getY() external returns (uint);\n    function setResources(\n        string[] memory _roles,\n        address[] memory _addresses\n    ) external;\n    function setResource(string memory _role, address _address) external;\n    function setState(string memory _activity, uint8 _state) external;\n    function getState(string memory _activity) external returns (State);\n    function compareStrings(\n        string memory a,\n        string memory b\n    ) external returns (bool);\n    function Activity_1w1utp5() external;\n    function checkXOR_Gateway_051yoek(uint256 y) external returns (uint256);\n}\n",
+    "localStorage": [
+      {
+        "type": "uint",
+        "name": "y",
+        "value": 1
+      }
+    ],
+    "address": "0x9862799E9A2e5BC5C16853FFE164C0735d14d305",
+    "deployGas": 1874605
+  },
+  {
+    "contractName": "Lane_0w29kx0_Contract_Collaboration_0pb2pqkx",
+    "networkId": "network-1",
+    "contractRoles": [
+      {
+        "role": "p1",
+        "address": "0xFD2578154fCf828772318716bD5f513953d80a71"
+      }
+    ],
+    "receiveTasks": [
+      {
+        "id": "Activity_0d2uaqj",
+        "sender": "p1",
+        "name": "",
+        "state": "Completed",
+        "externalParams": [],
+        "gasUsed": "53615"
+      }
+    ],
+    "contractCode": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\nimport \"./ILane_0w29kx0_Contract_Collaboration_0pb2pqkx.sol\";\nimport \"./ILane_1js0enj_Contract_Collaboration_0pb2pqkx.sol\";\ncontract Lane_0w29kx0_Contract_Collaboration_0pb2pqkx {\n    enum State {\n        Closed,\n        Open,\n        Completed\n    }\n\n    mapping(string => State) public state;\n\n    uint receiveFunctionCount = 1;\n\n    mapping(string => address) public contracts;\n\n    mapping(address => string) public addressToRole;\n\n    mapping(string => string[]) public activitytoRole;\n\n    modifier isAccessible(string memory _activity) {\n        require(state[_activity] == State.Open, \"Activity is not open\");\n\n        string memory userRole = addressToRole[msg.sender];\n        bool hasRequiredRole = false;\n\n        // If no roles are defined for the activity, grant access\n        if (activitytoRole[_activity].length == 0) {\n            hasRequiredRole = true;\n        } else {\n            // Iterate through the array of roles for the activity\n            for (uint256 i = 0; i < activitytoRole[_activity].length; i++) {\n                if (\n                    bytes(activitytoRole[_activity][i]).length == 0 ||\n                    compareStrings(userRole, activitytoRole[_activity][i])\n                ) {\n                    hasRequiredRole = true;\n                    break;\n                }\n            }\n        }\n\n        require(hasRequiredRole, \"Caller does not have the required role\");\n        _;\n    }\n\n    constructor() {\n        state[\"Activity_0d2uaqj\"] = State.Open;\n        activitytoRole[\"Activity_0d2uaqj\"] = [\"p1\"];\n    }\n\n    function setContracts(address[] memory addresses) public {\n        contracts[\"Lane_0w29kx0_Contract_Collaboration_0pb2pqkx\"] = addresses[\n            0\n        ];\n        contracts[\"Lane_1js0enj_Contract_Collaboration_0pb2pqkx\"] = addresses[\n            1\n        ];\n    }\n\n    function setResources(\n        string[] memory _roles,\n        address[] memory _addresses\n    ) public {\n        require(\n            _roles.length == _addresses.length,\n            \"Roles and addresses arrays must be of the same length\"\n        );\n\n        for (uint i = 0; i < _addresses.length; i++) {\n            addressToRole[_addresses[i]] = _roles[i];\n        }\n    }\n\n    function setResource(string memory _role, address _address) public {\n        addressToRole[_address] = _role;\n    }\n\n    function setState(string memory _activity, uint8 _state) public {\n        require(_state <= 3, \"Not Valid State\");\n        state[_activity] = State(_state);\n    }\n\n    function getState(string memory _activity) public view returns (State) {\n        return state[_activity];\n    }\n\n    //To be replaced with ENUM\n    function compareStrings(\n        string memory a,\n        string memory b\n    ) internal pure returns (bool) {\n        return keccak256(abi.encodePacked(a)) == keccak256(abi.encodePacked(b));\n    }\n\n    function Activity_0d2uaqj()\n        public\n        payable\n        isAccessible(\"Activity_0d2uaqj\")\n    {\n        uint256 branch = ILane_1js0enj_Contract_Collaboration_0pb2pqkx(\n            contracts[\"Lane_1js0enj_Contract_Collaboration_0pb2pqkx\"]\n        ).checkXOR_Gateway_051yoek(\n                ILane_1js0enj_Contract_Collaboration_0pb2pqkx(\n                    contracts[\"Lane_1js0enj_Contract_Collaboration_0pb2pqkx\"]\n                ).getY()\n            );\n        if ((branch & (1 << 0)) != 0) {} else if ((branch & (1 << 1)) != 0) {\n            ILane_1js0enj_Contract_Collaboration_0pb2pqkx(\n                contracts[\"Lane_1js0enj_Contract_Collaboration_0pb2pqkx\"]\n            ).setState(\"Activity_1w1utp5\", 1);\n        }\n\n        state[\"Activity_0d2uaqj\"] = State.Completed;\n    }\n}\n",
+    "contractInterface": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\ninterface ILane_0w29kx0_Contract_Collaboration_0pb2pqkx {\n    enum State {\n        Closed,\n        Open,\n        Completed\n    }\n    function setContracts(address[] memory addresses) external;\n    function setResources(\n        string[] memory _roles,\n        address[] memory _addresses\n    ) external;\n    function setResource(string memory _role, address _address) external;\n    function setState(string memory _activity, uint8 _state) external;\n    function getState(string memory _activity) external returns (State);\n    function compareStrings(\n        string memory a,\n        string memory b\n    ) external returns (bool);\n    function Activity_0d2uaqj() external;\n}\n",
+    "localStorage": [],
+    "address": "0xE7b6049aDe442D1D52840c9730CCdAD4fd808057",
+    "deployGas": 1949351
+  },
+  {
+    "contractName": "Lane_1js0enj_Contract_Collaboration_0pb2pqkx",
+    "networkId": "network-1",
+    "contractRoles": [
+      {
+        "role": "p1",
+        "address": "0xFD2578154fCf828772318716bD5f513953d80a71"
+      }
+    ],
+    "receiveTasks": [
+      {
+        "id": "Activity_1w1utp5",
+        "sender": "p1",
+        "name": "",
+        "state": "Closed",
+        "externalParams": []
+      }
+    ],
+    "contractCode": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\nimport \"./ILane_0w29kx0_Contract_Collaboration_0pb2pqkx.sol\";\nimport \"./ILane_1js0enj_Contract_Collaboration_0pb2pqkx.sol\";\ncontract Lane_1js0enj_Contract_Collaboration_0pb2pqkx {\n    enum State {\n        Closed,\n        Open,\n        Completed\n    }\n\n    mapping(string => State) public state;\n\n    uint receiveFunctionCount = 1;\n\n    mapping(string => address) public contracts;\n\n    mapping(address => string) public addressToRole;\n\n    mapping(string => string[]) public activitytoRole;\n\n    modifier isAccessible(string memory _activity) {\n        require(state[_activity] == State.Open, \"Activity is not open\");\n\n        string memory userRole = addressToRole[msg.sender];\n        bool hasRequiredRole = false;\n\n        // If no roles are defined for the activity, grant access\n        if (activitytoRole[_activity].length == 0) {\n            hasRequiredRole = true;\n        } else {\n            // Iterate through the array of roles for the activity\n            for (uint256 i = 0; i < activitytoRole[_activity].length; i++) {\n                if (\n                    bytes(activitytoRole[_activity][i]).length == 0 ||\n                    compareStrings(userRole, activitytoRole[_activity][i])\n                ) {\n                    hasRequiredRole = true;\n                    break;\n                }\n            }\n        }\n\n        require(hasRequiredRole, \"Caller does not have the required role\");\n        _;\n    }\n\n    struct LocalStorage {\n        uint y;\n    }\n    LocalStorage public localStorage;\n\n    constructor() {\n        state[\"Activity_1w1utp5\"] = State.Closed;\n        activitytoRole[\"Activity_1w1utp5\"] = [\"p1\"];\n        localStorage.y = 1;\n    }\n\n    function setContracts(address[] memory addresses) public {\n        contracts[\"Lane_0w29kx0_Contract_Collaboration_0pb2pqkx\"] = addresses[\n            0\n        ];\n        contracts[\"Lane_1js0enj_Contract_Collaboration_0pb2pqkx\"] = addresses[\n            1\n        ];\n    }\n\n    function getY() public view returns (uint) {\n        return localStorage.y;\n    }\n\n    function setResources(\n        string[] memory _roles,\n        address[] memory _addresses\n    ) public {\n        require(\n            _roles.length == _addresses.length,\n            \"Roles and addresses arrays must be of the same length\"\n        );\n\n        for (uint i = 0; i < _addresses.length; i++) {\n            addressToRole[_addresses[i]] = _roles[i];\n        }\n    }\n\n    function setResource(string memory _role, address _address) public {\n        addressToRole[_address] = _role;\n    }\n\n    function setState(string memory _activity, uint8 _state) public {\n        require(_state <= 3, \"Not Valid State\");\n        state[_activity] = State(_state);\n    }\n\n    function getState(string memory _activity) public view returns (State) {\n        return state[_activity];\n    }\n\n    //To be replaced with ENUM\n    function compareStrings(\n        string memory a,\n        string memory b\n    ) internal pure returns (bool) {\n        return keccak256(abi.encodePacked(a)) == keccak256(abi.encodePacked(b));\n    }\n\n    function Activity_1w1utp5()\n        public\n        payable\n        isAccessible(\"Activity_1w1utp5\")\n    {\n        state[\"Activity_1w1utp5\"] = State.Completed;\n    }\n\n    function checkXOR_Gateway_051yoek(uint256 y) public returns (uint256) {\n        require(\n            uint256(\n                ILane_0w29kx0_Contract_Collaboration_0pb2pqkx(\n                    contracts[\"Lane_0w29kx0_Contract_Collaboration_0pb2pqkx\"]\n                ).getState(\"Activity_0d2uaqj\")\n            ) == uint256(State.Open)\n        );\n        return ((y != 1) ? (1 << 0) : 0) | ((y == 1) ? (1 << 1) : 0);\n    }\n}\n",
+    "contractInterface": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\ninterface ILane_1js0enj_Contract_Collaboration_0pb2pqkx {\n    enum State {\n        Closed,\n        Open,\n        Completed\n    }\n    function setContracts(address[] memory addresses) external;\n    function getY() external returns (uint);\n    function setResources(\n        string[] memory _roles,\n        address[] memory _addresses\n    ) external;\n    function setResource(string memory _role, address _address) external;\n    function setState(string memory _activity, uint8 _state) external;\n    function getState(string memory _activity) external returns (State);\n    function compareStrings(\n        string memory a,\n        string memory b\n    ) external returns (bool);\n    function Activity_1w1utp5() external;\n    function checkXOR_Gateway_051yoek(uint256 y) external returns (uint256);\n}\n",
+    "localStorage": [
+      {
+        "type": "uint",
+        "name": "y",
+        "value": 1
+      }
+    ],
+    "address": "0xB71b92b80DD8d618Ca17a2157Af57E008C26B22a",
+    "deployGas": 1878049
+  },
+  {
+    "contractName": "Lane_0w29kx0_Contract_Collaboration_0pb2pqkxt",
+    "networkId": "network-1",
+    "contractRoles": [
+      {
+        "role": "p1",
+        "address": "0xFD2578154fCf828772318716bD5f513953d80a71"
+      }
+    ],
+    "receiveTasks": [
+      {
+        "id": "Activity_0d2uaqj",
+        "sender": "p1",
+        "name": "",
+        "state": "Completed",
+        "externalParams": [],
+        "gasUsed": "78878"
+      }
+    ],
+    "contractCode": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\nimport \"./ILane_0w29kx0_Contract_Collaboration_0pb2pqkxt.sol\";\nimport \"./ILane_1js0enj_Contract_Collaboration_0pb2pqkxt.sol\";\ncontract Lane_0w29kx0_Contract_Collaboration_0pb2pqkxt {\n    enum State {\n        Closed,\n        Open,\n        Completed\n    }\n\n    mapping(string => State) public state;\n\n    uint receiveFunctionCount = 1;\n\n    mapping(string => address) public contracts;\n\n    mapping(address => string) public addressToRole;\n\n    mapping(string => string[]) public activitytoRole;\n\n    modifier isAccessible(string memory _activity) {\n        require(state[_activity] == State.Open, \"Activity is not open\");\n\n        string memory userRole = addressToRole[msg.sender];\n        bool hasRequiredRole = false;\n\n        // If no roles are defined for the activity, grant access\n        if (activitytoRole[_activity].length == 0) {\n            hasRequiredRole = true;\n        } else {\n            // Iterate through the array of roles for the activity\n            for (uint256 i = 0; i < activitytoRole[_activity].length; i++) {\n                if (\n                    bytes(activitytoRole[_activity][i]).length == 0 ||\n                    compareStrings(userRole, activitytoRole[_activity][i])\n                ) {\n                    hasRequiredRole = true;\n                    break;\n                }\n            }\n        }\n\n        require(hasRequiredRole, \"Caller does not have the required role\");\n        _;\n    }\n\n    constructor() {\n        state[\"Activity_0d2uaqj\"] = State.Open;\n        activitytoRole[\"Activity_0d2uaqj\"] = [\"p1\"];\n    }\n\n    function setContracts(address[] memory addresses) public {\n        contracts[\"Lane_0w29kx0_Contract_Collaboration_0pb2pqkxt\"] = addresses[\n            0\n        ];\n        contracts[\"Lane_1js0enj_Contract_Collaboration_0pb2pqkxt\"] = addresses[\n            1\n        ];\n    }\n\n    function setResources(\n        string[] memory _roles,\n        address[] memory _addresses\n    ) public {\n        require(\n            _roles.length == _addresses.length,\n            \"Roles and addresses arrays must be of the same length\"\n        );\n\n        for (uint i = 0; i < _addresses.length; i++) {\n            addressToRole[_addresses[i]] = _roles[i];\n        }\n    }\n\n    function setResource(string memory _role, address _address) public {\n        addressToRole[_address] = _role;\n    }\n\n    function setState(string memory _activity, uint8 _state) public {\n        require(_state <= 3, \"Not Valid State\");\n        state[_activity] = State(_state);\n    }\n\n    function getState(string memory _activity) public view returns (State) {\n        return state[_activity];\n    }\n\n    //To be replaced with ENUM\n    function compareStrings(\n        string memory a,\n        string memory b\n    ) internal pure returns (bool) {\n        return keccak256(abi.encodePacked(a)) == keccak256(abi.encodePacked(b));\n    }\n\n    function Activity_0d2uaqj()\n        public\n        payable\n        isAccessible(\"Activity_0d2uaqj\")\n    {\n        uint256 branch = ILane_1js0enj_Contract_Collaboration_0pb2pqkxt(\n            contracts[\"Lane_1js0enj_Contract_Collaboration_0pb2pqkxt\"]\n        ).checkXOR_Gateway_051yoek(\n                ILane_1js0enj_Contract_Collaboration_0pb2pqkxt(\n                    contracts[\"Lane_1js0enj_Contract_Collaboration_0pb2pqkxt\"]\n                ).getY()\n            );\n        if ((branch & (1 << 0)) != 0) {} else if ((branch & (1 << 1)) != 0) {\n            ILane_1js0enj_Contract_Collaboration_0pb2pqkxt(\n                contracts[\"Lane_1js0enj_Contract_Collaboration_0pb2pqkxt\"]\n            ).setState(\"Activity_1w1utp5\", 1);\n        }\n\n        state[\"Activity_0d2uaqj\"] = State.Completed;\n    }\n}\n",
+    "contractInterface": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\ninterface ILane_0w29kx0_Contract_Collaboration_0pb2pqkxt {\n    enum State {\n        Closed,\n        Open,\n        Completed\n    }\n    function setContracts(address[] memory addresses) external;\n    function setResources(\n        string[] memory _roles,\n        address[] memory _addresses\n    ) external;\n    function setResource(string memory _role, address _address) external;\n    function setState(string memory _activity, uint8 _state) external;\n    function getState(string memory _activity) external returns (State);\n    function compareStrings(\n        string memory a,\n        string memory b\n    ) external returns (bool);\n    function Activity_0d2uaqj() external;\n}\n",
+    "localStorage": [],
+    "address": "0x9A7D906b6665CD738a79A962d56EB6698e2E329b",
+    "deployGas": 1889681
+  },
+  {
+    "contractName": "Lane_1js0enj_Contract_Collaboration_0pb2pqkxt",
+    "networkId": "network-1",
+    "contractRoles": [
+      {
+        "role": "p1",
+        "address": "0xFD2578154fCf828772318716bD5f513953d80a71"
+      }
+    ],
+    "receiveTasks": [
+      {
+        "id": "Activity_1w1utp5",
+        "sender": "p1",
+        "name": "",
+        "state": "Open",
+        "externalParams": []
+      }
+    ],
+    "contractCode": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\nimport \"./ILane_0w29kx0_Contract_Collaboration_0pb2pqkxt.sol\";\nimport \"./ILane_1js0enj_Contract_Collaboration_0pb2pqkxt.sol\";\ncontract Lane_1js0enj_Contract_Collaboration_0pb2pqkxt {\n    enum State {\n        Closed,\n        Open,\n        Completed\n    }\n\n    mapping(string => State) public state;\n\n    uint receiveFunctionCount = 1;\n\n    mapping(string => address) public contracts;\n\n    mapping(address => string) public addressToRole;\n\n    mapping(string => string[]) public activitytoRole;\n\n    modifier isAccessible(string memory _activity) {\n        require(state[_activity] == State.Open, \"Activity is not open\");\n\n        string memory userRole = addressToRole[msg.sender];\n        bool hasRequiredRole = false;\n\n        // If no roles are defined for the activity, grant access\n        if (activitytoRole[_activity].length == 0) {\n            hasRequiredRole = true;\n        } else {\n            // Iterate through the array of roles for the activity\n            for (uint256 i = 0; i < activitytoRole[_activity].length; i++) {\n                if (\n                    bytes(activitytoRole[_activity][i]).length == 0 ||\n                    compareStrings(userRole, activitytoRole[_activity][i])\n                ) {\n                    hasRequiredRole = true;\n                    break;\n                }\n            }\n        }\n\n        require(hasRequiredRole, \"Caller does not have the required role\");\n        _;\n    }\n\n    struct LocalStorage {\n        uint y;\n    }\n    LocalStorage public localStorage;\n\n    constructor() {\n        state[\"Activity_1w1utp5\"] = State.Closed;\n        activitytoRole[\"Activity_1w1utp5\"] = [\"p1\"];\n        localStorage.y = 1;\n    }\n\n    function setContracts(address[] memory addresses) public {\n        contracts[\"Lane_0w29kx0_Contract_Collaboration_0pb2pqkxt\"] = addresses[\n            0\n        ];\n        contracts[\"Lane_1js0enj_Contract_Collaboration_0pb2pqkxt\"] = addresses[\n            1\n        ];\n    }\n\n    function getY() public view returns (uint) {\n        return localStorage.y;\n    }\n\n    function setResources(\n        string[] memory _roles,\n        address[] memory _addresses\n    ) public {\n        require(\n            _roles.length == _addresses.length,\n            \"Roles and addresses arrays must be of the same length\"\n        );\n\n        for (uint i = 0; i < _addresses.length; i++) {\n            addressToRole[_addresses[i]] = _roles[i];\n        }\n    }\n\n    function setResource(string memory _role, address _address) public {\n        addressToRole[_address] = _role;\n    }\n\n    function setState(string memory _activity, uint8 _state) public {\n        require(_state <= 3, \"Not Valid State\");\n        state[_activity] = State(_state);\n    }\n\n    function getState(string memory _activity) public view returns (State) {\n        return state[_activity];\n    }\n\n    //To be replaced with ENUM\n    function compareStrings(\n        string memory a,\n        string memory b\n    ) internal pure returns (bool) {\n        return keccak256(abi.encodePacked(a)) == keccak256(abi.encodePacked(b));\n    }\n\n    function Activity_1w1utp5()\n        public\n        payable\n        isAccessible(\"Activity_1w1utp5\")\n    {\n        state[\"Activity_1w1utp5\"] = State.Completed;\n    }\n\n    function checkXOR_Gateway_051yoek(uint256 y) public returns (uint256) {\n        require(\n            uint256(\n                ILane_0w29kx0_Contract_Collaboration_0pb2pqkxt(\n                    contracts[\"Lane_0w29kx0_Contract_Collaboration_0pb2pqkxt\"]\n                ).getState(\"Activity_0d2uaqj\")\n            ) == uint256(State.Open)\n        );\n        return ((y != 1) ? (1 << 0) : 0) | ((y == 1) ? (1 << 1) : 0);\n    }\n}\n",
+    "contractInterface": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\ninterface ILane_1js0enj_Contract_Collaboration_0pb2pqkxt {\n    enum State {\n        Closed,\n        Open,\n        Completed\n    }\n    function setContracts(address[] memory addresses) external;\n    function getY() external returns (uint);\n    function setResources(\n        string[] memory _roles,\n        address[] memory _addresses\n    ) external;\n    function setResource(string memory _role, address _address) external;\n    function setState(string memory _activity, uint8 _state) external;\n    function getState(string memory _activity) external returns (State);\n    function compareStrings(\n        string memory a,\n        string memory b\n    ) external returns (bool);\n    function Activity_1w1utp5() external;\n    function checkXOR_Gateway_051yoek(uint256 y) external returns (uint256);\n}\n",
+    "localStorage": [
+      {
+        "type": "uint",
+        "name": "y",
+        "value": 1
+      }
+    ],
+    "address": "0x5c49a5426Db269194Cf065fBf6b7dF5d3cD71fce",
+    "deployGas": 1878085
+  }
+]
