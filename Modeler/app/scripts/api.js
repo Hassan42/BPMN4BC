@@ -7,7 +7,7 @@ export async function fetchData() {
   return await response.json();
 }
 
-export async function executeTask(network, contractName, task, form, sender) {
+export async function executeTask(network, contractName, task, form, sender, ethAmount) {
   const inputs = Array.from(form.elements)
     .filter(input => input.name)
     .map(input => (
@@ -19,7 +19,8 @@ export async function executeTask(network, contractName, task, form, sender) {
     contractName: contractName,
     taskId: task.id,
     sender: sender,
-    inputs: inputs
+    inputs: inputs,
+    value: ethAmount
   };
 
   try {

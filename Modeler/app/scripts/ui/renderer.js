@@ -45,7 +45,6 @@ function createReceiveTaskSection(network, contractName, tasks) {
     const isCompleted = task.state === "Completed";
     const displayName = task.name && task.name.trim() !== '' ? task.name : task.id;  // Use name or fallback to id
 
-
     const taskDiv = document.createElement('div');
     taskDiv.className = `p-4 my-2 rounded border ${isCompleted ? 'bg-green-200 border-green-400' : 'bg-gray-100 border-gray-300'
       }`;
@@ -75,6 +74,24 @@ function createReceiveTaskSection(network, contractName, tasks) {
     senderInput.className = 'w-full p-2 border rounded';
     senderDiv.appendChild(senderInput);
     taskContent.appendChild(senderDiv);
+
+    const amountDiv = document.createElement('div');
+    amountDiv.className = 'mb-2';
+
+    const amountLabel = document.createElement('label');
+    amountLabel.className = 'font-semibold';
+    amountLabel.innerText = 'Amount (ETH):';
+
+    const amountInput = document.createElement('input');
+    amountInput.type = 'number';
+    amountInput.step = '0.0001'; // Allows small ETH values
+    amountInput.min = '0'; // No negative values
+    amountInput.placeholder = 'Enter ETH amount';
+    amountInput.className = 'w-full p-2 border rounded';
+
+    amountDiv.appendChild(amountLabel);
+    amountDiv.appendChild(amountInput);
+    taskContent.appendChild(amountDiv);
 
     // External Params Form (if available)
     const form = document.createElement('form');
@@ -113,7 +130,8 @@ function createReceiveTaskSection(network, contractName, tasks) {
 
     executeBtn.onclick = () => {
       if (!isCompleted) {
-        executeTask(network, contractName, task, form, senderInput.value);
+        const ethAmount = parseFloat(amountInput.value) || 0; // Convert input to float, default to 0
+        executeTask(network, contractName, task, form, senderInput.value, ethAmount);
       }
     };
 
@@ -127,6 +145,7 @@ function createReceiveTaskSection(network, contractName, tasks) {
 
   return sectionDiv;
 }
+
 
 function createLocalStorageSection(dataArray) {
   const sectionDiv = document.createElement('div');

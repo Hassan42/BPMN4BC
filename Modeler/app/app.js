@@ -18,6 +18,8 @@ import bcExtension from '../resources/BC';
 
 import $ from 'jquery';
 
+import { renderFloatingWindow } from './scripts/ui/renderFloatingWindow.js';
+
 
 
 import {
@@ -53,6 +55,7 @@ const bpmnModeler = new BpmnModeler({
 const eventBus = bpmnModeler.get('eventBus');
 
 const lanes = [];
+const outputParametersArray = [];
 
 // Function to process all Participants and Lanes
 function processAllElements() {
@@ -65,6 +68,7 @@ function processAllElements() {
 
   // Clear the existing lanes array
   lanes.length = 0;
+  outputParametersArray.length = 0;
 
   // Loop through all elements in the model
   const elementRegistry = bpmnModeler.get('elementRegistry');
@@ -73,6 +77,46 @@ function processAllElements() {
   allElements.forEach(element => {
     const businessObject = element.businessObject;
 
+
+    let hasBC = businessObject && businessObject.bc;
+
+    // If the element is a bpmn:Lane, check if its parent has businessObject.bc
+    if (!hasBC && element.type === 'bpmn:Lane') {
+      let parentElement = element.parent;
+
+      while (parentElement && parentElement.type !== 'bpmn:Participant') {
+        parentElement = parentElement.parent;
+      }
+
+      // If parent Participant has businessObject.bc, consider this Lane valid
+      if (parentElement && parentElement.businessObject && parentElement.businessObject.bc) {
+        hasBC = true;
+      }
+    }
+
+    // Proceed only if the element itself has bc or is a Lane with a parent that has bc
+    if (hasBC) {
+      // Extract bpmnbc:outputParameters
+      if (businessObject.extensionElements && businessObject.extensionElements.values) {
+        businessObject.extensionElements.values.forEach(extElement => {
+          // Check for bpmnbc:OutputParameters type
+          if (extElement.$type && extElement.$type === 'bpmnbc:OutputParameters') {
+            if (Array.isArray(extElement.values)) {
+              extElement.values.forEach(param => {
+                outputParametersArray.push({
+                  name: param.name,
+                  value: param.value !== undefined ? param.value : 'N/A',
+                  type: param.type,
+                  transactional: param.transactional !== undefined ? 'Memory' : 'Storage',
+                  external: param.external !== undefined ? param.external : false,
+                  source: businessObject.name !== undefined ? businessObject.name : element.id,
+                });
+              });
+            }
+          }
+        });
+      }
+    }
     // Process Participants
     if (element.type === 'bpmn:Participant') {
       if (businessObject && businessObject.bc) {
@@ -106,7 +150,7 @@ function processAllElements() {
 
 // Listen for changes to the Collaboration element
 eventBus.on('element.changed', (event) => {
-    processAllElements();
+  processAllElements();
 });
 
 
@@ -114,9 +158,6 @@ eventBus.on('element.changed', (event) => {
 bpmnModeler.importXML(diagramXML).catch((err) => {
   console.error(err);
 });
-
-//copied from https://github.com/bpmn-io/bpmn-js-examples/blob/main/properties-panel-extension/src/app.js
-// bootstrap diagram functions
 
 $(function () {
 
@@ -129,7 +170,7 @@ $(function () {
 
   var downloadLink = $('#js-download-diagram');
   var downloadSvgLink = $('#js-download-svg');
-  
+
   $('.buttons a').click(function (e) {
     if (!$(this).is('.active')) {
       e.preventDefault();
@@ -243,14 +284,22 @@ $(function () {
   });
   $('#js-execute-panel').click(function (e) {
     e.preventDefault();
-  
+
     // Serialize the lanes array
     const lanesParam = encodeURIComponent(JSON.stringify(lanes));
-  
+
     // Open execute-panel.html with lanes as a query parameter
     const url = `execute-panel.html?lanes=${lanesParam}`;
-  
+
     // Open in a new tab
     window.open(url, '_blank');
-  });  
+  });
+  $('#js-open-floating-window').click(() => {
+    processAllElements();
+    if (outputParametersArray.length > 0) {
+      $('#floating-window').remove();
+      renderFloatingWindow(outputParametersArray);
+      $('#floating-window').show();
+    }
+  });
 });

@@ -322,27 +322,9 @@ function generateEntryFunction(activity, process, roles, collaborationId) {
             const condition = flow.conditionExpression?.body || '';
             const regex = /\${([^}]+)}/g;
 
-
-            const matches = [...condition.matchAll(regex)].map(match => {
-
-              return match[0].replace(/\${([^}]+)}/g, (_, varName) => {
-                const parts = varName.split('.');
-                // If parts.length === 2 and the second part is "localStorage", return localStorage.varName
-                if (parts.length === 2 && parts[0] === "localStorage") {
-                  return `localStorage.${parts[1]}`;
-                }
-                // If parts.length === 2, handle <string>.varname for contract retrieval
-                if (parts.length === 2) {
-                  const [prefix, variable] = parts;
-                  return `I${prefix}_Contract_${collaborationId}(contracts["${prefix}_Contract_${collaborationId}"]).get${capitalize(variable)}()`;
-                }
-
-                // Handle simple ${varname} case
-                return varName;
-              });
-
-
-            });
+            const matches = [...condition.matchAll(regex)]
+            .map(match => match[1]) // Extract only the variable name inside ${}
+            .filter(varName => varName.split('.').length !== 2); // Exclude those with exactly one dot
 
 
             matches.forEach(variable =>

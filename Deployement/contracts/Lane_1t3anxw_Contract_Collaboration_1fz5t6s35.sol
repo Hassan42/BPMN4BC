@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
-import "./ILane_19y529f_Contract_Collaboration_1glbzukaaxrtxt.sol";
-import "./ILane_0qoxvyf_Contract_Collaboration_1glbzukaaxrtxt.sol";
-contract Lane_0qoxvyf_Contract_Collaboration_1glbzukaaxrtxt {
+import "./ILane_1t3anxw_Contract_Collaboration_1fz5t6s35.sol";
+import "./ILane_1flgjqy_Contract_Collaboration_1fz5t6s35.sol";
+contract Lane_1t3anxw_Contract_Collaboration_1fz5t6s35 {
     enum State {
         Closed,
         Open,
@@ -45,29 +45,18 @@ contract Lane_0qoxvyf_Contract_Collaboration_1glbzukaaxrtxt {
         _;
     }
 
-    struct LocalStorage {
-        uint x;
-    }
-    LocalStorage public localStorage;
-
     constructor() {
-        state["Activity_0i3wqng"] = State.Closed;
-
-        activitytoRole["Activity_0i3wqng"] = ["p1"];
-        localStorage.x = 1;
+        state["Activity_0duu9ah"] = State.Open;
+        activitytoRole["Activity_0duu9ah"] = ["p1"];
     }
 
     function setContracts(address[] memory addresses) public {
-        contracts[
-            "Lane_19y529f_Contract_Collaboration_1glbzukaaxrtxt"
-        ] = addresses[0];
-        contracts[
-            "Lane_0qoxvyf_Contract_Collaboration_1glbzukaaxrtxt"
-        ] = addresses[1];
-    }
-
-    function getX() public view returns (uint) {
-        return localStorage.x;
+        contracts["Lane_1t3anxw_Contract_Collaboration_1fz5t6s35"] = addresses[
+            0
+        ];
+        contracts["Lane_1flgjqy_Contract_Collaboration_1fz5t6s35"] = addresses[
+            1
+        ];
     }
 
     function setResources(
@@ -105,38 +94,23 @@ contract Lane_0qoxvyf_Contract_Collaboration_1glbzukaaxrtxt {
         return keccak256(abi.encodePacked(a)) == keccak256(abi.encodePacked(b));
     }
 
-    function Activity_1m2pw5d() public payable {
-        require(
-            uint256(
-                ILane_19y529f_Contract_Collaboration_1glbzukaaxrtxt(
-                    contracts[
-                        "Lane_19y529f_Contract_Collaboration_1glbzukaaxrtxt"
-                    ]
-                ).getState("Activity_0biddql")
-            ) == uint256(State.Open)
-        );
+    function Activity_0duu9ah(
+        uint y
+    ) public payable isAccessible("Activity_0duu9ah") {
+        uint xy = 234;
+        uint256 branch = ILane_1flgjqy_Contract_Collaboration_1fz5t6s35(
+            contracts["Lane_1flgjqy_Contract_Collaboration_1fz5t6s35"]
+        ).checkXOR_Gateway_0zdwok1(y, xy);
+        if ((branch & (1 << 0)) != 0) {
+            ILane_1flgjqy_Contract_Collaboration_1fz5t6s35(
+                contracts["Lane_1flgjqy_Contract_Collaboration_1fz5t6s35"]
+            ).setState("Activity_0wsix1v", 1);
+        } else if ((branch & (1 << 1)) != 0) {
+            ILane_1flgjqy_Contract_Collaboration_1fz5t6s35(
+                contracts["Lane_1flgjqy_Contract_Collaboration_1fz5t6s35"]
+            ).setState("Activity_1be3ygs", 1);
+        }
 
-        localStorage.x = 1;
-    }
-
-    function Activity_0i3wqng()
-        public
-        payable
-        isAccessible("Activity_0i3wqng")
-    {
-        state["Activity_0i3wqng"] = State.Completed;
-    }
-
-    function checkXOR_Gateway_0x9om75(uint256 x) public returns (uint256) {
-        require(
-            uint256(
-                ILane_19y529f_Contract_Collaboration_1glbzukaaxrtxt(
-                    contracts[
-                        "Lane_19y529f_Contract_Collaboration_1glbzukaaxrtxt"
-                    ]
-                ).getState("Activity_0biddql")
-            ) == uint256(State.Open)
-        );
-        return ((x == 2) ? (1 << 0) : 0) | ((x == 1) ? (1 << 1) : 0);
+        state["Activity_0duu9ah"] = State.Completed;
     }
 }

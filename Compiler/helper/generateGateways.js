@@ -52,28 +52,10 @@ function generateXORGateway(gateway, process, collaborationId) {
         if (condition) {
             // Extract variables within `${}` using regex
             const regex = /\${([^}]+)}/g;
-            const matches = [...condition.matchAll(regex)].map(match => {
-                const fullVar = match[1]; // Extract full match
-                return fullVar.includes('.') ? fullVar.split('.').pop() : fullVar;
-            });
+            const matches = [...condition.matchAll(regex)].map(match => match[1]) // Extract fullVar directly
+            .filter(fullVar => !fullVar.includes('.')); // Only keep those without a dot
             return {
-                condition: condition.replace(/\${([^}]+)}/g, (_, varName) => {
-                    const parts = varName.split('.');
-
-                    // If parts.length === 2 and the second part is "localStorage", return localStorage.varName
-                    if (parts.length === 2 && parts[0] === "localStorage") {
-                        return `localStorage.${parts[1]}`;
-                    }
-
-                    // If parts.length === 2, handle <string>.varname for contract retrieval
-                    if (parts.length === 2) {
-                        const [prefix, variable] = parts;
-                        return variable;
-                    }
-
-                    // Handle simple ${varname} case
-                    return varName;
-                }), // Replace `${}` for Solidity syntax
+                condition: generateExpression(condition, collaborationId),
                 variables: matches
             };
         }
