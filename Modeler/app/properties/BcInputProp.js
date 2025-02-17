@@ -20,14 +20,14 @@ export default function InputParameterProps(props) {
       parameter
     },
     {
-      id: idPrefix + '-value',
-      component: Value,
+      id: idPrefix + '-type',
+      component: Type,
       idPrefix,
       parameter
     },
     {
-      id: idPrefix + '-type',
-      component: Type,
+      id: idPrefix + '-value',
+      component: Value,
       idPrefix,
       parameter
     },

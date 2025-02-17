@@ -37,7 +37,7 @@ html, body, #container {
   color: #52B415 !important;
 }
 
-.buttons {
+/* .buttons {
   position: fixed;
   bottom: 20px;
   left: 20px;
@@ -47,14 +47,14 @@ html, body, #container {
   display: flex;
   gap: 10px;
   font-family: 'Georgia', serif;
-}
+} */
 
-.buttons li {
+/* .buttons li {
   list-style: none;
-}
-
+} */
+/* 
 .buttons a, .buttons label {
-  background: #f8f9fa;
+  background: #b0b0b0;
   border: 1px solid #343a40;
   border-radius: 4px;
   color: #343a40;
@@ -65,16 +65,16 @@ html, body, #container {
   opacity: 0.3;
   font-size: 14px;
   cursor: pointer;
-}
-
+} */
+/* 
 .buttons a.active, .buttons label:hover {
   opacity: 1.0;
   background: #e9ecef;
-}
+} */
 
-.buttons input[type="file"] {
+/* .buttons input[type="file"] {
   display: none;
-}
+} */
 
 #js-properties-panel {
   position: absolute;

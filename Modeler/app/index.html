@@ -7,51 +7,62 @@
   <link rel="stylesheet" href="vendor/bpmn-js/assets/bpmn-font/css/bpmn-embedded.css" />
   <link rel="stylesheet" href="https://unpkg.com/@bpmn-io/properties-panel/dist/assets/properties-panel.css">
   <link rel="stylesheet" href="css/app.css" />
-  <style>
-    #floating-window {
-      position: fixed;
-      top: 100px;
-      left: 100px;
-      width: 300px;
-      border: 1px solid #ccc;
-      background-color: #fff;
-      box-shadow: 0 0 10px rgba(0,0,0,0.5);
-      display: none;
-      z-index: 1000;
-    }
-
-    #floating-window-header {
-      background-color: #f1f1f1;
-      padding: 10px;
-      cursor: move;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    #floating-window-content {
-      padding: 10px;
-    }
-
-    .minimize-btn, .close-btn {
-      cursor: pointer;
-      margin-left: 10px;
-    }
-  </style>
+  <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body>
+
   <div id="container"></div>
   <div id="js-properties-panel"></div>
 
-  <ul class="buttons">
-    <li><a id="js-download-diagram" href title="download BPMN diagram">BPMN diagram</a></li>
-    <li><a id="js-download-svg" href title="download as SVG image">SVG image</a></li>
-    <li><label for="js-upload-diagram">Upload</label><input type="file" id="js-upload-diagram" title="Upload BPMN diagram" accept=".bpmn"/></li>
-    <li><a id="js-compile-diagram" class="active">Compile</a></li>
-    <li><a id="js-deploy-diagram" class="active">Deploy</a></li>
-    <li><a id="js-execute-panel" class="active">Workflow Panel</a></li>
-    <li><a id="js-open-floating-window" class="active">Process Variables</a></li>
+  <!-- Sticky Button Panel -->
+  <ul class="buttons fixed bottom-4 left-1/2 transform -translate-x-1/2 flex gap-2 bg-white border border-gray-300 p-2 rounded">
+    <li>
+      <a id="js-download-diagram" href="#" title="Download BPMN diagram"
+        class="px-3 py-1 bg-[#d8d9d9] text-black text-sm rounded border border-[#b1b1b1] cursor-pointer hover:bg-[#c4c5c5]">
+        BPMN Diagram
+      </a>
+    </li>
+    <li>
+      <a id="js-download-svg" href="#" title="Download as SVG image"
+        class="px-3 py-1 bg-[#d8d9d9] text-black text-sm rounded border border-[#b1b1b1] cursor-pointer hover:bg-[#c4c5c5]">
+        SVG Image
+      </a>
+    </li>
+    <li>
+      <a id="js-upload-diagram-btn" title="Upload BPMN diagram"
+        class="px-3 py-1 bg-[#d8d9d9] text-black text-sm rounded border border-[#b1b1b1] cursor-pointer hover:bg-[#c4c5c5]">
+        Upload
+      </a>
+      <input type="file" id="js-upload-diagram" accept=".bpmn" class="hidden"/>
+    </li>
+    <li>
+      <a id="js-compile-diagram" href="#" class="px-3 py-1 bg-[#d8d9d9] text-black text-sm rounded border border-[#b1b1b1] cursor-pointer hover:bg-[#c4c5c5]">
+        Compile
+      </a>
+    </li>
+    <li>
+      <a id="js-deploy-diagram" href="#" class="px-3 py-1 bg-[#d8d9d9] text-black text-sm rounded border border-[#b1b1b1] cursor-pointer hover:bg-[#c4c5c5]">
+        Deploy
+      </a>
+    </li>
+    <li>
+      <a id="js-execute-panel" href="#" class="px-3 py-1 bg-[#d8d9d9] text-black text-sm rounded border border-[#b1b1b1] cursor-pointer hover:bg-[#c4c5c5]">
+        Workflow Panel
+      </a>
+    </li>
+    <li>
+      <a id="js-open-floating-window" href="#" class="px-3 py-1 bg-[#d8d9d9] text-black text-sm rounded border border-[#b1b1b1] cursor-pointer hover:bg-[#c4c5c5]">
+        Process Variables
+      </a>
+    </li>
   </ul>
+
+  <script>
+    // Make the Upload button trigger file input
+    document.getElementById('js-upload-diagram-btn').addEventListener('click', function() {
+      document.getElementById('js-upload-diagram').click();
+    });
+  </script>
 
   <script src="app.js"></script>
 

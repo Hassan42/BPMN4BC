@@ -8,12 +8,6 @@ export default function (element) {
 
   // Initialize props array with the bcId object
   let props = [
-    {
-      id: 'bcId',
-      element,
-      component: bcId,
-      isEdited: isTextFieldEntryEdited
-    },
   ];
 
   if (is(element, 'bpmn:ReceiveTask') && element.businessObject.bc == "true") {
@@ -63,6 +57,12 @@ export default function (element) {
   } else if (is(element, 'bpmn:Lane') || is(element, 'bpmn:Participant')) {
     props.push(
       {
+        id: 'bcId',
+        element,
+        component: bcId,
+        isEdited: isTextFieldEntryEdited
+      },
+      {
         id: 'script',
         element,
         component: Script,
@@ -93,7 +93,7 @@ function Error(props) {
   return html`<${TextFieldEntry}
     id=${id}
     element=${element}
-    description=${translate('Revert Error Message')}
+    description=${translate('Revert error message.')}
     label=${translate('Error')}
     getValue=${getValue}
     setValue=${setValue}
@@ -121,8 +121,8 @@ function Sender(props) {
   return html`<${TextFieldEntry}
     id=${id}
     element=${element}
-    description=${translate('Transaction Sender Role')}
-    label=${translate('Sender Role')}
+    description=${translate('Initiator role.')}
+    label=${translate('Initiator')}
     getValue=${getValue}
     setValue=${setValue}
     debounce=${debounce}
@@ -149,7 +149,7 @@ function Event(props) {
   return html`<${TextFieldEntry}
     id=${id}
     element=${element}
-    description=${translate('Smart Contract Event Name')}
+    description=${translate('Smart contract event name.')}
     label=${translate('Event Name')}
     getValue=${getValue}
     setValue=${setValue}
@@ -177,8 +177,7 @@ function bcId(props) {
   return html`<${TextFieldEntry}
     id=${id}
     element=${element}
-    description=${translate('Blockchain network ID')}
-    label=${translate('Blockchain ID')}
+    label=${translate('Network ID')}
     getValue=${getValue}
     setValue=${setValue}
     debounce=${debounce}
@@ -289,8 +288,7 @@ function Script(props) {
   return html`<${TextAreaEntry}
     id=${id}
     element=${element}
-    description=${translate('Solidity Script')}
-    label=${translate('Script')}
+    label=${translate('Solidity Script')}
     getValue=${getValue}
     setValue=${setValue}
     debounce=${debounce}
@@ -317,7 +315,7 @@ function Returns(props) {
   return html`<${TextFieldEntry}
     id=${id}
     element=${element}
-    description=${translate('return variables')}
+    description=${translate('Return variables. (type:varname),(type:varname)')}
     label=${translate('Return')}
     getValue=${getValue}
     setValue=${setValue}

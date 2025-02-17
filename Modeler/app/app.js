@@ -107,7 +107,7 @@ function processAllElements() {
                   name: param.name,
                   value: param.value !== undefined ? param.value : 'N/A',
                   type: param.type,
-                  transactional: param.transactional !== undefined ? 'Memory' : 'Storage',
+                  transactional: param.transactional !== undefined ? 'Transaction' : 'Contract',
                   external: param.external !== undefined ? param.external : false,
                   source: businessObject.name !== undefined ? businessObject.name : element.id,
                 });
