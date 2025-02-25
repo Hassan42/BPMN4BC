@@ -364,7 +364,8 @@ const generateContractConfig = ({
     participant,
     startReceiveTaskIds,
     formattedSolidityCode,
-    formattedSolidityInterface
+    formattedSolidityInterface,
+    contractText
 }) => {
 
     const receiveTasks = activities.filter(activity => activity.$type === 'bpmn:ReceiveTask');
@@ -440,7 +441,8 @@ const generateContractConfig = ({
         receiveTasks: receiveTasksInfo,
         contractCode: formattedSolidityCode,
         contractInterface: formattedSolidityInterface,
-        localStorage: localStorage
+        localStorage: localStorage,
+        contractText
     };
 }
 

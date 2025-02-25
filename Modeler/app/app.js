@@ -61,6 +61,13 @@ const outputParametersArray = [];
 function processAllElements() {
   const definitions = bpmnModeler.getDefinitions();
   const collaboration = definitions.rootElements.find(el => el.$type === 'bpmn:Collaboration');
+  function generateRandomNumber(digits) {
+    const min = Math.pow(10, digits - 1);
+    const max = Math.pow(10, digits) - 1;
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+  collaboration.id = `Collaboration_${generateRandomNumber(8)}`
 
   if (!collaboration) {
     return;

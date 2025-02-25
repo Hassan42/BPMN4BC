@@ -365,10 +365,11 @@ const getContractsState = (network) => {
     // Create a new object containing only receiveTasks and localStorage for each contract
     const contractsState = networkContracts.reduce((acc, contract) => {
         // Extract only the necessary fields
-        const { contractName, networkId, receiveTasks, localStorage } = contract;
+        const { contractName, contractText, networkId, receiveTasks, localStorage } = contract;
 
         // Add the contract's relevant data to the result object
         acc[contractName] = {
+            contractText,
             receiveTasks,
             localStorage
         };

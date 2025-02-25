@@ -18,7 +18,8 @@ export function renderContract(data, networkKey) {
 
       const contractHeader = document.createElement('button');
       contractHeader.className = 'text-lg font-bold bg-gray-200 p-2 rounded w-full text-left';
-      contractHeader.innerText = contractKey;
+    
+      contractHeader.innerText = contract.contractText && contract.contractText.trim() !== '' ? contract.contractText : contractKey;
       contractHeader.onclick = () => toggleVisibility(contractContent);
 
       const contractContent = document.createElement('div');

@@ -42,7 +42,7 @@ export default function OutputParameterProps(props) {
     )
   }
 
-  if (is(element, "bpmn:ReceiveTask") || is(element, "bpmn:Lane") || is(element, "bpmn:Participant")) {
+  if (is(element, "bpmn:ReceiveTask")) {
     entries.push(
       {
         id: idPrefix + '-external',

@@ -25,7 +25,8 @@ async function generateContract(contractParams) {
     roles,
     participant,
     lane,
-    collaborationId
+    collaborationId,
+    contractText
   } = contractParams;
 
   const { storageStruct, initializationCode, readFunctions } = generateStorage(activities, participant, lane);
@@ -190,7 +191,8 @@ async function generateContract(contractParams) {
       participant,
       startReceiveTaskIds,
       formattedSolidityCode,
-      formattedSolidityInterface
+      formattedSolidityInterface,
+      contractText
     });
     return contractConfig;
   } catch (error) {
@@ -259,7 +261,8 @@ async function generateContracts(definitions) {
             process,
             roles,
             participant,
-            collaborationId:collaboration.id
+            collaborationId:collaboration.id,
+            contractText : process.name,
           };
           const contractConfig = await generateContract(contractParams);
           contracts.push(contractConfig);
@@ -276,7 +279,8 @@ async function generateContracts(definitions) {
               roles,
               participant,
               lane,
-              collaborationId:collaboration.id
+              collaborationId:collaboration.id,
+              contractText: lane.name,
             };
             const contractConfig = await generateContract(contractParams);
             contracts.push(contractConfig);

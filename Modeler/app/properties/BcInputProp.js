@@ -2,9 +2,6 @@ import { TextFieldEntry, CheckboxEntry, SelectEntry } from '@bpmn-io/properties-
 
 import { useService } from 'bpmn-js-properties-panel';
 
-// import ExtensionList from './ExtensionList';
-
-
 export default function InputParameterProps(props) {
 
   const {
