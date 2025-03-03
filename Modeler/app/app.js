@@ -247,51 +247,48 @@ $(function () {
       reader.readAsText(file);
     }
   });
-  $('#js-compile-diagram').click(async function () {
+  $('#js-compile-deploy').click(async function () {
     try {
+      // Get BPMN XML
       const { xml } = await bpmnModeler.saveXML({ format: true });
-
-      const response = await fetch('http://localhost:8000/compile', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ xml })
-      });
-
-      if (response.ok) {
-        alert('Compilation successful');
-      } else {
-        const errorText = await response.text();
-        alert(`Compilation failed: ${errorText}`);
-      }
-    } catch (err) {
-      console.error('Error happened during compilation: ', err);
-    }
-  });
-  $('#js-deploy-diagram').click(async function () {
-    try {
-      const { xml } = await bpmnModeler.saveXML({ format: true });
-      
+  
       const baseUrl = `${window.location.origin}${window.location.pathname.replace(/\/$/, '')}`; 
-      const apiUrl = `${baseUrl}/api/deploy`;
+      const compileUrl = `${baseUrl}/api/compile`;
+      const deployUrl = `${baseUrl}/api/deploy`;
   
-      const response = await fetch(apiUrl, { 
+      // Step 1: Compile
+      console.log('Compiling BPMN diagram...');
+      const compileResponse = await fetch(compileUrl, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ xml })
       });
   
-      if (response.ok) {
-        alert('Deployment successful');
-      } else {
-        const errorText = await response.text();
-        alert(`Deployment failed: ${errorText}`);
+      if (!compileResponse.ok) {
+        const errorText = await compileResponse.text();
+        alert(`Compilation failed: ${errorText}`);
+        return; // Stop execution if compilation fails
       }
+  
+      console.log('Compilation successful! Proceeding to deployment...');
+  
+      // Step 2: Deploy
+      const deployResponse = await fetch(deployUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ xml })
+      });
+  
+      if (!deployResponse.ok) {
+        const errorText = await deployResponse.text();
+        alert(`Deployment failed: ${errorText}`);
+        return; // Stop execution if deployment fails
+      }
+  
+      alert('Compilation & Deployment successful!');
     } catch (err) {
-      console.error('Error happened during deployment: ', err);
+      console.error('Error during process:', err);
+      alert('An error occurred. Please check the console for details.');
     }
   });
   $('#js-execute-panel').click(function (e) {
