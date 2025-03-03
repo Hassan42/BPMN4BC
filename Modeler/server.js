@@ -5,7 +5,8 @@ const axios = require('axios');
 
 const app = express();
 const PORT = 5000;
-const API_BASE_URL = 'http://deployment:3000'; // External API running on port 3000
+const DEP_API_BASE_URL = 'http://deployment:3000'; // External API running on port 3000
+const COM_API_BASE_URL = 'http://compiler:8000'; // External API running on port 3000
 
 // Middleware to log incoming requests
 app.use((req, res, next) => {
@@ -27,7 +28,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.get('/api/query', async (req, res) => {
   try {
     console.log('Fetching data from external API...');
-    const response = await axios.get(`${API_BASE_URL}/query`);
+    const response = await axios.get(`${DEP_API_BASE_URL}/query`);
     res.json(response.data);
   } catch (error) {
     console.error('Error fetching data:', error.message);
@@ -39,7 +40,7 @@ app.get('/api/query', async (req, res) => {
 app.post('/api/executeTask', async (req, res) => {
   try {
     console.log('Executing task via external API...');
-    const response = await axios.post(`${API_BASE_URL}/executeTask`, req.body, {
+    const response = await axios.post(`${DEP_API_BASE_URL}/executeTask`, req.body, {
       headers: { 'Content-Type': 'application/json' }
     });
     res.json(response.data);
@@ -53,7 +54,7 @@ app.post('/api/executeTask', async (req, res) => {
 app.post('/api/deploy', async (req, res) => {
   try {
     console.log('Deploying BPMN diagram...');
-    const response = await axios.post(`${API_BASE_URL}/deploy`, req.body, {
+    const response = await axios.post(`${DEP_API_BASE_URL}/deploy`, req.body, {
       headers: { 'Content-Type': 'application/json' }
     });
 
@@ -61,6 +62,22 @@ app.post('/api/deploy', async (req, res) => {
   } catch (error) {
     console.error('Error deploying BPMN diagram:', error.message);
     res.status(error.response?.status || 500).json({ error: `Failed to deploy diagram: ${error.message}` });
+  }
+});
+
+// **New Endpoint: Proxy /api/compile to /compile**
+app.post('/api/compile', async (req, res) => {
+  try {
+    console.log('Compiling BPMN diagram...');
+
+    const response = await axios.post(`${COM_API_BASE_URL}/compile`, req.body, {
+      headers: { 'Content-Type': 'application/json' }
+    });
+
+    res.json(response.data);
+  } catch (error) {
+    console.error('Error during compilation:', error.message);
+    res.status(error.response?.status || 500).json({ error: `Compilation failed: ${error.message}` });
   }
 });
 
