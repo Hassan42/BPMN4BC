@@ -195,7 +195,7 @@ app.post('/deploy', async (req, res) => {
 
   try {
     // Call the compile route to generate the contracts
-    const response = await axios.post(`http://localhost:${compilerPort}/compile`, { xml });
+    const response = await axios.post(`http://compiler:${compilerPort}/compile`, { xml });
     const contracts = response.data;
 
     // Ensure the contracts directory exists

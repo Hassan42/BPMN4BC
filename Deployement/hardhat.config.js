@@ -12,10 +12,10 @@
   module.exports = {
   "networks": {
     "network-2": {
-      "url": "http://localhost:8546"
+      "url": "http://network-1:8546"
     },
     "network-1": {
-      "url": "http://localhost:8545"
+      "url": "http://network-2:8545"
     },
     "network-4": {
       "url": "http://localhost:8549"
