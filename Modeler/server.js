@@ -30,8 +30,8 @@ async function safeFetch(url, options = {}) {
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`Error from ${url}: ${response.status} - ${errorText}`);
-      throw new Error(`${response.status}: ${errorText}`);
+      console.error(`Error from ${url}: ${errorText}`);
+      throw new Error(`${errorText}`);
     }
 
     return await response.json();
