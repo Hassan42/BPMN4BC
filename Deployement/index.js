@@ -245,6 +245,7 @@ app.post('/deploy', async (req, res) => {
 
     const contractNames = contracts.map(contract => contract.contractName);
     const networks = [...new Set(contractNames.map(name => contractManager.getNetworkByContractName(name)))];
+    const networkResults = {};
 
     for (const network of networks) {
 
