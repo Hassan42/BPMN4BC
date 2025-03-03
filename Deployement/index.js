@@ -243,10 +243,11 @@ app.post('/deploy', async (req, res) => {
 
     const contractManager = createContractManager();
 
-    const networks = contractManager.getNetworks();
+    const contractNames = contracts.map(contract => contract.contractName);
+    const networks = [...new Set(contractNames.map(name => contractManager.getNetworkByContractName(name)))];
 
-    const networkResults = {};
     for (const network of networks) {
+
 
       // Compile contracts for each network
       console.log(`Compiling started for network ${network}...`);
@@ -254,8 +255,6 @@ app.post('/deploy', async (req, res) => {
       console.log(`Compilation successful for network ${network}!`);
       console.log('Compile Output:', compileResult);
       networkResults[network] = { compile: compileResult };
-
-      const contractNames = contracts.map(contract => contract.contractName);
 
       // Deploy contracts to each network
       console.log(`Deployment started for network ${network}...`);

@@ -430,6 +430,20 @@ const getNetworks = () => {
     return Array.from(networkIds);
 };
 
+const getNetworkByContractName = (contractName) => {
+    const contracts = readContractsFile(); // Read the contracts file
+
+    // Find the contract by its name
+    const contract = contracts.find(c => c.contractName === contractName);
+
+    if (!contract) {
+        throw new Error(`Contract with name "${contractName}" not found.`);
+    }
+
+    // Return the network ID of the found contract
+    return contract.networkId;
+};
+
 // Add or update the deployGas field for a contract, ensuring the correct networkId
 const updateDeployGas = (contractName, deployGas, networkId) => {
     // Read and parse the existing contracts file
@@ -471,7 +485,8 @@ const createContractManager = () => ({
     getContractsState,
     updateTaskGas,
     getNetworks,
-    updateDeployGas
+    updateDeployGas,
+    getNetworkByContractName
 });
 
 module.exports = createContractManager;
