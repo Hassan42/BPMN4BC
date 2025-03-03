@@ -60,7 +60,7 @@ app.post('/api/deploy', async (req, res) => {
     res.json(response.data);
   } catch (error) {
     console.error('Error deploying BPMN diagram:', error.message);
-    res.status(error.response?.status || 500).json({ error: 'Failed to deploy diagram' });
+    res.status(error.response?.status || 500).json({ error: `Failed to deploy diagram: ${error.message}` });
   }
 });
 
