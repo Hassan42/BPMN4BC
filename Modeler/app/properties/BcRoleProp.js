@@ -19,12 +19,12 @@ export default function RoleParameterProps(props) {
       idPrefix,
       parameter
     },
-    {
-      id: idPrefix + '-address',
-      component: Address,
-      idPrefix,
-      parameter
-    },
+    // {
+    //   id: idPrefix + '-address',
+    //   component: Address,
+    //   idPrefix,
+    //   parameter
+    // },
   ];
 
   return entries;
