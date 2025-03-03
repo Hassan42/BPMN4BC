@@ -1,12 +1,11 @@
 const express = require('express');
 const path = require('path');
 const cors = require('cors');
-const axios = require('axios');
 
 const app = express();
 const PORT = 5000;
 const DEP_API_BASE_URL = 'http://deployment:3000'; // External API running on port 3000
-const COM_API_BASE_URL = 'http://compiler:8000'; // External API running on port 3000
+const COM_API_BASE_URL = 'http://compiler:8000'; // External API running on port 8000
 
 // Middleware to log incoming requests
 app.use((req, res, next) => {
@@ -24,15 +23,32 @@ app.use(cors()); // Allow cross-origin requests (optional)
 app.use(express.json()); // Parse JSON request bodies
 app.use(express.static(path.join(__dirname, 'public')));
 
+// **Helper function to handle API requests safely**
+async function safeFetch(url, options = {}) {
+  try {
+    const response = await fetch(url, options);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Error from ${url}: ${response.status} - ${errorText}`);
+      throw new Error(`${response.status}: ${errorText}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error(`Request to ${url} failed:`, error.message);
+    throw error; // Rethrow for the caller to handle
+  }
+}
+
 // **Relay GET request to fetch data**
 app.get('/api/query', async (req, res) => {
   try {
     console.log('Fetching data from external API...');
-    const response = await axios.get(`${DEP_API_BASE_URL}/query`);
-    res.json(response.data);
+    const data = await safeFetch(`${DEP_API_BASE_URL}/query`);
+    res.json(data);
   } catch (error) {
-    console.error('Error fetching data:', error.message);
-    res.status(error.response?.status || 500).json({ error: 'Failed to fetch data' });
+    res.status(500).json({ error: `${error.message}` });
   }
 });
 
@@ -40,44 +56,44 @@ app.get('/api/query', async (req, res) => {
 app.post('/api/executeTask', async (req, res) => {
   try {
     console.log('Executing task via external API...');
-    const response = await axios.post(`${DEP_API_BASE_URL}/executeTask`, req.body, {
-      headers: { 'Content-Type': 'application/json' }
+    const data = await safeFetch(`${DEP_API_BASE_URL}/executeTask`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req.body),
     });
-    res.json(response.data);
+    res.json(data);
   } catch (error) {
-    console.error('Error executing task:', error.message);
-    res.status(error.response?.status || 500).json({ error: 'Failed to execute task' });
+    res.status(500).json({ error: `${error.message}` });
   }
 });
 
-// **New Endpoint: Relay POST request to deploy BPMN diagram**
+// **Relay POST request to deploy BPMN diagram**
 app.post('/api/deploy', async (req, res) => {
   try {
     console.log('Deploying BPMN diagram...');
-    const response = await axios.post(`${DEP_API_BASE_URL}/deploy`, req.body, {
-      headers: { 'Content-Type': 'application/json' }
+    const data = await safeFetch(`${DEP_API_BASE_URL}/deploy`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req.body),
     });
-
-    res.json(response.data);
+    res.json(data);
   } catch (error) {
-    console.error('Error deploying BPMN diagram:', error.message);
-    res.status(error.response?.status || 500).json({ error: `Failed to deploy diagram: ${error.message}` });
+    res.status(500).json({ error: `${error.message}` });
   }
 });
 
-// **New Endpoint: Proxy /api/compile to /compile**
+// **Relay POST request to compile BPMN diagram**
 app.post('/api/compile', async (req, res) => {
   try {
     console.log('Compiling BPMN diagram...');
-
-    const response = await axios.post(`${COM_API_BASE_URL}/compile`, req.body, {
-      headers: { 'Content-Type': 'application/json' }
+    const data = await safeFetch(`${COM_API_BASE_URL}/compile`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req.body),
     });
-
-    res.json(response.data);
+    res.json(data);
   } catch (error) {
-    console.error('Error during compilation:', error.message);
-    res.status(error.response?.status || 500).json({ error: `Compilation failed: ${error.message}` });
+    res.status(500).json({ error: `${error.message}` });
   }
 });
 

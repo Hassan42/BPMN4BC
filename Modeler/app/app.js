@@ -247,12 +247,15 @@ $(function () {
       reader.readAsText(file);
     }
   });
-  $('#js-compile-deploy').click(async function () {
+
+  $('#js-compile-deploy').click(async function (event) {
+    event.preventDefault(); // Prevents accidental page reload
+  
     try {
       // Get BPMN XML
       const { xml } = await bpmnModeler.saveXML({ format: true });
   
-      const baseUrl = `${window.location.origin}${window.location.pathname.replace(/\/$/, '')}`; 
+      const baseUrl = `${window.location.origin}${window.location.pathname.replace(/\/$/, '')}`;
       const compileUrl = `${baseUrl}/api/compile`;
       const deployUrl = `${baseUrl}/api/deploy`;
   
@@ -263,11 +266,18 @@ $(function () {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ xml })
       });
+      console.log("ERROR", compileResponse)
+      let compileData;
+      try {
+        compileData = await compileResponse.json();
+      } catch (jsonError) {
+        compileData = { error: 'Invalid response from server' };
+      }
   
       if (!compileResponse.ok) {
-        const errorText = await compileResponse.text();
-        alert(`Compilation failed: ${errorText}`);
-        return; // Stop execution if compilation fails
+        console.error('Compilation error response:', compileData);
+        alert(`Compilation failed:\n${compileData.error || 'Unknown error'}`);
+        return;
       }
   
       console.log('Compilation successful! Proceeding to deployment...');
@@ -279,19 +289,26 @@ $(function () {
         body: JSON.stringify({ xml })
       });
   
+      let deployData;
+      try {
+        deployData = await deployResponse.json();
+      } catch (jsonError) {
+        deployData = { error: 'Invalid response from server' };
+      }
+  
       if (!deployResponse.ok) {
-        const errorText = await deployResponse.text();
-        alert(`Deployment failed: ${errorText}`);
-        return; // Stop execution if deployment fails
+        console.error('Deployment error response:', deployData);
+        alert(`Deployment failed:\n${deployData.error || 'Unknown error'}`);
+        return;
       }
   
       alert('Compilation & Deployment successful!');
     } catch (err) {
-      console.error('Error during process:', err);
-      alert('An error occurred. Please check the console for details.');
+      console.error('Unexpected error:', err);
+      alert(`An unexpected error occurred:\n${err.message || 'Unknown error'}`);
     }
-  });
-  
+  });  
+
   $('#js-execute-panel').click(function (e) {
     e.preventDefault();
 
