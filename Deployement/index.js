@@ -6,7 +6,7 @@ const path = require('path');
 const Docker = require('dockerode');
 const hardhat = require('hardhat');
 const createContractManager = require('./contractsManager');
-const { executeHardhatTask, fetchGasPrice, updateHardhatConfig } = require('./utils');
+const { executeHardhatTask, fetchGasPrice, updateHardhatConfig, removeSolFiles } = require('./utils');
 
 const app = express();
 app.use(cors()); // Enables CORS for all routes
@@ -181,6 +181,8 @@ app.post('/deploy', async (req, res) => {
   const { xml } = req.body;
 
   // await cleanOutputDirectories();
+
+  removeSolFiles(contractsDir);
 
   try {
     // Call the compile route to generate the contracts

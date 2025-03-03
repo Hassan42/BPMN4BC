@@ -40,6 +40,30 @@ const executeHardhatTask = async (taskName, networkName, taskArgs) => {
   });
 };
 
+// Function to delete .sol files
+const removeSolFiles = (folderPath) => {
+  fs.readdir(folderPath, (err, files) => {
+    if (err) {
+      return console.error('Error reading directory:', err);
+    }
+
+    files.forEach(file => {
+      if (path.extname(file) === '.sol') {
+        const filePath = path.join(folderPath, file);
+
+        fs.unlink(filePath, err => {
+          if (err) {
+            console.error(`Error deleting file ${file}:`, err);
+          } else {
+            console.log(`Deleted: ${file}`);
+          }
+        });
+      }
+    });
+  });
+}
+
+
 // Fetch the latest gas price from Infura
 const fetchGasPrice = async (infuraUrl) => {
   try {
@@ -111,4 +135,4 @@ const updateHardhatConfig = (networkId, url) => {
 
 
 
-module.exports = { executeHardhatTask, fetchGasPrice, updateHardhatConfig };
+module.exports = { executeHardhatTask, fetchGasPrice, updateHardhatConfig, removeSolFiles };
