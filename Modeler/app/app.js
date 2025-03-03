@@ -291,6 +291,7 @@ $(function () {
       alert('An error occurred. Please check the console for details.');
     }
   });
+  
   $('#js-execute-panel').click(function (e) {
     e.preventDefault();
 
