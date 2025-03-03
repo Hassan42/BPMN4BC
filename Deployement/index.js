@@ -189,13 +189,13 @@ app.get('/query', async (req, res) => {
 app.post('/deploy', async (req, res) => {
   const { xml } = req.body;
 
-  // await cleanOutputDirectories();
+  await cleanOutputDirectories();
 
-  removeSolFiles(contractsDir);
+  // removeSolFiles(contractsDir);
 
   try {
     // Call the compile route to generate the contracts
-    const response = await axios.post(`http://compiler:${compilerPort}/compile`, { xml });
+    const response = await axios.post(`http://localhost:${compilerPort}/compile`, { xml });
     const contracts = response.data;
 
     // Ensure the contracts directory exists
