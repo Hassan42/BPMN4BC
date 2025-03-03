@@ -151,8 +151,17 @@ app.get('/query', async (req, res) => {
     // Object to store results
     const results = {};
 
+    // Read hardhat.config.js and parse networks
+    const hardhatConfigPath = path.join(__dirname, 'hardhat.config.js');
+    const hardhatConfig = require(hardhatConfigPath);
+    const availableNetworks = new Set(Object.keys(hardhatConfig.networks || {}));
+
     // Iterate over each network and execute the query-contracts task
     for (const network of networks) {
+      if (!availableNetworks.has(network)) {
+        continue;
+      }
+
       try {
         // Execute the Hardhat task for the current network
         await executeHardhatTask('query-contracts', network, { network: network });
