@@ -65,7 +65,7 @@ function processAllElements() {
     const min = Math.pow(10, digits - 1);
     const max = Math.pow(10, digits) - 1;
     return Math.floor(Math.random() * (max - min + 1)) + min;
-}
+  }
 
   collaboration.id = `Collaboration_${generateRandomNumber(8)}`
 
@@ -262,7 +262,8 @@ $(function () {
       if (response.ok) {
         alert('Compilation successful');
       } else {
-        alert('Compilation failed');
+        const errorText = await response.text();
+        alert(`Compilation failed: ${errorText}`);
       }
     } catch (err) {
       console.error('Error happened during compilation: ', err);
@@ -271,19 +272,23 @@ $(function () {
   $('#js-deploy-diagram').click(async function () {
     try {
       const { xml } = await bpmnModeler.saveXML({ format: true });
-
-      const response = await fetch('http://localhost:3000/deploy', {
+      
+      const baseUrl = `${window.location.origin}${window.location.pathname.replace(/\/$/, '')}`; 
+      const apiUrl = `${baseUrl}/api/deploy`;
+  
+      const response = await fetch(apiUrl, { 
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({ xml })
       });
-
+  
       if (response.ok) {
         alert('Deployment successful');
       } else {
-        alert('Deployment failed');
+        const errorText = await response.text();
+        alert(`Deployment failed: ${errorText}`);
       }
     } catch (err) {
       console.error('Error happened during deployment: ', err);

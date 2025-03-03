@@ -56,7 +56,7 @@ function generateStorage(activities, participant, lane) {
 
     // Generate read functions for each output parameter
     const readFunctions = outputParamsArray.map(({ type, name }) => `
-    function get${capitalize(name)}() public view returns (${type}${isValueType(type) ? '' : ' memory'}) {
+    function get${capitalize(name)}() public view returns (${type}${isValueType(name, type) ? '' : ' memory'}) {
         return localStorage.${name};
     }
     `).join('');

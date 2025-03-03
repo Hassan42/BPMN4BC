@@ -61,14 +61,14 @@ function generateScriptFunction(activity, process, collaborationId) {
   }).join(' || ')});`;
 
   const inputTypes = inputParams.map(param => {
-    const memoryKeyword = isValueType(param.type) ? '' : 'memory ';
+    const memoryKeyword = isValueType(param.name, param.type) ? '' : 'memory ';
     return `${param.type} ${memoryKeyword}${param.name}`;
   }).join(', ');
 
   const combinedReturnParams = [...returnParams, ...outputParams.filter(param => String(param.transactional).trim().toLowerCase() == "true")];
   const returnTypes = combinedReturnParams
     .map(param => {
-      const typeWithMemory = isValueType(param.type) ? param.type : `${param.type} memory`;
+      const typeWithMemory = isValueType(param.name, param.type) ? param.type : `${param.type} memory`;
       return typeWithMemory;
     }).join(', ');
 
@@ -81,6 +81,9 @@ function generateScriptFunction(activity, process, collaborationId) {
     .filter(param => String(param.transactional).trim().toLowerCase() !== "true")
     .map(param => {
       const { name, value } = param;
+      if(!value){
+        throw new Error(`Variable ${name} has missing value.`);
+      }
       return `localStorage.${name} = ${generateExpression(value, collaborationId)};`;
     })
     .join('\n');
@@ -90,7 +93,10 @@ function generateScriptFunction(activity, process, collaborationId) {
     .filter(param => String(param.transactional).trim().toLowerCase() === "true")
     .map(param => {
       const { type, name, value } = param;
-      const memoryKeyword = isValueType(type) ? '' : 'memory ';
+      if(!value){
+        throw new Error(`Variable ${name} has missing value.`);
+      }
+      const memoryKeyword = isValueType(name,type) ? '' : 'memory ';
       return `${type} ${memoryKeyword}${name} = ${generateExpression(value, collaborationId)};`;
     })
     .join('\n');
@@ -149,7 +155,7 @@ function generateEntryFunction(activity, process, roles, collaborationId) {
   // const senderAddress = roles.find(r => r.role === senderRole)?.address.replace(/\s+/g, '') || '';
 
   if (!senderRole) {
-    throw new Error(`Sender role is not defined in actvitiy ${activity.id}.`);
+    throw new Error(`Initiator is not defined in actvitiy "${activity.name || activity.id}".`);
   }
 
   const proceedingElements = activity.outgoing?.flatMap(flow => getProceedingElementsFromFlow(flow, process)) || [];
@@ -158,7 +164,7 @@ function generateEntryFunction(activity, process, roles, collaborationId) {
   const externalParams = outputParameters
     .filter(param => String(param.external).trim() === "true")
     .map(param => {
-      const memoryKeyword = isValueType(param.type) ? '' : 'memory ';
+      const memoryKeyword = isValueType(param.name,param.type) ? '' : 'memory ';
       return `${param.type} ${memoryKeyword}${param.name}`;
     })
     .join(', ');
@@ -169,6 +175,9 @@ function generateEntryFunction(activity, process, roles, collaborationId) {
     .map(param => {
       const { name, value, external } = param;
 
+      if(!value && String(param.external).trim().toLowerCase() !== "true"){
+        throw new Error(`Variable ${name} has missing value.`);
+      }
       if (String(external).trim().toLowerCase() === "true") {
         return `localStorage.${name} = ${name};`;
       }
@@ -182,7 +191,10 @@ function generateEntryFunction(activity, process, roles, collaborationId) {
     .filter(param => String(param.transactional).trim().toLowerCase() === "true" && String(param.external).trim().toLowerCase() !== "true")
     .map(param => {
       const { type, name, value } = param;
-      const memoryKeyword = isValueType(type) ? '' : 'memory ';
+      if(!value){
+        throw new Error(`Variable ${name} has missing value.`);
+      }
+      const memoryKeyword = isValueType(name, type) ? '' : 'memory ';
       if (value.startsWith('${') && value.endsWith('}')) {
         const varName = value.slice(2, -1);
         return `${type} ${memoryKeyword}${name} = localStorage.${varName};`;
@@ -255,7 +267,7 @@ function generateEntryFunction(activity, process, roles, collaborationId) {
           .map(param => {
             if (!definedVariables.has(param.name)) {
               definedVariables.add(param.name);
-              const declaration = isValueType(param.type) ? `${param.type} ${param.name};` : `${param.type} memory ${param.name};`;
+              const declaration = isValueType(param.name, param.type) ? `${param.type} ${param.name};` : `${param.type} memory ${param.name};`;
               return declaration;
             }
             return '';

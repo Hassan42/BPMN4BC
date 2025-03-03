@@ -4,7 +4,7 @@ const CopyWebpackPlugin = require('copy-webpack-plugin');
 module.exports = {
   entry: {
     app: './app/app.js',                         // Main app entry
-    'execution-panel': './app/scripts/execution-panel.js' // ✅ Corrected path
+    'execution-panel': './app/scripts/execution-panel.js' // Corrected path
   },
   output: {
     path: path.resolve(__dirname, 'public'),
@@ -31,7 +31,7 @@ module.exports = {
     new CopyWebpackPlugin({
       patterns: [
         { from: 'assets/**', to: 'vendor/bpmn-js', context: 'node_modules/bpmn-js/dist/' },
-        { from: '**/*.{html,css}', context: 'app/' }  // ✅ Ensure HTML/CSS files are copied
+        { from: '**/*.{html,css}', context: 'app/' }  // Ensure HTML/CSS files are copied
       ]
     })
   ],

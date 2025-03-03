@@ -26,7 +26,7 @@ app.post('/compile', async (req, res) => {
     res.status(200).json(contracts);
   } catch (err) {
     console.error('Error during compilation:', err);
-    res.status(500).send('Compilation failed');
+    res.status(500).send(err.message);
   }
 });
 

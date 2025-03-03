@@ -15,6 +15,7 @@ const port = 3000;
 
 const compilerPort = 8000;
 const contractsDir = path.resolve('./contracts');
+const artifactsDir = path.resolve('./artifacts');
 
 const docker = new Docker(); // Initialize Docker client
 
@@ -31,7 +32,6 @@ app.post('/start', async (req, res) => {
     if (!Array.isArray(networks) || networks.length === 0) {
       return res.status(400).json({ message: 'Networks array is required and cannot be empty.' });
     }
-
 
     await cleanOutputDirectories();
 
@@ -76,6 +76,8 @@ app.post('/start', async (req, res) => {
           PortBindings: { [`${port}/tcp`]: [{ HostPort: port.toString() }] }
         }
       });
+
+      // console.log(container)
 
       await container.start();
 
@@ -182,7 +184,7 @@ app.post('/deploy', async (req, res) => {
 
   try {
     // Call the compile route to generate the contracts
-    const response = await axios.post(`http://localhost:${compilerPort}/compile`, { xml });
+    const response = await axios.post(`http://compiler:${compilerPort}/compile`, { xml });
     const contracts = response.data;
 
     // Ensure the contracts directory exists
@@ -251,16 +253,17 @@ app.post('/deploy', async (req, res) => {
       console.log('Compile Output:', compileResult);
       networkResults[network] = { compile: compileResult };
 
+      const contractNames = contracts.map(contract => contract.contractName);
+
       // Deploy contracts to each network
       console.log(`Deployment started for network ${network}...`);
-      const deployResult = await executeHardhatTask('deploy-contracts', network, { network: network });
+      const deployResult = await executeHardhatTask('deploy-contracts', network, { contractNames, network: network });
       console.log(`Deployment successful for network ${network}!`);
       console.log('Deploy Output:', deployResult);
       networkResults[network].deploy = deployResult;
 
       // Setup contracts for each network
       console.log(`Setup started for network ${network}...`);
-      const contractNames = contracts.map(contract => contract.contractName);
       const setupResult = await executeHardhatTask('setup-contracts', network, { contractNames, network: network });
       console.log(`Setup successful for network ${network}!`);
       console.log('Setup Output:', setupResult);
@@ -270,7 +273,7 @@ app.post('/deploy', async (req, res) => {
     res.status(200).json({ message: 'Contracts deployment successful', results: networkResults });
   } catch (err) {
     console.error('Error during deployment:', err);
-    res.status(500).send('Deployment failed.');
+    res.status(500).send(err);
   }
 });
 
@@ -347,7 +350,7 @@ app.post('/executeAll', async (req, res) => {
   }
 });
 
-app.listen(port, () => {
+app.listen(port, async () => {
   console.log(`Server listening at http://localhost:${port}`);
 });
 
@@ -357,9 +360,10 @@ const cleanOutputDirectories = async () => {
   try {
     // Ensure directories exist
     await fs.ensureDir(contractsDir);
-
+    await fs.ensureDir(artifactsDir);
     // Clean directories
     await fs.emptyDir(contractsDir);
+    await fs.emptyDir(artifactsDir);
   } catch (err) {
     console.error('Error cleaning output directories:', err);
   }

@@ -293,7 +293,10 @@ const extractInputParameters = (activity) => {
  * @param {string} type - The parameter type.
  * @returns {boolean} True if the type is a value type, false otherwise.
  */
-const isValueType = (type) => {
+const isValueType = (name, type) => {
+    if(!type){
+        throw new Error(`Variable ${name} type is undefined.`)
+    }
     const valueTypes = ['uint', 'address'];
     return valueTypes.some(valueType => type.startsWith(valueType));
 }

@@ -197,7 +197,7 @@ async function generateContract(contractParams) {
     return contractConfig;
   } catch (error) {
     console.log(solidityCode);
-    throw ('Error formatting or writing Solidity code:', error);
+    throw new Error('Error formatting or writing Solidity code:', error);
   }
 }
 
@@ -244,7 +244,7 @@ async function generateContracts(definitions) {
       const process = findProcessForParticipant(definitions, participant);
       const networkId = participant.bcid;
       if (!networkId) {
-        throw ("Process has no blockchain ID.")
+        throw new Error("Process has no blockchain network ID defined.")
       }
       if (!process) {
         console.log(`No process found for the participant with id ${participant.id}.`);

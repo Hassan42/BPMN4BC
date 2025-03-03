@@ -6,7 +6,7 @@
     "build": "webpack --mode production",
     "build:watch": "webpack --watch",
     "dev": "run-p build:watch serve",
-    "serve": "sirv public --dev",
+    "serve": "node server.js",
     "lint": "eslint .",
     "start": "run-s build serve"
   },
@@ -21,8 +21,11 @@
     "webpack-cli": "^4.5.0"
   },
   "dependencies": {
+    "axios": "^1.8.1",
     "bpmn-js": "^17.6.4",
     "bpmn-js-properties-panel": "^5.16.0",
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
     "inherits-browser": "^0.1.0",
     "jquery": "^3.7.1",
     "min-dash": "^3.7.0"

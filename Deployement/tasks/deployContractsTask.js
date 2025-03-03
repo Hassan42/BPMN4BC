@@ -15,6 +15,7 @@ task('deploy-contracts', 'Deploys all contracts and updates contracts.json')
             return;
         }
 
+        const { contractNames } = args;
         const { network } = args;
         const [deployer] = await ethers.getSigners();
         const contractManager = createContractManager(); // Create an instance of the contract manager
@@ -32,6 +33,11 @@ task('deploy-contracts', 'Deploys all contracts and updates contracts.json')
         for (const file of contractFiles) {
             const contractName = path.basename(file, '.sol');
             console.log(`Checking ${contractName}...`);
+
+            // Skip if contractName is NOT in contractNames
+            if (!contractNames.includes(contractName)) {
+                continue;
+            }
 
             // Check if the contract is intended for the specified network
             const contractInfo = contractManager.getContractByName(contractName);
