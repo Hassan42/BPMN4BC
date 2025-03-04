@@ -172,7 +172,7 @@ function toggleLockButton(isDisabled, isLoading = false) {
       <span class="spinner-border animate-spin inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full"></span> Deploying...
     `);
   } else {
-    compileDeployButton.html(`Deploy`);
+    compileDeployButton.html(`Deploy Process`);
   }
 }
 
