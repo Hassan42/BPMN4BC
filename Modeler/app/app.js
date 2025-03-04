@@ -156,13 +156,23 @@ function processAllElements() {
 }
 
 const compileDeployButton = $('#js-compile-deploy');
-function toggleLockButton(isDisabled) {
+// Function to toggle button state (lock/unlock & show loading animation)
+function toggleLockButton(isDisabled, isLoading = false) {
   compileDeployButton.prop('disabled', isDisabled);
 
   if (isDisabled) {
     compileDeployButton.addClass('opacity-50 cursor-not-allowed').removeClass('cursor-pointer hover:bg-[#c4c5c5]');
   } else {
     compileDeployButton.removeClass('opacity-50 cursor-not-allowed').addClass('cursor-pointer hover:bg-[#c4c5c5]');
+  }
+
+  // Show loading animation
+  if (isLoading) {
+    compileDeployButton.html(`
+      <span class="spinner-border animate-spin inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full"></span> Deploying...
+    `);
+  } else {
+    compileDeployButton.html(`Deploy`);
   }
 }
 
@@ -264,7 +274,7 @@ $(function () {
     event.preventDefault(); // Prevents accidental page reloa
     
     if (compileDeployButton.prop('disabled')) return;
-    toggleLockButton(true);
+    toggleLockButton(true, true);
   
     try {
       // Get BPMN XML
