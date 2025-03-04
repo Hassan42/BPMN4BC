@@ -335,6 +335,7 @@ $(function () {
       alert(`An unexpected error occurred:\n${err.message || 'Unknown error'}`);
       toggleLockButton(false);
     }
+    toggleLockButton(true, false);
   });  
 
   $('#js-execute-panel').click(function (e) {
