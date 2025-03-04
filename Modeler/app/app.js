@@ -18,7 +18,7 @@ import bcExtension from '../resources/BC';
 
 import $ from 'jquery';
 
-import { renderFloatingWindow } from './scripts/ui/renderFloatingWindow.js';
+import { renderVariablesWindow } from './scripts/ui/variablesWindow.js';
 
 
 
@@ -155,9 +155,21 @@ function processAllElements() {
   });
 }
 
+const compileDeployButton = $('#js-compile-deploy');
+function toggleLockButton(isDisabled) {
+  compileDeployButton.prop('disabled', isDisabled);
+
+  if (isDisabled) {
+    compileDeployButton.addClass('opacity-50 cursor-not-allowed').removeClass('cursor-pointer hover:bg-[#c4c5c5]');
+  } else {
+    compileDeployButton.removeClass('opacity-50 cursor-not-allowed').addClass('cursor-pointer hover:bg-[#c4c5c5]');
+  }
+}
+
 // Listen for changes to the Collaboration element
 eventBus.on('element.changed', (event) => {
   processAllElements();
+  toggleLockButton(false);
 });
 
 
@@ -249,7 +261,10 @@ $(function () {
   });
 
   $('#js-compile-deploy').click(async function (event) {
-    event.preventDefault(); // Prevents accidental page reload
+    event.preventDefault(); // Prevents accidental page reloa
+    
+    if (compileDeployButton.prop('disabled')) return;
+    toggleLockButton(true);
   
     try {
       // Get BPMN XML
@@ -277,6 +292,7 @@ $(function () {
       if (!compileResponse.ok) {
         console.error('Compilation error response:', compileData);
         alert(`Compilation failed:\n${compileData.error || 'Unknown error'}`);
+        toggleLockButton(false);
         return;
       }
   
@@ -299,13 +315,15 @@ $(function () {
       if (!deployResponse.ok) {
         console.error('Deployment error response:', deployData);
         alert(`Deployment failed:\n${deployData.error || 'Unknown error'}`);
+        toggleLockButton(false);
         return;
       }
   
-      alert('Compilation & Deployment successful!');
+      alert('Deployment successful.');
     } catch (err) {
       console.error('Unexpected error:', err);
       alert(`An unexpected error occurred:\n${err.message || 'Unknown error'}`);
+      toggleLockButton(false);
     }
   });  
 
@@ -325,7 +343,7 @@ $(function () {
     processAllElements();
     if (outputParametersArray.length > 0) {
       $('#floating-window').remove();
-      renderFloatingWindow(outputParametersArray);
+      renderVariablesWindow(outputParametersArray);
       $('#floating-window').show();
     }
   });

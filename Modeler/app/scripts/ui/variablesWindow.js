@@ -1,4 +1,4 @@
-export function renderFloatingWindow(outputParametersArray) {
+export function renderVariablesWindow(outputParametersArray) {
 
   const floatingWindow = document.createElement('div');
   floatingWindow.id = 'floating-window';

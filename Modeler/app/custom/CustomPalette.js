@@ -56,7 +56,7 @@ export default class CustomPalette {
       'SEND': {
         group: 'BC',
         imageUrl: SEND,
-        title: translate('Create send transaction activity'),
+        title: translate('Create send transaction task'),
         action: {
           dragstart: createElement("true", "SendTask"),
           click: createElement("true", "SendTask")
@@ -66,7 +66,7 @@ export default class CustomPalette {
       'RECEIVE': {
         group: 'BC',
         imageUrl: RECEIVE,
-        title: translate('Create receive transaction activity'),
+        title: translate('Create receive transaction task'),
         action: {
           dragstart: createElement("true", "ReceiveTask"),
           click: createElement("true", "ReceiveTask")
@@ -76,7 +76,7 @@ export default class CustomPalette {
       'BCGroup': {
         group: 'BC',
         imageUrl: BC,
-        title: translate('Create BC group'),
+        title: translate('Create blockchain pool'),
         action: {
           dragstart: createElement("true", "Participant"),
           click: createElement("true", "Participant")
@@ -86,7 +86,7 @@ export default class CustomPalette {
       'BCThrowEvent': {
         group: 'BC',
         imageUrl: BCTHROW,
-        title: translate('Create BC throw event'),
+        title: translate('Create blockchain throw event'),
         action: {
           dragstart: createElement("true", "IntermediateThrowEvent", "throwEvent"),
           click: createElement("true", "IntermediateThrowEvent", "throwEvent")
@@ -96,7 +96,7 @@ export default class CustomPalette {
       'BCCatchEvent': {
         group: 'BC',
         imageUrl: BCCATCH,
-        title: translate('Create BC throw event'),
+        title: translate('Create blockchain catch event'),
         action: {
           dragstart: createElement("true", "IntermediateCatchEvent", "catchEvent"),
           click: createElement("true", "IntermediateCatchEvent", "catchEvent")
@@ -106,7 +106,7 @@ export default class CustomPalette {
       'BCThrowRevertEvent': {
         group: 'BC',
         imageUrl: BCREVTHROW,
-        title: translate('Create BC throw event'),
+        title: translate('Create blockchain throw revert event'),
         action: {
           dragstart: createElement("true", "EndEvent", "throwRevertEvent"),
           click: createElement("true", "EndEvent", "throwRevertEvent")
@@ -116,7 +116,7 @@ export default class CustomPalette {
       'BCCatchRevertEvent': {
         group: 'BC',
         imageUrl: BCREVCATCH,
-        title: translate('Create BC throw event'),
+        title: translate('Create blockchain catch revert event'),
         action: {
           dragstart: createElement("true", "BoundaryEvent", "catchRevertEvent"),
           click: createElement("true", "BoundaryEvent", "catchRevertEvent")
@@ -126,7 +126,7 @@ export default class CustomPalette {
       'BCScript': {
         group: 'BC',
         imageUrl: BCSCRIPT,
-        title: translate('Create BC script task'),
+        title: translate('Create blockchain script task'),
         action: {
           dragstart: createElement("true", "ScriptTask"),
           click: createElement("true", "ScriptTask")
@@ -136,7 +136,7 @@ export default class CustomPalette {
       'BCTimer': {
         group: 'BC',
         imageUrl: BCSTIMER,
-        title: translate('Create BC timer event'),
+        title: translate('Create blockchain timer event'),
         action: {
           dragstart: createElement("true", "IntermediateCatchEvent", "timerEvent"),
           click: createElement("true", "IntermediateCatchEvent", "timerEvent")
