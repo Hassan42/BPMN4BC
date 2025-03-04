@@ -62,6 +62,18 @@ CustomRules.prototype.init = function () {
       return false;
     }
 
+    if (is(shapeBo, "bpmn:ScriptTask") && shapeBo.bc === "true" && !targetBo.bc) {
+      return false;
+    }
+
+    if (is(shapeBo, "bpmn:IntermediateThrowEvent") && shapeBo.bc === "true" && !targetBo.bc) {
+      return false;
+    }
+
+    if (is(shapeBo, "bpmn:EndEvent") && shapeBo.bc === "true" && !targetBo.bc) {
+      return false;
+    }
+
     // Allow the creation of the shape if none of the above rules apply
     return true;
   });
