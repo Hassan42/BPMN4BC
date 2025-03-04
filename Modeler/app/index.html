@@ -1,21 +1,24 @@
 <!DOCTYPE html>
 <html>
+
 <head>
   <title>bpmn-js-example-model-extension</title>
-  <meta charset="utf-8"/>
+  <meta charset="utf-8" />
   <link rel="stylesheet" href="vendor/bpmn-js/assets/diagram-js.css" />
   <link rel="stylesheet" href="vendor/bpmn-js/assets/bpmn-font/css/bpmn-embedded.css" />
   <link rel="stylesheet" href="https://unpkg.com/@bpmn-io/properties-panel/dist/assets/properties-panel.css">
   <link rel="stylesheet" href="css/app.css" />
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
+
 <body>
 
   <div id="container"></div>
   <div id="js-properties-panel"></div>
 
   <!-- Sticky Button Panel -->
-  <ul class="buttons fixed bottom-4 left-1/2 transform -translate-x-1/2 flex gap-2 bg-white border border-gray-300 p-2 rounded">
+  <ul
+    class="buttons fixed bottom-4 left-1/2 transform -translate-x-1/2 flex gap-2 bg-white border border-gray-300 p-2 rounded">
     <li>
       <a id="js-download-diagram" href="#" title="Download BPMN diagram"
         class="px-3 py-1 bg-[#d8d9d9] text-black text-sm rounded border border-[#b1b1b1] cursor-pointer hover:bg-[#c4c5c5]">
@@ -33,7 +36,7 @@
         class="px-3 py-1 bg-[#d8d9d9] text-black text-sm rounded border border-[#b1b1b1] cursor-pointer hover:bg-[#c4c5c5]">
         Upload Diagram
       </a>
-      <input type="file" id="js-upload-diagram" accept=".bpmn" class="hidden"/>
+      <input type="file" id="js-upload-diagram" accept=".bpmn" class="hidden" />
     </li>
     <!-- <li>
       <a id="js-compile-diagram" href="#" class="px-3 py-1 bg-[#d8d9d9] text-black text-sm rounded border border-[#b1b1b1] cursor-pointer hover:bg-[#c4c5c5]">
@@ -41,17 +44,20 @@
       </a>
     </li> -->
     <li>
-      <a id="js-compile-deploy" href="#" class="px-3 py-1 bg-[#d8d9d9] text-black text-sm rounded border border-[#b1b1b1] cursor-pointer hover:bg-[#c4c5c5]">
+      <a id="js-compile-deploy" href="#"
+        class="px-3 py-1 bg-[#d8d9d9] text-black text-sm rounded border border-[#b1b1b1] cursor-pointer hover:bg-[#c4c5c5]">
         Deploy Process
       </a>
     </li>
     <li>
-      <a id="js-execute-panel" href="#" class="px-3 py-1 bg-[#d8d9d9] text-black text-sm rounded border border-[#b1b1b1] cursor-pointer hover:bg-[#c4c5c5]">
+      <a id="js-execute-panel" href="#"
+        class="px-3 py-1 bg-[#d8d9d9] text-black text-sm rounded border border-[#b1b1b1] cursor-pointer hover:bg-[#c4c5c5]">
         Workflow Panel
       </a>
     </li>
     <li>
-      <a id="js-open-floating-window" href="#" class="px-3 py-1 bg-[#d8d9d9] text-black text-sm rounded border border-[#b1b1b1] cursor-pointer hover:bg-[#c4c5c5]">
+      <a id="js-open-floating-window" href="#"
+        class="px-3 py-1 bg-[#d8d9d9] text-black text-sm rounded border border-[#b1b1b1] cursor-pointer hover:bg-[#c4c5c5]">
         Process Variables
       </a>
     </li>
@@ -59,12 +65,19 @@
 
   <script>
     // Make the Upload button trigger file input
-    document.getElementById('js-upload-diagram-btn').addEventListener('click', function() {
+    document.getElementById('js-upload-diagram-btn').addEventListener('click', function () {
       document.getElementById('js-upload-diagram').click();
     });
   </script>
 
+  <!-- Warning Note -->
+  <div
+    class="fixed bottom-16 left-4 bg-white p-2 border border-red-500 text-red-600 italic text-xs rounded shadow-lg w-64">
+    Reloading the page will erase the process diagram. Download the diagram to save your work.
+  </div>
+
   <script src="app.js"></script>
 
 </body>
+
 </html>
