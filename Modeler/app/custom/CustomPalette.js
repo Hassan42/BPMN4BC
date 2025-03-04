@@ -44,6 +44,13 @@ export default class CustomPalette {
           const processElement = bpmnFactory.create('bpmn:Process');
           shape.businessObject.processRef = processElement;
         }
+
+        // If IntermediateCatchEvent, add MessageEventDefinition
+        if (bcType === "IntermediateCatchEvent") {
+          const messageEventDefinition = bpmnFactory.create('bpmn:MessageEventDefinition');
+          businessObject.eventDefinitions = [messageEventDefinition];
+        }
+
         create.start(event, shape);
       };
     }

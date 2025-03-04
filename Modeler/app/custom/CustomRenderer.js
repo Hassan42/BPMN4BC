@@ -120,15 +120,32 @@ export default class CustomRenderer extends BaseRenderer {
           }); break;
           case "IntermediateCatchEvent":
             this.bpmnRenderer.drawShape(parentNode, element);
+
+            // Create white background circle
+            const bgCircle = svgCreate("circle", {
+              cx: element.width / 2,
+              cy: element.height / 2,
+              r: element.width / 2.5, // Adjust size to fit
+              fill: "white",
+              stroke: "black",
+              "stroke-width": 1
+            });
+    
+            svgAppend(parentNode, bgCircle); // Append background first
+    
             var href = BCRECEIVE;
-            if(bcevent=="timerEvent") {href=BCTIMER;}
+            if (bcevent == "timerEvent") {
+              href = BCTIMER;
+            }
+    
             bcSvg = svgCreate("image", {
               x: 9,
               y: 8.5,
-              width: element.width/2,
-              height: element.height/2,
+              width: element.width / 2,
+              height: element.height / 2,
               href: href
-          }); break;
+            });
+            break;
           case "BoundaryEvent":
             this.bpmnRenderer.drawShape(parentNode, element);
             var href = BCREVCATCH;
