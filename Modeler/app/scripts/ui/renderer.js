@@ -11,7 +11,7 @@ export function renderContract(data, networkKey) {
 
   Object.keys(data).forEach(contractKey => {
 
-    if (lanesFilter.length === 0 || lanesFilter.some(lane => contractKey == lane)) {
+    // if (lanesFilter.length === 0 || lanesFilter.some(lane => contractKey == lane)) {
       const contract = data[contractKey];
       const contractDiv = document.createElement('div');
       contractDiv.className = 'border border-gray-300 p-4 rounded mb-4';
@@ -35,7 +35,7 @@ export function renderContract(data, networkKey) {
       contractDiv.appendChild(contractHeader);
       contractDiv.appendChild(contractContent);
       container.appendChild(contractDiv);
-    }
+    // }
   });
 }
 
