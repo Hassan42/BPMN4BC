@@ -262,7 +262,7 @@ async function generateContracts(definitions) {
             roles,
             participant,
             collaborationId:collaboration.id,
-            contractText : process.name,
+            contractText : participant.name,
           };
           const contractConfig = await generateContract(contractParams);
           contracts.push(contractConfig);
