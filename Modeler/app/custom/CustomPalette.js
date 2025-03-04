@@ -29,7 +29,7 @@ export default class CustomPalette {
     } = this;
 
     function createElement(bcNode, bcType, bcEvent) {
-      return function(event) {
+      return function (event) {
         const businessObject = bpmnFactory.create(`bpmn:${bcType}`);
         businessObject.bc = bcNode;
         businessObject.bctype = bcType;
@@ -52,6 +52,13 @@ export default class CustomPalette {
       'SEPERATOR': {
         group: 'BC',
         separator: true
+      },
+      'BCGroupLabel': {
+        group: 'BC',
+        html: '<div class="custom-palette-label">Blockchain Components</div>',
+        action: {
+          click: function () { } // Empty action to prevent unwanted clicks
+        }
       },
       'SEND': {
         group: 'BC',
@@ -116,7 +123,7 @@ export default class CustomPalette {
       'BCCatchRevertEvent': {
         group: 'BC',
         imageUrl: BCREVCATCH,
-        title: translate('Create blockchain catch revert event'),
+        title: translate('Create blockchain catch revert boundary event'),
         action: {
           dragstart: createElement("true", "BoundaryEvent", "catchRevertEvent"),
           click: createElement("true", "BoundaryEvent", "catchRevertEvent")
