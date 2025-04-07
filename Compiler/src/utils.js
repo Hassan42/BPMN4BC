@@ -195,7 +195,7 @@ const getEntryFunctions = (element, process) => {
         const precedingElements = getPreviousElementsFromFlow(flow, process);
 
         precedingElements.forEach(element => {
-            if (element.$type === 'bpmn:ReceiveTask') { 
+            if (element.$type === 'bpmn:ReceiveTask') {
                 entryFunctions.push(element);
             }
         });
@@ -294,7 +294,7 @@ const extractInputParameters = (activity) => {
  * @returns {boolean} True if the type is a value type, false otherwise.
  */
 const isValueType = (name, type) => {
-    if(!type){
+    if (!type) {
         throw new Error(`Variable ${name} type is undefined.`)
     }
     const valueTypes = ['uint', 'address'];
@@ -464,25 +464,46 @@ function findReceiveTask(flowElement) {
     return []; // Return an empty array if no ReceiveTask is found
 }
 
-function generateExpression(expression, collaborationId){
+function generateExpression(expression, collaborationId) {
 
-        return expression.replace(/\${([^}]+)}/g, (_, varName) => {
-          const parts = varName.split('.');
-         
-          // If parts.length === 2 and the second part is "localStorage", return localStorage.varName
-          if (parts.length === 2 && parts[0] === "localStorage") {
+    return expression.replace(/\${([^}]+)}/g, (_, varName) => {
+        const parts = varName.split('.');
+
+        // If parts.length === 2 and the second part is "localStorage", return localStorage.varName
+        if (parts.length === 2 && parts[0] === "localStorage") {
             return `localStorage.${parts[1]}`;
-          }
-      
-          // If parts.length === 2, handle <string>.varname for contract retrieval
-          if (parts.length === 2) {
+        }
+
+        // If parts.length === 2, handle <string>.varname for contract retrieval
+        if (parts.length === 2) {
             const [prefix, variable] = parts;
             return `I${prefix}_Contract_${collaborationId}(contracts["${prefix}_Contract_${collaborationId}"]).get${capitalize(variable)}()`;
-          }
-          
-          // Handle simple ${varname} case
-          return varName;
-        });
+        }
+
+        // Handle simple ${varname} case
+        return varName;
+    });
+}
+
+/**
+ * Parses the encoded return values string and extracts types and variable names.
+ * @param {string} encodedString - The encoded return values string.
+ * @returns {Array} The list of return values with types and names.
+ * @throws {Error} If the encoded string contains an invalid return value expression.
+ */
+function parseReturnValues(encodedString) {
+    if (!encodedString.trim()) {
+        return [];
+    }
+
+    return encodedString.split(',').map(item => {
+        const match = item.match(/^\(([^)]+)\):(.+)$/);
+        if (match) {
+            return { type: match[1], name: match[2] };
+        } else {
+            throw new Error(`Invalid return value expression: ${item}`);
+        }
+    });
 }
 
 // Helper function to capitalize the first letter of a string
@@ -513,5 +534,6 @@ module.exports = {
     findReceiveTask,
     getPreviousElementsFromFlow,
     getEntryFunctions,
-    generateExpression
+    generateExpression,
+    parseReturnValues
 };

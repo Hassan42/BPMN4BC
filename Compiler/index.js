@@ -4,7 +4,7 @@ const fs = require('fs-extra');
 const path = require('path');
 const BpmnModdle = require('bpmn-moddle');
 const bpmnbcDescriptor = require('./resources/BC.json');
-const { generateContracts } = require('./helper/generateContracts');
+const { generateContracts } = require('./src/generateContracts');
 
 const app = express();
 const port = 8000;

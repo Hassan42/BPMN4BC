@@ -6,7 +6,8 @@ const {
   getContractNameForElement,
   getEntryFunctions,
   capitalize,
-  generateExpression
+  generateExpression,
+  parseReturnValues
 } = require('./utils.js');
 
 /**
@@ -119,27 +120,6 @@ function generateScriptFunction(activity, process, collaborationId) {
         ${returnStatement}
     }
   `;
-}
-
-/**
- * Parses the encoded return values string and extracts types and variable names.
- * @param {string} encodedString - The encoded return values string.
- * @returns {Array} The list of return values with types and names.
- * @throws {Error} If the encoded string contains an invalid return value expression.
- */
-function parseReturnValues(encodedString) {
-  if (!encodedString.trim()) {
-    return [];
-  }
-
-  return encodedString.split(',').map(item => {
-    const match = item.match(/^\(([^)]+)\):(.+)$/);
-    if (match) {
-      return { type: match[1], name: match[2] };
-    } else {
-      throw new Error(`Invalid return value expression: ${item}`);
-    }
-  });
 }
 
 /**
@@ -400,9 +380,6 @@ function generateEntryFunction(activity, process, roles, collaborationId) {
       }
     }
   });
-
-
-
 
   proceedingElements.forEach(element => {
     processElement(element);
