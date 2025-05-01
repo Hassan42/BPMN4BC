@@ -8,7 +8,9 @@
     "dev": "run-p build:watch serve",
     "serve": "node server.js",
     "lint": "eslint .",
-    "start": "run-s build serve"
+    "start": "run-s build serve",
+    "start:local": "DEP_API_BASE_URL=http://localhost:3000 COM_API_BASE_URL=http://localhost:8000 npm run start",
+    "start:docker": "DEP_API_BASE_URL=http://deployment:3000 COM_API_BASE_URL=http://compiler:8000 npm run start"
   },
   "devDependencies": {
     "copy-webpack-plugin": "^8.1.0",

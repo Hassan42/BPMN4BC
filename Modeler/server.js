@@ -4,8 +4,9 @@ const cors = require('cors');
 
 const app = express();
 const PORT = 5000;
-const DEP_API_BASE_URL = 'http://deployment:3000'; // External API running on port 3000
-const COM_API_BASE_URL = 'http://compiler:8000'; // External API running on port 8000
+
+const DEP_API_BASE_URL = process.env.DEP_API_BASE_URL || 'http://localhost:3000'; //base url for deployer
+const COM_API_BASE_URL = process.env.COM_API_BASE_URL || 'http://localhost:8000'; //base url for compiler
 
 // Middleware to log incoming requests
 app.use((req, res, next) => {

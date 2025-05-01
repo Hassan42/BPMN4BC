@@ -17,12 +17,12 @@ const compilerPort = 8000;
 const contractsDir = path.resolve('./contracts');
 const artifactsDir = path.resolve('./artifacts');
 
+const COM_API_BASE_URL = process.env.COM_API_BASE_URL || 'http://localhost:8000';
+
 const docker = new Docker(); // Initialize Docker client
 
 app.use(express.json());
 app.use(express.json());
-
-// Start Ganache container
 
 // Start Ganache containers
 app.post('/start', async (req, res) => {
@@ -195,7 +195,7 @@ app.post('/deploy', async (req, res) => {
 
   try {
     // Call the compile route to generate the contracts
-    const response = await axios.post(`http://compiler:${compilerPort}/compile`, { xml });
+    const response = await axios.post(`${COM_API_BASE_URL}/compile`, { xml });
     const contracts = response.data;
 
     // Ensure the contracts directory exists
@@ -287,7 +287,6 @@ app.post('/deploy', async (req, res) => {
     res.status(500).send(err);
   }
 });
-
 
 //Execute task in contract
 app.post('/executeTask', async (req, res) => {

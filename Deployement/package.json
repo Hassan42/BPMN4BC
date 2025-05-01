@@ -5,6 +5,8 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
+    "start:local": "COM_API_BASE_URL=http://localhost:8000 node index.js",
+    "start:docker": "COM_API_BASE_URL=http://compiler:8000 node index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",
