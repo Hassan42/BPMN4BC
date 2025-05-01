@@ -1,4 +1,4 @@
-export function renderVariablesWindow(outputParametersArray) {
+export function renderVariablesWindow(ParametersArray) {
 
   const floatingWindow = document.createElement('div');
   floatingWindow.id = 'floating-window';
@@ -17,17 +17,19 @@ export function renderVariablesWindow(outputParametersArray) {
             <th class="p-2 text-left border-r border-[#b1b1b1]">Type</th>
             <th class="p-2 text-left border-r border-[#b1b1b1]">Initial Value</th>
             <th class="p-2 text-left border-r border-[#b1b1b1]">Scope</th>
-            <th class="p-2 text-left">Source</th>
+            <th class="p-2 text-left border-r border-[#b1b1b1]">Source</th>
+            <th class="p-2 text-left">I/O</th>
           </tr>
         </thead>
         <tbody>
-          ${outputParametersArray.map((param, index) => `
+          ${ParametersArray.map((param, index) => `
             <tr class="border-b border-[#b1b1b1] ${index % 2 === 0 ? 'bg-white' : 'bg-[#f1f1f1]'}">
               <td class="p-2 border-r border-[#b1b1b1]">${param.name}</td>
               <td class="p-2 border-r border-[#b1b1b1]">${param.type}</td>
               <td class="p-2 border-r border-[#b1b1b1]">${param.value}</td>
               <td class="p-2 border-r border-[#b1b1b1]">${param.transactional}</td>
-              <td class="p-2">${param.source}</td>
+              <td class="p-2 border-r border-[#b1b1b1]">${param.source}</td>
+              <td class="p-2">${param.flow}</td>
             </tr>
           `).join('')}
         </tbody>

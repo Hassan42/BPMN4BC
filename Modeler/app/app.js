@@ -55,7 +55,7 @@ const bpmnModeler = new BpmnModeler({
 const eventBus = bpmnModeler.get('eventBus');
 
 const lanes = [];
-const outputParametersArray = [];
+const ParametersArray = [];
 
 // Function to process all Participants and Lanes
 function processAllElements() {
@@ -75,7 +75,7 @@ function processAllElements() {
 
   // Clear the existing lanes array
   lanes.length = 0;
-  outputParametersArray.length = 0;
+  ParametersArray.length = 0;
 
   // Loop through all elements in the model
   const elementRegistry = bpmnModeler.get('elementRegistry');
@@ -110,17 +110,36 @@ function processAllElements() {
           if (extElement.$type && extElement.$type === 'bpmnbc:OutputParameters') {
             if (Array.isArray(extElement.values)) {
               extElement.values.forEach(param => {
-                outputParametersArray.push({
+                ParametersArray.push({
                   name: param.name,
                   value: param.value !== undefined ? param.value : 'N/A',
                   type: param.type,
                   transactional: param.transactional !== undefined ? 'Transaction' : 'Contract',
                   external: param.external !== undefined ? param.external : false,
                   source: businessObject.name !== undefined ? businessObject.name : element.id,
+                  flow: "Output"
                 });
               });
             }
           }
+
+          if (extElement.$type && extElement.$type === 'bpmnbc:InputParameters') {
+            console.log("test")
+            if (Array.isArray(extElement.values)) {
+              extElement.values.forEach(param => {
+                ParametersArray.push({
+                  name: param.name,
+                  value: param.value !== undefined ? param.value : 'N/A',
+                  type: param.type,
+                  transactional: 'Transaction',
+                  external: param.external !== undefined ? param.external : false,
+                  source: businessObject.name !== undefined ? businessObject.name : element.id,
+                  flow: "Input"
+                });
+              });
+            }
+          }
+
         });
       }
     }
@@ -272,18 +291,18 @@ $(function () {
 
   $('#js-compile-deploy').click(async function (event) {
     event.preventDefault(); // Prevents accidental page reloa
-    
+
     if (compileDeployButton.prop('disabled')) return;
     toggleLockButton(true, true);
-  
+
     try {
       // Get BPMN XML
       const { xml } = await bpmnModeler.saveXML({ format: true });
-  
+
       const baseUrl = `${window.location.origin}${window.location.pathname.replace(/\/$/, '')}`;
       const compileUrl = `${baseUrl}/api/compile`;
       const deployUrl = `${baseUrl}/api/deploy`;
-  
+
       // Step 1: Compile
       console.log('Compiling BPMN diagram...');
       const compileResponse = await fetch(compileUrl, {
@@ -298,37 +317,37 @@ $(function () {
       } catch (jsonError) {
         compileData = { error: 'Invalid response from server' };
       }
-  
+
       if (!compileResponse.ok) {
         console.error('Compilation error response:', compileData);
         alert(`Compilation failed:\n${compileData.error || 'Unknown error'}`);
         toggleLockButton(false);
         return;
       }
-  
+
       console.log('Compilation successful! Proceeding to deployment...');
-  
+
       // Step 2: Deploy
       const deployResponse = await fetch(deployUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ xml })
       });
-  
+
       let deployData;
       try {
         deployData = await deployResponse.json();
       } catch (jsonError) {
         deployData = { error: 'Invalid response from server' };
       }
-  
+
       if (!deployResponse.ok) {
         console.error('Deployment error response:', deployData);
         alert(`Deployment failed:\n${deployData.error || 'Unknown error'}`);
         toggleLockButton(false);
         return;
       }
-  
+
       alert('Deployment successful.');
     } catch (err) {
       console.error('Unexpected error:', err);
@@ -336,7 +355,7 @@ $(function () {
       toggleLockButton(false);
     }
     toggleLockButton(true, false);
-  });  
+  });
 
   $('#js-execute-panel').click(function (e) {
     e.preventDefault();
@@ -352,9 +371,9 @@ $(function () {
   });
   $('#js-open-floating-window').click(() => {
     processAllElements();
-    if (outputParametersArray.length > 0) {
+    if (ParametersArray.length > 0) {
       $('#floating-window').remove();
-      renderVariablesWindow(outputParametersArray);
+      renderVariablesWindow(ParametersArray);
       $('#floating-window').show();
     }
   });
