@@ -7,7 +7,7 @@ function generateEvents(events) {
   return events.map(event => {
     switch (event.$type) {
       case 'bpmn:IntermediateThrowEvent':
-        const eventName = event.bceventname || event.id.replace(/\s+/g, '');
+        const eventName = event.bceventname?.replace(/\s+/g, '') || event.id.replace(/\s+/g, '');
         return `event ${eventName}();\n`;
       default:
         return ``;
@@ -24,7 +24,7 @@ function generateEmitFunctions(events) {
   return events.map(event => {
     switch (event.$type) {
       case 'bpmn:IntermediateThrowEvent':
-        const eventName = event.bceventname || event.id.replace(/\s+/g, '');
+        const eventName = event.bceventname?.replace(/\s+/g, '') || event.id.replace(/\s+/g, '');
         return `function emit_${eventName}() public {\n` +
                `    emit ${eventName}();\n` +
                `}\n`;

@@ -343,7 +343,7 @@ function generateEntryFunction(activity, process, roles, collaborationId) {
         break;
       }
       case 'bpmn:IntermediateThrowEvent': {
-        const eventName = element.bceventname || element.id.replace(/\s+/g, '');
+        const eventName = element.bceventname?.replace(/\s+/g, '') || element.id.replace(/\s+/g, '');
         if (elementContractName !== contractName) {
           proceedingLogic += `I${elementContractName}(contracts["${elementContractName}"]).emit_${eventName}();\n`;
         }
