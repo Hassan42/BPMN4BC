@@ -46,14 +46,14 @@ function generateXORGateway(gateway, process, collaborationId) {
     const functionName = `checkXOR_${gateway.id}`;
 
     // Collect condition expressions and variables from `${}`
-    const conditions = gateway.outgoing.map((flow, index) => {
+    const conditions = gateway.outgoing.map((flow) => {
         const condition = flow.conditionExpression?.body || null;
 
         if (condition) {
-            // Extract variables within `${}` using regex
             const regex = /\${([^}]+)}/g;
-            const matches = [...condition.matchAll(regex)].map(match => match[1]) // Extract fullVar directly
-            .filter(fullVar => !fullVar.includes('.')); // Only keep those without a dot
+            const matches = [...condition.matchAll(regex)]
+                .map(match => match[1])
+                .filter(fullVar => !fullVar.includes('.'));
             return {
                 condition: generateExpression(condition, collaborationId),
                 variables: matches
@@ -62,6 +62,14 @@ function generateXORGateway(gateway, process, collaborationId) {
 
         return { condition: '0', variables: [] }; // Default to 0 for branches without conditions
     });
+
+    const emptyConditionCount = conditions.filter(({ condition }) => condition === '0').length;
+    if (emptyConditionCount > 1) {
+        throw new Error(`XOR Gateway '${gateway.id}' has more than one default (empty) condition.`);
+    }
+
+    const defaultIndex = conditions.findIndex(({ condition }) => condition === '0');
+
 
     // Extract transactional parameters from preceding elements
     const { incoming } = findFlowsForElement(gateway);
@@ -72,7 +80,6 @@ function generateXORGateway(gateway, process, collaborationId) {
 
         precedingElements.forEach(element => {
             const params = extractOutputParameters(element);
-
             params.forEach(param => {
                 if (String(param.transactional).trim().toLowerCase() === 'true') {
                     transactionalParameters.set(param.name, param.type);
@@ -90,33 +97,35 @@ function generateXORGateway(gateway, process, collaborationId) {
     // Create the parameter list based on variables and their types from transactionalParameters
     const parameterList = Array.from(allVariables)
         .map(variable => {
-            const type = transactionalParameters.get(variable) || 'uint256'; // Default to uint256 if not found
+            const type = transactionalParameters.get(variable) || 'uint256';
             return `${type} ${variable}`;
         })
         .join(', ');
 
-    // Generate Solidity conditions
-    const solidityConditions = conditions
+
+    const hasFallback = defaultIndex !== -1;
+
+    const conditionalBits = conditions
         .map(({ condition }, index) => {
-            // If the condition is '0', directly return the shifting without checking
-            if (condition === '0') {
-                return `(1 << ${index})`; // Return the shift for the index without condition
-            }
-            return `((${condition}) ? (1 << ${index}) : 0)`; // Normal condition with shift
+            if (condition === '0') return null; // Skip fallback
+            return `((${condition}) ? (1 << ${index}) : 0)`;
         })
+        .filter(Boolean)
         .join(' | ');
 
+    const solidityConditions = hasFallback
+        ? `((${conditionalBits}) != 0 ? (${conditionalBits}) : (1 << ${defaultIndex}))`
+        : conditionalBits;
+
+    // Build require state check
     const entryFunctions = getEntryFunctions(gateway, process);
     const contractName = getContractNameForElement(gateway, process, collaborationId);
 
     const requireState = `require(${entryFunctions.map((entryFunction) => {
         const entryFunctionContractName = getContractNameForElement(entryFunction, process, collaborationId);
-
         const entryFunctionState = entryFunctionContractName !== contractName
             ? `I${entryFunctionContractName}(contracts["${entryFunctionContractName}"]).getState("${entryFunction.id}")`
             : `state["${entryFunction.id}"]`;
-
-
         return `uint256(${entryFunctionState}) == uint256(State.Open)`;
     }).join(' || ')});`;
 
@@ -125,8 +134,9 @@ function generateXORGateway(gateway, process, collaborationId) {
             ${requireState}
             return ${solidityConditions};
         }
-        `;
+    `;
 }
+
 
 
 

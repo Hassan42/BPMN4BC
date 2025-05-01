@@ -1,17 +1,7 @@
 import { renderTabs } from './ui/tabs.js';
 
 function getBaseUrl() {
-  const url = new URL(window.location.href);
-  const pathParts = url.pathname.split('/');
-
-  // Find "modeler" in the path and construct the base URL dynamically
-  const modelerIndex = pathParts.indexOf('modeler');
-  if (modelerIndex === -1) {
-    throw new Error('Base URL extraction failed: "modeler" not found in the path.');
-  }
-
-  const dynamicBasePath = pathParts.slice(0, modelerIndex + 1).join('/');
-  return `${url.origin}${dynamicBasePath}`; 
+  return window.location.origin;
 }
 
 export async function fetchData() {
