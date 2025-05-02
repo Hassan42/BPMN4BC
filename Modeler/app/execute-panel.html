@@ -1,18 +1,29 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Blockchain Workflow Panel</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script type="module" src="execution-panel.js" defer></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Blockchain Workflow Panel</title>
+  <script type="module" src="./execution-panel.js" defer></script>
+  <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-gray-100 p-6">
-    <div class="max-w-4xl mx-auto bg-white p-6 rounded-lg shadow-lg">
-        <h1 class="text-2xl font-bold mb-4">Blockchain Workflow Panel</h1>
-        <button id="fetch-data-btn" class="mb-4 bg-blue-500 text-white px-4 py-2 rounded">Fetch Data</button>
-        <div id="tabsContainer" class="flex space-x-2 mb-4"></div>
-        <div id="jsonContainer"></div>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center">
+  <div class="max-w-4xl w-full bg-white p-6 rounded-lg shadow-lg">
+    <h1 class="text-2xl font-bold mb-4">Blockchain Workflow Panel</h1>
+
+    <!-- Spinner -->
+    <div id="loading-spinner" class="hidden flex justify-center items-center mb-4">
+      <svg class="animate-spin h-8 w-8 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+      </svg>
     </div>
+
+    <!-- Tab container -->
+    <div id="tabsContainer" class="flex space-x-2 mb-4"></div>
+
+    <!-- JSON output or content -->
+    <div id="jsonContainer"></div>
+  </div>
 </body>
 </html>
