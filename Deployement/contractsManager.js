@@ -365,13 +365,15 @@ const getContractsState = (network) => {
     // Create a new object containing only receiveTasks and localStorage for each contract
     const contractsState = networkContracts.reduce((acc, contract) => {
         // Extract only the necessary fields
-        const { contractName, contractText, networkId, receiveTasks, localStorage } = contract;
+        const { contractName, contractRoles, contractText, balance, networkId, receiveTasks, localStorage } = contract;
 
         // Add the contract's relevant data to the result object
         acc[contractName] = {
             contractText,
             receiveTasks,
-            localStorage
+            localStorage,
+            contractRoles,
+            balance
         };
 
         return acc;
@@ -464,6 +466,65 @@ const updateDeployGas = (contractName, deployGas, networkId) => {
     writeContractsFile(contracts);
 };
 
+// Get all role objects from a specific contract
+const getRolesByContractName = (contractName) => {
+    const contracts = getAllContracts();
+
+    // Find the contract by name
+    const contract = contracts.find(c => c.contractName === contractName);
+
+    if (!contract) {
+        throw new Error(`Contract with name "${contractName}" not found.`);
+    }
+
+    // Return the full role objects if available, otherwise an empty array
+    return Array.isArray(contract.contractRoles) ? contract.contractRoles : [];
+};
+
+// Update the balance of a specific role in a contract
+const updateRoleBalance = (contractName, roleName, newBalance) => {
+    const contracts = readContractsFile();
+
+    // Find the contract by name
+    const contract = contracts.find(c => c.contractName === contractName);
+
+    if (!contract) {
+        throw new Error(`Contract with name "${contractName}" not found.`);
+    }
+
+    if (!Array.isArray(contract.contractRoles)) {
+        throw new Error(`No roles defined for contract "${contractName}".`);
+    }
+
+    const role = contract.contractRoles.find(r => r.role === roleName);
+
+    if (!role) {
+        throw new Error(`Role "${roleName}" not found in contract "${contractName}".`);
+    }
+
+    role.balance = newBalance;
+
+    writeContractsFile(contracts);
+};
+
+// Update the balance of a specific contract
+const updateContractBalance = (contractName, balance) => {
+    const contracts = readContractsFile();
+
+    // Find the contract by name
+    const contract = contracts.find(c => c.contractName === contractName);
+
+    if (!contract) {
+        throw new Error(`Contract with name "${contractName}" not found.`);
+    }
+
+    // Update or set the balance field
+    contract.balance = balance;
+
+    // Write the updated contracts back to the file
+    writeContractsFile(contracts);
+};
+
 
 // Export the contract management functions
 const createContractManager = () => ({
@@ -486,7 +547,10 @@ const createContractManager = () => ({
     updateTaskGas,
     getNetworks,
     updateDeployGas,
-    getNetworkByContractName
+    getNetworkByContractName,
+    getRolesByContractName,
+    updateRoleBalance,
+    updateContractBalance
 });
 
 module.exports = createContractManager;

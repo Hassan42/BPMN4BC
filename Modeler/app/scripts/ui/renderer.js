@@ -172,3 +172,75 @@ function createLocalStorageSection(dataArray) {
   return sectionDiv;
 }
 
+export function renderRoleBalances(networks) {
+  const container = document.getElementById('jsonContainer');
+
+  Object.entries(networks).forEach(([networkName, contracts]) => {
+    const sectionContent = document.createElement('div');
+    sectionContent.className = 'p-4';
+
+    // Add contract balances
+    Object.entries(contracts).forEach(([contractKey, contract]) => {
+      const contractName = contract.contractText || contractKey;
+
+      const contractBalanceDiv = document.createElement('div');
+      contractBalanceDiv.className = 'p-3 bg-gray-100 border rounded shadow-sm mb-2';
+
+      const name = document.createElement('div');
+      name.className = 'font-semibold text-gray-700';
+      name.innerText = `${contractName} (Contract)`;
+
+      const balance = document.createElement('div');
+      balance.className = 'text-blue-700 font-semibold';
+      balance.innerText = `Balance: ${contract.balance} ETH`;
+
+      contractBalanceDiv.appendChild(name);
+      contractBalanceDiv.appendChild(balance);
+      sectionContent.appendChild(contractBalanceDiv);
+    });
+
+    // Collect unique roles
+    const uniqueRoles = new Map();
+    Object.values(contracts).forEach(contract => {
+      if (Array.isArray(contract.contractRoles)) {
+        contract.contractRoles.forEach(role => {
+          if (!uniqueRoles.has(role.address)) {
+            uniqueRoles.set(role.address, {
+              role: role.role,
+              address: role.address,
+              balance: role.balance
+            });
+          }
+        });
+      }
+    });
+
+    // Render roles
+    uniqueRoles.forEach(({ role, address, balance }) => {
+      const roleCard = document.createElement('div');
+      roleCard.className = 'p-3 bg-gray-100 border rounded shadow-sm mb-2';
+
+      const roleName = document.createElement('div');
+      roleName.className = 'font-semibold text-gray-700';
+      roleName.innerText = `${role} (${address.slice(0, 6)}…)`;
+
+      const roleBalance = document.createElement('div');
+      roleBalance.className = 'text-blue-700 font-semibold';
+      roleBalance.innerText = `Balance: ${balance} ETH`;
+
+      roleCard.appendChild(roleName);
+      roleCard.appendChild(roleBalance);
+      sectionContent.appendChild(roleCard);
+    });
+
+    // Use your collapsible component here
+    const collapsible = createCollapsibleSection(`Role Balances – ${networkName}`, sectionContent);
+    container.appendChild(collapsible);
+  });
+}
+
+
+
+
+
+

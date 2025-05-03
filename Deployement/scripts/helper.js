@@ -41,9 +41,9 @@ const setResources = async (contractManager, network, contractName, contractInst
         // Create a mapping of roles to signers
         const roleSignerMap = {};
         roles.forEach((role, index) => {
-            roleSignerMap[role] = signers[index+1].address;
+            roleSignerMap[role] = signers[index + 1].address;
             // Update the role address in the contract manager
-            contractManager.updateRoleAddress(contractName, role, signers[index+1].address);
+            contractManager.updateRoleAddress(contractName, role, signers[index + 1].address);
         });
 
         // Convert the roleSignerMap to arrays
@@ -80,22 +80,20 @@ const bigIntToStateString = (bigIntValue) => {
 
 //Query contract data
 const queryContract = async (contractManager, contractName, contractInstance) => {
+    const { ethers } = require("hardhat");
+
     const taskIds = contractManager.getAllTaskIds(contractName);
 
+    // Update localStorage
     if (typeof contractInstance.localStorage === 'function') {
-        // Fetch localStorage if the method exists
         const newData = await contractInstance.localStorage();
-
-        // Ensure newData is an array
         const newDataArray = Array.isArray(newData) ? newData : [newData];
-
         contractManager.updateLocalStorage(contractName, newDataArray);
     }
 
-
+    // Update task states
     for (const taskId of taskIds) {
         try {
-            // Query the current state of the task
             const newState = await contractInstance.getState(taskId);
             contractManager.updateTaskState(contractName, taskId, bigIntToStateString(newState));
             console.log(`Updated state of task ${taskId}`);
@@ -104,8 +102,28 @@ const queryContract = async (contractManager, contractName, contractInstance) =>
         }
     }
 
+    // Update role balances
+    const roles = contractManager.getRolesByContractName(contractName);
+
+    for (const role of roles) {
+        try {
+            const balanceWei = await contractInstance.runner.provider.getBalance(role.address);
+            const balanceEth = ethers.formatEther(balanceWei);
+            contractManager.updateRoleBalance(contractName, role.role, balanceEth);
+        } catch (err) {
+            console.error(`Error fetching balance for role ${role.role}:`, err);
+        }
+    }
+    try {
+        const contractBalanceWei = await contractInstance.runner.provider.getBalance(contractInstance.target);
+        const contractBalanceEth = ethers.formatEther(contractBalanceWei);
+        contractManager.updateContractBalance(contractName, contractBalanceEth);
+    } catch (err) {
+        console.error(`Error fetching balance for contract ${contractInstance.target}:`, err);
+    }
+
     return contractManager.getAllTasks();
-}
+};
 
 //Query all contracts
 const queryContracts = async (contractManager) => {
@@ -172,12 +190,12 @@ const executeTask = async (contractManager, contractName, contractInstance, task
 
         let roleSigner = signers.find(signer => signer.address === roleAddress);
 
-        if(!roleSigner){
+        if (!roleSigner) {
             roleSigner = signers[0];
         }
 
         // Find if the roleAddress exists among the signers
-        
+
         // if (!roleSigner) {
         //     throw new Error(`Role address "${roleAddress}" is not in the list of available signers.`);
         // }
