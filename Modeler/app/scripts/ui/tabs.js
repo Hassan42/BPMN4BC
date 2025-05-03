@@ -22,3 +22,54 @@ export function renderTabs(networks) {
   renderContract(networks[firstNetwork], firstNetwork);
   renderRoleBalances({ [firstNetwork]: networks[firstNetwork] });
 }
+
+
+export function renderTransactionLog(logs) {
+  const logContent = document.getElementById('logContent');
+  logContent.innerHTML = ''; // Clear previous logs
+
+  logs.forEach((tx, index) => {
+    const txDiv = document.createElement('div');
+    txDiv.className = 'bg-gray-100 p-3 rounded border';
+
+    txDiv.innerHTML = `
+      <div><strong>#${index + 1}</strong> [<span class="font-medium ${tx.status === 'failed' ? 'text-red-600' : 'text-green-600'}">${tx.status}</span>]</div>
+      <div><strong>Time:</strong> ${tx.timestamp}</div>
+      <div><strong>Contract:</strong> ${tx.contract}</div>
+      <div><strong>Task:</strong> ${tx.task}</div>
+      <div><strong>Sender:</strong> ${tx.sender}</div>
+      <div><strong>Value:</strong> ${tx.value} ETH</div>
+      <div><strong>Gas Used:</strong> ${tx.gasUsed || 'N/A'}</div>
+      <div><strong>Tx Hash:</strong> <code class="break-all">${tx.txHash || 'N/A'}</code></div>
+    `;
+
+    // Append parsed events if available
+    if (tx.events && Array.isArray(tx.events) && tx.events.length > 0) {
+      const eventList = document.createElement('ul');
+      eventList.className = 'mt-2 pl-4 list-disc';
+
+      tx.events.forEach(ev => {
+        const li = document.createElement('li');
+        li.innerHTML = `<strong>${ev.name}</strong>: ${JSON.stringify(ev.args)}`;
+        eventList.appendChild(li);
+      });
+
+      txDiv.appendChild(document.createElement('hr'));
+      const eventLabel = document.createElement('div');
+      eventLabel.className = 'font-semibold mt-2';
+      eventLabel.innerText = 'Events:';
+      txDiv.appendChild(eventLabel);
+      txDiv.appendChild(eventList);
+    }
+
+    // Show error if present
+    if (tx.status === 'failed' && tx.error) {
+      const err = document.createElement('div');
+      err.className = 'text-red-600 mt-2 break-words';
+      err.innerHTML = `<strong>Error:</strong> ${tx.error}`;
+      txDiv.appendChild(err);
+    }
+
+    logContent.prepend(txDiv);
+  });
+}

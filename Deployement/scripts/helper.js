@@ -1,4 +1,6 @@
 // const { ethers } = require("hardhat");
+const fs = require('fs');
+const path = require('path');
 
 const setContracts = async (contractManager, network, contractName, contractInstance, contractNames) => {
 
@@ -176,11 +178,14 @@ const queryContracts = async (contractManager) => {
 
 
 const executeTask = async (contractManager, contractName, contractInstance, taskId, sender, inputs, value) => {
+    const timestamp = new Date().toISOString();
     try {
         const { ethers } = require("hardhat");
 
         // Get the task by its ID
         // const task = contractManager.getTaskById(contractName, taskId);
+
+
 
         // Get the address of the role associated with this task
         const roleAddress = contractManager.getAddressByRole(contractName, sender);
@@ -220,20 +225,74 @@ const executeTask = async (contractManager, contractName, contractInstance, task
             const receipt = await txResponse.wait();
             const gasUsed = receipt.gasUsed.toString();
             contractManager.updateTaskGas(contractName, taskId, gasUsed);
-            console.log(`Executed ${taskId} with inputs ${inputs}`);
-            console.log(`Gas used for ${taskId}: ${gasUsed}`);
+
+
+            const parsedEvents = receipt.logs.map(log => {
+                try {
+                    return contractInstance.interface.parseLog(log);
+                } catch {
+                    return null;
+                }
+            }).filter(Boolean).map(event => ({
+                name: event.name,
+                args: Object.fromEntries(
+                    Object.entries(event.args)
+                        .filter(([key]) => isNaN(key)) // remove numeric indices
+                )
+            }));
+
+            appendTransactionLog({
+                timestamp,
+                contract: contractName,
+                task: taskId,
+                sender,
+                inputs,
+                value: value || "0",
+                txHash: txResponse.hash,
+                gasUsed,
+                status: "success",
+                events: parsedEvents
+            });
+
         } else {
             throw new Error(`Function "${taskId}" not found on contract instance.`);
         }
     } catch (error) {
+        appendTransactionLog({
+            timestamp,
+            contract: contractName,
+            task: taskId,
+            sender,
+            inputs,
+            value: value || "0",
+            status: "failed",
+            error: error.data?.reason || String(error)
+        });
 
-        // if(error.data){
-        //     console.log(error.data)
-        // }
-        // else{
         throw new Error(`Function "${taskId}" failed to execute:${error}`);
-        // }
     }
+}
+
+// Helper to append to the transaction log
+function appendTransactionLog(logEntry) {
+
+    // Path to the transaction log file
+    const logFilePath = path.resolve(__dirname, '../transactionslog.json');
+
+
+    let logs = [];
+
+    if (fs.existsSync(logFilePath)) {
+        try {
+            logs = JSON.parse(fs.readFileSync(logFilePath, 'utf8'));
+        } catch (err) {
+            console.warn('Could not parse existing transactionslog.json:', err);
+        }
+    }
+
+    logs.push(logEntry);
+
+    fs.writeFileSync(logFilePath, JSON.stringify(logs, null, 2), 'utf8');
 }
 
 // Function to generate a random value based on the type

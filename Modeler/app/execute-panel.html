@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -7,13 +8,15 @@
   <script type="module" src="./execution-panel.js" defer></script>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
+
 <body class="bg-gray-100 min-h-screen flex items-center justify-center">
   <div class="max-w-4xl w-full bg-white p-6 rounded-lg shadow-lg">
     <h1 class="text-2xl font-bold mb-4">Blockchain Workflow Panel</h1>
 
     <!-- Spinner -->
     <div id="loading-spinner" class="hidden flex justify-center items-center mb-4">
-      <svg class="animate-spin h-8 w-8 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+      <svg class="animate-spin h-8 w-8 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none"
+        viewBox="0 0 24 24">
         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
       </svg>
@@ -25,5 +28,25 @@
     <!-- JSON output or content -->
     <div id="jsonContainer"></div>
   </div>
+
+  <!-- Floating Transaction Log Panel -->
+  <div id="transactionLogPanel"
+    class="fixed bottom-4 right-4 w-96 bg-white shadow-lg rounded-lg overflow-hidden border border-gray-300 text-sm z-50">
+    <button id="toggleLogBtn" class="w-full bg-blue-500 text-white px-4 py-2 text-left font-semibold">
+      Transaction Log
+    </button>
+    <div id="logContent" class="max-h-96 overflow-y-auto hidden p-4 space-y-4"></div>
+  </div>
+
+  <!-- Transaction Popup Modal -->
+  <div id="transactionModal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 hidden">
+    <div class="bg-white p-6 rounded-lg shadow-lg max-w-md w-full relative">
+      <button id="closeModalBtn" class="absolute top-2 right-2 text-gray-500 hover:text-black text-xl">&times;</button>
+      <h2 class="text-lg font-bold mb-2">Transaction Details</h2>
+      <div id="transactionModalContent" class="text-sm space-y-2 max-h-96 overflow-y-auto"></div>
+    </div>
+  </div>
+  
 </body>
+
 </html>

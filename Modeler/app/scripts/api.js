@@ -1,4 +1,5 @@
-import { renderTabs } from './ui/tabs.js';
+import { renderTabs, renderTransactionLog } from './ui/tabs.js';
+import { showTransactionModal } from './ui/renderer.js'
 
 function getBaseUrl() {
   return window.location.origin;
@@ -33,16 +34,19 @@ export async function executeTask(network, contractName, task, form, sender, eth
       body: JSON.stringify(payload)
     });
 
+    const data = await fetchData();
+
     if (response.ok) {
-      alert(`Task ${task.id} executed successfully.`);
-      // Re-fetch data and re-render tabs
-      const data = await fetchData();
       renderTabs(data.result);
-    } else {
-      const errorData = await response.json();
-      const errorMessage = errorData.error || 'Unknown error occurred';
-      alert(`Failed to execute task ${task.id}: ${errorMessage}`);
     }
+
+    // Render the transaction popup
+    if (data.transactions && data.transactions.length > 0) {
+      renderTransactionLog(data.transactions);
+      const latestTx = data.transactions[data.transactions.length - 1];
+      showTransactionModal(latestTx);
+    }
+
   } catch (error) {
     console.error('Error executing task:', error);
     alert('Error executing task. Check the console for details.');

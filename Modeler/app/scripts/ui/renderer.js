@@ -1,6 +1,6 @@
 import { createCollapsibleSection } from './collapsible.js';
 import { executeTask } from '../api.js';
-import {toggleVisibility} from '../utils/helper.js';
+import { toggleVisibility } from '../utils/helper.js';
 
 export function renderContract(data, networkKey) {
   const container = document.getElementById('jsonContainer');
@@ -12,29 +12,29 @@ export function renderContract(data, networkKey) {
   Object.keys(data).forEach(contractKey => {
 
     // if (lanesFilter.length === 0 || lanesFilter.some(lane => contractKey == lane)) {
-      const contract = data[contractKey];
-      const contractDiv = document.createElement('div');
-      contractDiv.className = 'border border-gray-300 p-4 rounded mb-4';
+    const contract = data[contractKey];
+    const contractDiv = document.createElement('div');
+    contractDiv.className = 'border border-gray-300 p-4 rounded mb-4';
 
-      const contractHeader = document.createElement('button');
-      contractHeader.className = 'text-lg font-bold bg-gray-200 p-2 rounded w-full text-left';
-    
-      contractHeader.innerText = contract.contractText && contract.contractText.trim() !== '' ? contract.contractText : contractKey;
-      contractHeader.onclick = () => toggleVisibility(contractContent);
+    const contractHeader = document.createElement('button');
+    contractHeader.className = 'text-lg font-bold bg-gray-200 p-2 rounded w-full text-left';
 
-      const contractContent = document.createElement('div');
-      contractContent.className = 'mt-2';
+    contractHeader.innerText = contract.contractText && contract.contractText.trim() !== '' ? contract.contractText : contractKey;
+    contractHeader.onclick = () => toggleVisibility(contractContent);
 
-      if (Array.isArray(contract.receiveTasks) && contract.receiveTasks.length > 0) {
-        contractContent.appendChild(createCollapsibleSection('Tasks', createReceiveTaskSection(networkKey, contractKey, contract.receiveTasks)));
-      }
-      if (Array.isArray(contract.localStorage) && contract.localStorage.length > 0) {
-        contractContent.appendChild(createCollapsibleSection('Data', createLocalStorageSection(contract.localStorage)));
-      }
+    const contractContent = document.createElement('div');
+    contractContent.className = 'mt-2';
 
-      contractDiv.appendChild(contractHeader);
-      contractDiv.appendChild(contractContent);
-      container.appendChild(contractDiv);
+    if (Array.isArray(contract.receiveTasks) && contract.receiveTasks.length > 0) {
+      contractContent.appendChild(createCollapsibleSection('Tasks', createReceiveTaskSection(networkKey, contractKey, contract.receiveTasks)));
+    }
+    if (Array.isArray(contract.localStorage) && contract.localStorage.length > 0) {
+      contractContent.appendChild(createCollapsibleSection('Data', createLocalStorageSection(contract.localStorage)));
+    }
+
+    contractDiv.appendChild(contractHeader);
+    contractDiv.appendChild(contractContent);
+    container.appendChild(contractDiv);
     // }
   });
 }
@@ -129,10 +129,27 @@ function createReceiveTaskSection(network, contractName, tasks) {
     // Disable button if task is completed
     executeBtn.disabled = isCompleted;
 
-    executeBtn.onclick = () => {
-      if (!isCompleted) {
-        const ethAmount = parseFloat(amountInput.value) || 0; // Convert input to float, default to 0
-        executeTask(network, contractName, task, form, senderInput.value, ethAmount);
+    executeBtn.onclick = async () => {
+      if (isCompleted) return;
+    
+      const originalContent = executeBtn.innerHTML;
+      executeBtn.disabled = true;
+      executeBtn.innerHTML = `
+        <svg class="animate-spin h-5 w-5 mx-auto text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+        </svg>
+      `;
+    
+      const ethAmount = parseFloat(amountInput.value) || 0;
+    
+      try {
+        await executeTask(network, contractName, task, form, senderInput.value, ethAmount);
+      } catch (err) {
+        console.error('Task execution failed:', err);
+      } finally {
+        executeBtn.disabled = false;
+        executeBtn.innerHTML = originalContent;
       }
     };
 
@@ -239,8 +256,52 @@ export function renderRoleBalances(networks) {
   });
 }
 
+export function showTransactionModal(tx) {
+  const modal = document.getElementById('transactionModal');
+  const modalContent = document.getElementById('transactionModalContent');
+  const closeBtn = document.getElementById('closeModalBtn');
 
+  if (!modal || !modalContent || !closeBtn) return;
 
+  // Populate the content
+  modalContent.innerHTML = `
+    <div><strong>Status:</strong> <span class="${tx.status === 'failed' ? 'text-red-600' : 'text-green-600'}">${tx.status}</span></div>
+    <div><strong>Time:</strong> ${tx.timestamp}</div>
+    <div><strong>Contract:</strong> ${tx.contract}</div>
+    <div><strong>Task:</strong> ${tx.task}</div>
+    <div><strong>Sender:</strong> ${tx.sender}</div>
+    <div><strong>Value:</strong> ${tx.value} ETH</div>
+    <div><strong>Gas Used:</strong> ${tx.gasUsed || 'N/A'}</div>
+    <div><strong>Tx Hash:</strong> <code class="break-all">${tx.txHash || 'N/A'}</code></div>
+  `;
 
+  // Error message if failed
+  if (tx.status === 'failed') {
+    if (tx.parsedError) {
+      modalContent.innerHTML += `
+          <div class="text-red-600 mt-2"><strong>Error:</strong> ${tx.parsedError.name}</div>
+          <div class="text-red-500 break-words text-xs">
+            ${JSON.stringify(tx.parsedError.args)}
+          </div>
+        `;
+    } else if (tx.error) {
+      modalContent.innerHTML += `
+          <div class="text-red-600 mt-2"><strong>Error:</strong> ${tx.error}</div>
+        `;
+    }
+  }
 
+  // Add events if any
+  if (tx.events && tx.events.length > 0) {
+    const eventsHTML = tx.events.map(ev =>
+      `<div class="border-t pt-2"><strong>${ev.name}</strong>: ${JSON.stringify(ev.args)}</div>`
+    ).join('');
+    modalContent.innerHTML += `<div class="mt-2">${eventsHTML}</div>`;
+  }
 
+  // Show modal
+  modal.classList.remove('hidden');
+
+  // Close handler
+  closeBtn.onclick = () => modal.classList.add('hidden');
+}

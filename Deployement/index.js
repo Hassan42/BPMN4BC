@@ -16,6 +16,7 @@ const port = 3000;
 const compilerPort = 8000;
 const contractsDir = path.resolve('./contracts');
 const artifactsDir = path.resolve('./artifacts');
+const transactionLogPath = path.join(__dirname, 'transactionslog.json');
 
 const COM_API_BASE_URL = process.env.COM_API_BASE_URL || 'http://localhost:8000';
 
@@ -176,8 +177,21 @@ app.get('/query', async (req, res) => {
       }
     }
 
+    const logFilePath = path.resolve(__dirname, 'transactionslog.json');
+    let transactions = [];
+
+    if (fs.existsSync(logFilePath)) {
+      try {
+        transactions = JSON.parse(fs.readFileSync(logFilePath, 'utf8'));
+        if (!Array.isArray(transactions)) transactions = [];
+      } catch (err) {
+        console.warn('Could not parse transactionslog.json. Using empty list.');
+        transactions = [];
+      }
+    }
+
     // Send successful response with the results for all networks
-    res.status(200).json({ result: results });
+    res.status(200).json({ result: results, transactions });
   } catch (err) {
     // Handle unexpected errors
     console.error('Error executing query:', err);
@@ -294,30 +308,48 @@ app.post('/executeTask', async (req, res) => {
     const taskArgs = req.body;
 
     // Validate the structure of taskArgs
-    if (typeof taskArgs !== 'object' || !taskArgs.taskId || !taskArgs.contractName || !taskArgs.network || !taskArgs.sender || !Array.isArray(taskArgs.inputs)) {
-      console.log(taskArgs)
-      return res.status(400).json({ message: 'Invalid request. Please provide taskArgs with taskName, contractName, and inputs.' });
+    if (
+      typeof taskArgs !== 'object' ||
+      !taskArgs.taskId ||
+      !taskArgs.contractName ||
+      !taskArgs.network ||
+      !taskArgs.sender ||
+      !Array.isArray(taskArgs.inputs)
+    ) {
+      console.log(taskArgs);
+      return res.status(400).json({
+        message:
+          'Invalid request. Please provide taskArgs with taskId, contractName, network, sender, and inputs.',
+      });
     }
 
     const network = taskArgs.network;
 
     // Execute the Hardhat task
-    const executionResult = await executeHardhatTask("execute-task", network, taskArgs);
-    console.log(executionResult);
-    // Send successful response
-    res.status(200).json({ message: executionResult });
-  } catch (err) {
-    // Handle errors and send error response
-    console.error('Error executing Hardhat task:', err);
-    // Extract the error message
-    let errorMessage = 'Unknown error occurred';
+    await executeHardhatTask('execute-task', network, taskArgs);
 
-    const match = err.match(/Error: (.*?)(\n|$)/);
+    // Read the transaction log file
+    const logFilePath = path.resolve(__dirname, 'transactionslog.json');
+    const logs = JSON.parse(fs.readFileSync(logFilePath, 'utf8'));
+
+    // Get the last log entry
+    // const lastLog = logs[logs.length - 1];
+
+    res.status(200).json({
+      message: 'Task executed successfully.',
+      transactions: logs,
+    });
+  } catch (err) {
+    console.error('Error executing Hardhat task:', err);
+
+    let errorMessage = 'Unknown error occurred';
+    const match = typeof err === 'string' && err.match(/Error: (.*?)(\n|$)/);
     if (match) {
-      errorMessage = match[1]; // Extract the message after 'Error:'
-    } else {
-      errorMessage = err; // Fallback if regex doesn't match
+      errorMessage = match[1];
+    } else if (err.message) {
+      errorMessage = err.message;
     }
+
     res.status(500).json({ message: 'Error executing task.', error: errorMessage });
   }
 });
@@ -374,6 +406,14 @@ const cleanOutputDirectories = async () => {
     // Clean directories
     await fs.emptyDir(contractsDir);
     await fs.emptyDir(artifactsDir);
+
+     // Delete transaction log if it exists
+     if (await fs.pathExists(transactionLogPath)) {
+      await fs.remove(transactionLogPath);
+      console.log('Deleted transactionslog.json');
+    }
+
+    
   } catch (err) {
     console.error('Error cleaning output directories:', err);
   }
