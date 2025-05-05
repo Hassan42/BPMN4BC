@@ -2,14 +2,16 @@ import { renderTabs, renderTransactionLog } from './ui/tabs.js';
 import { showTransactionModal } from './ui/renderer.js'
 
 function getBaseUrl() {
-  const dockerVer = process.env.DOCKER_VER === 'true'; // for Node build tools like Webpack/Vite/etc.
   const origin = window.location.origin;
+  const hostname = window.location.hostname;
 
-  if (dockerVer) {
-    const parts = window.location.pathname.split('/').filter(Boolean);
-    if (parts.length >= 2) {
-      return `${origin}/${parts[0]}/${parts[1]}`;
-    }
+  if (hostname === 'localhost') {
+    return origin;
+  }
+
+  const parts = window.location.pathname.split('/').filter(Boolean);
+  if (parts.length >= 2) {
+    return `${origin}/${parts[0]}/${parts[1]}`;
   }
 
   return origin;
