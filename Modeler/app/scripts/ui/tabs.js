@@ -37,6 +37,9 @@ export function renderTransactionLog(logs) {
       <div><strong>Contract:</strong> ${tx.contract}</div>
       <div><strong>Task:</strong> ${tx.task}</div>
       <div><strong>Sender:</strong> ${tx.sender}</div>
+      ${tx.inputs && tx.inputs.length > 0
+      ? `<div><strong>Inputs:</strong> ${tx.inputs.map(i => `<code class="bg-white px-1 rounded">${i}</code>`).join(', ')}</div>`
+      : ''}
       <div><strong>Value:</strong> ${tx.value} ETH</div>
       <div><strong>Gas Used:</strong> ${tx.gasUsed || 'N/A'}</div>
       <div><strong>Tx Hash:</strong> <code class="break-all">${tx.txHash || 'N/A'}</code></div>
