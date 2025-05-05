@@ -202,10 +202,17 @@ eventBus.on('element.changed', (event) => {
 });
 
 
-// import XML
-bpmnModeler.importXML(diagramXML).catch((err) => {
-  console.error(err);
-});
+// Try to load from localStorage, fallback to default BPMN file
+const savedXML = localStorage.getItem('autosave_bpmn');
+if (savedXML) {
+  bpmnModeler.importXML(savedXML).catch((err) => {
+    console.error('Error loading saved XML from localStorage:', err);
+  });
+} else {
+  bpmnModeler.importXML(diagramXML).catch((err) => {
+    console.error('Error loading default diagram XML:', err);
+  });
+}
 
 $(function () {
 
@@ -256,6 +263,8 @@ $(function () {
     try {
 
       const { xml } = await bpmnModeler.saveXML({ format: true });
+
+      localStorage.setItem('autosave_bpmn', xml);
 
       setEncoded(downloadLink, 'diagram.bpmn', xml);
     } catch (err) {

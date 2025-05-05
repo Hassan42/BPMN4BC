@@ -23,14 +23,13 @@ export function renderTabs(networks) {
   renderRoleBalances({ [firstNetwork]: networks[firstNetwork] });
 }
 
-
 export function renderTransactionLog(logs) {
   const logContent = document.getElementById('logContent');
   logContent.innerHTML = ''; // Clear previous logs
 
   logs.forEach((tx, index) => {
     const txDiv = document.createElement('div');
-    txDiv.className = 'bg-gray-100 p-3 rounded border';
+    txDiv.className = 'bg-gray-100 p-3 rounded border mb-4';
 
     txDiv.innerHTML = `
       <div><strong>#${index + 1}</strong> [<span class="font-medium ${tx.status === 'failed' ? 'text-red-600' : 'text-green-600'}">${tx.status}</span>]</div>
@@ -43,7 +42,6 @@ export function renderTransactionLog(logs) {
       <div><strong>Tx Hash:</strong> <code class="break-all">${tx.txHash || 'N/A'}</code></div>
     `;
 
-    // Append parsed events if available
     if (tx.events && Array.isArray(tx.events) && tx.events.length > 0) {
       const eventList = document.createElement('ul');
       eventList.className = 'mt-2 pl-4 list-disc';
@@ -62,7 +60,6 @@ export function renderTransactionLog(logs) {
       txDiv.appendChild(eventList);
     }
 
-    // Show error if present
     if (tx.status === 'failed' && tx.error) {
       const err = document.createElement('div');
       err.className = 'text-red-600 mt-2 break-words';
@@ -72,4 +69,18 @@ export function renderTransactionLog(logs) {
 
     logContent.prepend(txDiv);
   });
+
+  // Handle "Download All Logs" button
+  const downloadAllBtn = document.getElementById('downloadAllLogs');
+  if (downloadAllBtn) {
+    downloadAllBtn.onclick = () => {
+      const blob = new Blob([JSON.stringify(logs, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `all-transaction-logs.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    };
+  }
 }

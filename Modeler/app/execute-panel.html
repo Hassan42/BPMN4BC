@@ -7,6 +7,14 @@
   <title>Blockchain Workflow Panel</title>
   <script type="module" src="./execution-panel.js" defer></script>
   <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @media print {
+      #transactionLogPanel,
+      #transactionModal {
+        display: none !important;
+      }
+    }
+  </style>
 </head>
 
 <body class="bg-gray-100 min-h-screen flex items-center justify-center">
@@ -32,11 +40,21 @@
   <!-- Floating Transaction Log Panel -->
   <div id="transactionLogPanel"
     class="fixed bottom-4 right-4 w-96 bg-white shadow-lg rounded-lg overflow-hidden border border-gray-300 text-sm z-50">
-    <button id="toggleLogBtn" class="w-full bg-blue-500 text-white px-4 py-2 text-left font-semibold">
-      Transaction Log
-    </button>
+    <div class="flex items-center justify-between bg-blue-500 text-white px-4 py-2">
+      <button id="toggleLogBtn" class="text-left font-semibold">
+        Transaction Log
+      </button>
+      <button id="downloadAllLogs" class="p-1 hover:bg-blue-600 rounded" title="Download All Logs">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+          stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round"
+            d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4" />
+        </svg>
+      </button>
+    </div>
     <div id="logContent" class="max-h-96 overflow-y-auto hidden p-4 space-y-4"></div>
   </div>
+
 
   <!-- Transaction Popup Modal -->
   <div id="transactionModal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 hidden">
@@ -46,7 +64,7 @@
       <div id="transactionModalContent" class="text-sm space-y-2 max-h-96 overflow-y-auto"></div>
     </div>
   </div>
-  
+
 </body>
 
 </html>

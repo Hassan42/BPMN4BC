@@ -246,7 +246,7 @@ async function generateContracts(definitions) {
   } else {
     for (const participant of participants) {
       const process = findProcessForParticipant(definitions, participant);
-      const networkId = participant.bcid;
+      const networkId = participant.bcid || "network-1";
       if (!networkId) {
         throw new Error("Process has no blockchain network ID defined.")
       }

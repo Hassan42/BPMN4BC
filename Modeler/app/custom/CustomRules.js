@@ -100,17 +100,24 @@ CustomRules.prototype.init = function () {
       const existingScriptTasks = source.outgoing
         .filter(flow => is(flow.target.businessObject, 'bpmn:ScriptTask'))
         .map(flow => flow.source);
-  
+
       // If there is already a ScriptTask connected, disallow additional connections
       if (existingScriptTasks.length > 0 && (bcTarget === "true")) {
         return false;
       }
     }
-  
+
 
     // Assign role to the receive task
-    if (is(sourceBo, "bpmn:SendTask") && is(targetBo, "bpmn:ReceiveTask") && (bcSource === "true") && (bcTarget === "true")) {
-      let participantRole = source.parent && source.parent.businessObject.name;
+    if (
+      is(sourceBo, "bpmn:SendTask") &&
+      is(targetBo, "bpmn:ReceiveTask") &&
+      bcSource === "true" &&
+      bcTarget === "true"
+    ) {
+      let participantBo = source.parent && source.parent.businessObject;
+      let participantRole = participantBo.name;
+
       if (participantRole) {
         targetBo.bcsender = participantRole;
         sourceBo.bcid = targetBo.bcid;

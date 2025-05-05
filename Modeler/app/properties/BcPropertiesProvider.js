@@ -99,9 +99,9 @@ export default function BcPropertiesProvider(propertiesPanel, injector, translat
         groups = groups.filter(group => group.id !== 'condition');
       }
 
-      if (isCollaboration) {
-        groups.push(createBcRoleGroup(element, injector, translate));
-      }
+      // if (isCollaboration) {
+      //   groups.push(createBcRoleGroup(element, injector, translate));
+      // }
 
 
       return groups;

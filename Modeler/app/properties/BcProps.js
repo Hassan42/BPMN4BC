@@ -165,7 +165,7 @@ function bcId(props) {
   const debounce = useService('debounceInput');
 
   const getValue = () => {
-    return element.businessObject.bcid || '';
+    return element.businessObject.bcid || 'network-1';
   };
 
   const setValue = value => {

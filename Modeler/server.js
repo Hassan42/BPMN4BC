@@ -1,6 +1,7 @@
 const express = require('express');
 const path = require('path');
 const cors = require('cors');
+const fs = require('fs');
 
 const app = express();
 const PORT = 5000;
@@ -71,18 +72,42 @@ app.post('/api/executeTask', async (req, res) => {
 // **Relay POST request to deploy BPMN diagram**
 app.post('/api/deploy', async (req, res) => {
   try {
+    const { xml } = req.body;
+
+    if (!xml) {
+      return res.status(400).json({ error: 'Missing XML in request body' });
+    }
+
+    // Ensure attempts folder exists
+    const attemptsDir = path.join(__dirname, 'resources', 'attempts');
+    if (!fs.existsSync(attemptsDir)) {
+      fs.mkdirSync(attemptsDir, { recursive: true });
+    }
+
+    // Create timestamped filename
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const filePath = path.join(attemptsDir, `attempt-${timestamp}.bpmn`);
+
+    // Save the BPMN XML to file
+    fs.writeFileSync(filePath, xml, 'utf8');
+
+    console.log(`Saved deployment attempt to: ${filePath}`);
     console.log('Deploying BPMN diagram...');
+
+    // Deployment call
     const data = await safeFetch(`${DEP_API_BASE_URL}/deploy`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(req.body),
+      body: JSON.stringify({ xml })
     });
+
     res.json(data);
+
   } catch (error) {
+    console.error('Deployment error:', error);
     res.status(500).json({ error: `${error.message}` });
   }
 });
-
 // **Relay POST request to compile BPMN diagram**
 app.post('/api/compile', async (req, res) => {
   try {

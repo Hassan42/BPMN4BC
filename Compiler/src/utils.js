@@ -336,27 +336,37 @@ const getContractNameForElement = (element, process, collaborationId) => {
  * @returns {Array} An array of role objects, each containing `role`, `address`.
  * @throws {Error} If the collaboration element does not contain `roleParameters`.
  */
+// const extractRolesFromCollaboration = (collaboration) => {
+//     const roleParameters = [];
+
+//     if (collaboration.extensionElements && collaboration.extensionElements.values) {
+//         const roleParams = collaboration.extensionElements.values.find(extension => extension.$type === 'bpmnbc:RoleParameters');
+//         if (roleParams && roleParams.values) {
+//             roleParams.values.forEach(param => {
+//                 if (param.$type === 'bpmnbc:RoleParameter') {
+//                     roleParameters.push({
+//                         role: param.role || '',
+//                         address: param.address || '',
+//                     });
+//                 }
+//             });
+//         } else {
+//             throw new Error('No roleParameters found in the collaboration element.');
+//         }
+//     }
+
+//     return roleParameters;
+// }
+
 const extractRolesFromCollaboration = (collaboration) => {
-    const roleParameters = [];
+    if (!collaboration || !collaboration.participants) return [];
+    const participants = collaboration.participants.filter((participant) => participant.bc === "true");
 
-    if (collaboration.extensionElements && collaboration.extensionElements.values) {
-        const roleParams = collaboration.extensionElements.values.find(extension => extension.$type === 'bpmnbc:RoleParameters');
-        if (roleParams && roleParams.values) {
-            roleParams.values.forEach(param => {
-                if (param.$type === 'bpmnbc:RoleParameter') {
-                    roleParameters.push({
-                        role: param.role || '',
-                        address: param.address || '',
-                    });
-                }
-            });
-        } else {
-            throw new Error('No roleParameters found in the collaboration element.');
-        }
-    }
 
-    return roleParameters;
-}
+    return collaboration.participants.filter(participant => participant.bc !== "true").map(participant => {
+        return { role: participant.name || participant.id, address: '' };
+    });
+};
 
 const generateContractConfig = ({
     contractName,
