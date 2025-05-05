@@ -10,7 +10,7 @@
     "lint": "eslint .",
     "start": "run-s build serve",
     "start:local": "DEP_API_BASE_URL=http://localhost:3000 COM_API_BASE_URL=http://localhost:8000 npm run start",
-    "start:docker": "DEP_API_BASE_URL=http://deployment:3000 COM_API_BASE_URL=http://compiler:8000 npm run start"
+    "start:docker": "DOCKER_VER=true DEP_API_BASE_URL=http://deployment:3000 COM_API_BASE_URL=http://compiler:8000 npm run start"
   },
   "devDependencies": {
     "copy-webpack-plugin": "^8.1.0",
