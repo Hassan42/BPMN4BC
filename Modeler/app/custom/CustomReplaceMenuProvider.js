@@ -30,8 +30,6 @@ export default function CustomReplaceMenuProvider(
 
       if (hasBc(parentBo)) {
 
-        console.log('CustomReplaceMenuProvider triggered for Gateway:', bo.id);
-
         filteredReplaceOptions = filter(filteredReplaceOptions, (option) => {
           return (
             option.target.type === 'bpmn:ExclusiveGateway' ||
@@ -42,8 +40,6 @@ export default function CustomReplaceMenuProvider(
       }
 
       filteredReplaceOptions = filter(filteredReplaceOptions, (option) => option.target.type !== bo.$type);
-
-      console.log(filteredReplaceOptions)
 
       return this._createEntries(element, filteredReplaceOptions);
     }
