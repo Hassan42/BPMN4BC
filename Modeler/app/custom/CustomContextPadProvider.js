@@ -15,19 +15,22 @@ export default function CustomContextPadProvider(injector, connect, translate) {
         const parentBo = element.parent && element.parent.businessObject;
 
         const hasBc = (obj) => obj && String(obj.bc) === "true";
+        const isGateway = bo && bo.$type && bo.$type.includes('Gateway');
 
         if (hasBc(bo) || hasBc(parentBo)) {
-            // Remove 'replace'
-            if (actions['replace']) {
+
+            if (!isGateway && actions['replace']) {
+                
                 delete actions['replace'];
             }
 
-            // Remove all 'append.*' EXCEPT 'append.start-event' and 'append.end-event'
             forEach(actions, (action, key) => {
                 if (key.startsWith('append.') && key !== 'append.start-event' && key !== 'append.end-event') {
                     delete actions[key];
                 }
             });
+
+
         }
 
         return actions;

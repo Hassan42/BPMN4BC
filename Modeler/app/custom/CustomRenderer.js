@@ -54,120 +54,120 @@ export default class CustomRenderer extends BaseRenderer {
 
     const { bc, bctype, bcevent } = businessObject;
 
-    if(bc == "true"){
+    if (bc == "true") {
 
       let bcSvg = "";
 
-      switch(bctype){
-          case "SendTask":
-            this.bpmnRenderer.drawShape(parentNode, element);
-            bcSvg = svgCreate("image", {
-              x: 6,
-              y: 3,
-              width: element.width/3.5,
-              height: element.height/3.5,
-              href: SEND
+      switch (bctype) {
+        case "SendTask":
+          this.bpmnRenderer.drawShape(parentNode, element);
+          bcSvg = svgCreate("image", {
+            x: 6,
+            y: 3,
+            width: element.width / 3.5,
+            height: element.height / 3.5,
+            href: SEND
           }); break;
-          case "ScriptTask":
-            this.bpmnRenderer.drawShape(parentNode, element);
-            // drawBpmnTaskShape(parentNode, 100, 80, 10, 'black');
-            bcSvg = svgCreate("image", {
-              x: 1.3,
-              y: 3.4,
-              width: element.width/3,
-              height: element.height/3.4,
-              href: SCRIPT
+        case "ScriptTask":
+          this.bpmnRenderer.drawShape(parentNode, element);
+          // drawBpmnTaskShape(parentNode, 100, 80, 10, 'black');
+          bcSvg = svgCreate("image", {
+            x: 1.3,
+            y: 3.4,
+            width: element.width / 3,
+            height: element.height / 3.4,
+            href: SCRIPT
           }); break;
-          case "ReceiveTask": 
-            this.bpmnRenderer.drawShape(parentNode, element);
-            bcSvg = svgCreate("image", {
-              x: 5.6,
-              y: 3,
-              width: element.width/3.5,
-              height: element.height/3.5,
-              href: RECEIVE
+        case "ReceiveTask":
+          this.bpmnRenderer.drawShape(parentNode, element);
+          bcSvg = svgCreate("image", {
+            x: 5.6,
+            y: 3,
+            width: element.width / 3.5,
+            height: element.height / 3.5,
+            href: RECEIVE
           }); break;
-          case "EventBasedGateway":
-            // this.bpmnRenderer.drawShape(parentNode, element);
-            bcSvg = svgCreate("image", {
-              x: 0,
-              y: 0,
-              width: element.width,
-              height: element.height,
-              href: BEO
+        case "EventBasedGateway":
+          // this.bpmnRenderer.drawShape(parentNode, element);
+          bcSvg = svgCreate("image", {
+            x: 0,
+            y: 0,
+            width: element.width,
+            height: element.height,
+            href: BEO
           }); break;
-          case "Participant":
-            // const dottedRect = drawDottedRect(parentNode, element.width, element.height, 2, "#000000", 2);
-            // const rect = drawRect(parentNode, element.width, element.height, 2, "#000000");
-            this.bpmnRenderer.drawShape(parentNode, element);
-            bcSvg = svgCreate("image", {
-              x: 5,
-              y: 3,
-              width: 21,
-              height: 21,
-              href: BCGroup
+        case "Participant":
+          // const dottedRect = drawDottedRect(parentNode, element.width, element.height, 2, "#000000", 2);
+          // const rect = drawRect(parentNode, element.width, element.height, 2, "#000000");
+          this.bpmnRenderer.drawShape(parentNode, element);
+          bcSvg = svgCreate("image", {
+            x: 5,
+            y: 3,
+            width: 21,
+            height: 21,
+            href: BCGroup
           }); break;
-          case "IntermediateThrowEvent":
-            this.bpmnRenderer.drawShape(parentNode, element);
-            var href = BCGroup;
-            // if(bcevent=="throwRevertEvent") {href=BCREVTHROW;}
-            bcSvg = svgCreate("image", {
-              x: 9,
-              y: 8.5,
-              width: element.width/2,
-              height: element.height/2,
-              href: href
+        case "IntermediateThrowEvent":
+          this.bpmnRenderer.drawShape(parentNode, element);
+          var href = BCGroup;
+          // if(bcevent=="throwRevertEvent") {href=BCREVTHROW;}
+          bcSvg = svgCreate("image", {
+            x: 9,
+            y: 8.5,
+            width: element.width / 2,
+            height: element.height / 2,
+            href: href
           }); break;
-          case "IntermediateCatchEvent":
-            this.bpmnRenderer.drawShape(parentNode, element);
+        case "IntermediateCatchEvent":
+          this.bpmnRenderer.drawShape(parentNode, element);
 
-            // Create white background circle
-            const bgCircle = svgCreate("circle", {
-              cx: element.width / 2,
-              cy: element.height / 2,
-              r: element.width / 2.5, // Adjust size to fit
-              fill: "white",
-              stroke: "black",
-              "stroke-width": 1
-            });
-    
-            svgAppend(parentNode, bgCircle); // Append background first
-    
-            var href = BCRECEIVE;
-            if (bcevent == "timerEvent") {
-              href = BCTIMER;
-            }
-    
-            bcSvg = svgCreate("image", {
-              x: 9,
-              y: 8.5,
-              width: element.width / 2,
-              height: element.height / 2,
-              href: href
-            });
-            break;
-          case "BoundaryEvent":
-            this.bpmnRenderer.drawShape(parentNode, element);
-            var href = BCREVCATCH;
-            bcSvg = svgCreate("image", {
-              x: 9,
-              y: 8.5,
-              width: element.width/2,
-              height: element.height/2,
-              href: href
+          // Create white background circle
+          const bgCircle = svgCreate("circle", {
+            cx: element.width / 2,
+            cy: element.height / 2,
+            r: element.width / 2.5, // Adjust size to fit
+            fill: "white",
+            stroke: "black",
+            "stroke-width": 1
+          });
+
+          svgAppend(parentNode, bgCircle); // Append background first
+
+          var href = BCRECEIVE;
+          if (bcevent == "timerEvent") {
+            href = BCTIMER;
+          }
+
+          bcSvg = svgCreate("image", {
+            x: 9,
+            y: 8.5,
+            width: element.width / 2,
+            height: element.height / 2,
+            href: href
+          });
+          break;
+        case "BoundaryEvent":
+          this.bpmnRenderer.drawShape(parentNode, element);
+          var href = BCREVCATCH;
+          bcSvg = svgCreate("image", {
+            x: 9,
+            y: 8.5,
+            width: element.width / 2,
+            height: element.height / 2,
+            href: href
           }); break;
-          case "EndEvent":
-            this.bpmnRenderer.drawShape(parentNode, element);
-            var href = BCREVTHROW;
-            bcSvg = svgCreate("image", {
-              x: 9,
-              y: 8.5,
-              width: element.width/2,
-              height: element.height/2,
-              href: href
+        case "EndEvent":
+          this.bpmnRenderer.drawShape(parentNode, element);
+          var href = BCREVTHROW;
+          bcSvg = svgCreate("image", {
+            x: 9,
+            y: 8.5,
+            width: element.width / 2,
+            height: element.height / 2,
+            href: href
           }); break;
-          default: throw("Unkown BC type.")
-        }
+        default: throw ("Unkown BC type.")
+      }
 
       svgAppend(parentNode, bcSvg);
       return bcSvg;
@@ -177,7 +177,7 @@ export default class CustomRenderer extends BaseRenderer {
   }
 }
 
-CustomRenderer.$inject = [ 'eventBus', 'bpmnRenderer' ];
+CustomRenderer.$inject = ['eventBus', 'bpmnRenderer'];
 
 // helpers //////////
 
