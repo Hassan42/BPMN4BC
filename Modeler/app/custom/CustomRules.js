@@ -95,6 +95,19 @@ CustomRules.prototype.init = function () {
     const bcTarget = targetBo.bc;
     const bcSource = sourceBo.bc;
 
+
+    // Enforce that StartEvent can only connect to ReceiveTask with bc === 'true'
+    if (is(sourceBo, 'bpmn:StartEvent')) {
+      const participantBo = source.parent && source.parent.businessObject;
+      if (!participantBo || participantBo.bc !== 'true') {
+        return;
+      }
+      if (!is(targetBo, 'bpmn:ReceiveTask') || bcTarget !== 'true') {
+        return false;
+      }
+    }
+
+
     if (is(sourceBo, "bpmn:ParallelGateway")) {
       // Check existing connections from this ParallelGateway to ScriptTask
       const existingScriptTasks = source.outgoing
