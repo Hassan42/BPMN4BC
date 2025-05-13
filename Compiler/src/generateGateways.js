@@ -130,7 +130,7 @@ function generateXORGateway(gateway, process, collaborationId) {
     }).join(' || ')});`;
 
     return `
-        function ${functionName}(${parameterList}) public returns (uint256) {
+        function ${functionName}(${parameterList}) public payable returns (uint256) {
             ${requireState}
             return ${solidityConditions};
         }

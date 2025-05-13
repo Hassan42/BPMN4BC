@@ -95,6 +95,18 @@ CustomRules.prototype.init = function () {
     const bcTarget = targetBo.bc;
     const bcSource = sourceBo.bc;
 
+    // Rule to prevent Intermediate Catch/Throw Event with bc === 'true' from being connected
+    if (
+      (is(sourceBo, 'bpmn:IntermediateCatchEvent') || is(sourceBo, 'bpmn:IntermediateThrowEvent')) && bcSource === 'true'
+    ) {
+      return false;
+    }
+
+    if (
+      (is(targetBo, 'bpmn:IntermediateCatchEvent') || is(targetBo, 'bpmn:IntermediateThrowEvent')) && bcTarget === 'true'
+    ) {
+      return false;
+    }
 
     // Enforce that StartEvent can only connect to ReceiveTask with bc === 'true'
     if (is(sourceBo, 'bpmn:StartEvent')) {
