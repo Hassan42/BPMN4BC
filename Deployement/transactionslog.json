@@ -1,0 +1,46 @@
+[
+  {
+    "timestamp": "2025-05-15T11:20:08.000Z",
+    "contract": "Lane_0w12gik_Contract_Collaboration_51328039",
+    "task": "Activity_1bz9ot6",
+    "sender": "Candidate",
+    "inputs": [],
+    "value": 25,
+    "txHash": "0x84ed643ebf3ffa9b447c58fb2e2e95d0808ac84f4b93ac7addf140d468954118",
+    "gasUsed": "61592",
+    "status": "success",
+    "events": []
+  },
+  {
+    "timestamp": "2025-05-15T11:20:19.284Z",
+    "contract": "Lane_0engt9d_Contract_Collaboration_51328039",
+    "task": "Activity_1av9c73",
+    "sender": "Candidate",
+    "inputs": [
+      "bob",
+      "26"
+    ],
+    "value": "0",
+    "txHash": "0x201b5eedb107856e82f9fa3c8df802b08f71c9865e53aebb06d9c37062119933",
+    "gasUsed": "118989",
+    "status": "success",
+    "events": [
+      {
+        "name": "CandidateEnrolled",
+        "args": {}
+      }
+    ]
+  },
+  {
+    "timestamp": "2025-05-15T11:20:26.958Z",
+    "contract": "Lane_0engt9d_Contract_Collaboration_51328039",
+    "task": "Activity_1hak9ss",
+    "sender": "Candidate",
+    "inputs": [],
+    "value": "0",
+    "txHash": "0x72bcfae2ad1e24a97ae11dd03f4e361a8d8c666086172c0f127d4cf440779374",
+    "gasUsed": "59607",
+    "status": "success",
+    "events": []
+  }
+]
