@@ -1,6 +1,4 @@
 // const { ethers } = require("hardhat");
-const fs = require('fs');
-const path = require('path');
 
 const setContracts = async (contractManager, network, contractName, contractInstance, contractNames) => {
 
@@ -179,6 +177,7 @@ const queryContracts = async (contractManager) => {
 
 const executeTask = async (contractManager, contractName, contractInstance, taskId, sender, inputs, value) => {
     const timestamp = new Date().toISOString();
+    const log = (entry) => appendTransactionLog(contractManager, entry);
     try {
         const { ethers } = require("hardhat");
 
@@ -241,7 +240,7 @@ const executeTask = async (contractManager, contractName, contractInstance, task
                 )
             }));
 
-            appendTransactionLog({
+            log({
                 timestamp,
                 contract: contractName,
                 task: taskId,
@@ -258,7 +257,7 @@ const executeTask = async (contractManager, contractName, contractInstance, task
             throw new Error(`Function "${taskId}" not found on contract instance.`);
         }
     } catch (error) {
-        appendTransactionLog({
+        log({
             timestamp,
             contract: contractName,
             task: taskId,
@@ -266,33 +265,17 @@ const executeTask = async (contractManager, contractName, contractInstance, task
             inputs,
             value: value || "0",
             status: "failed",
-            error: error.data?.reason || String(error)
+            error: error.revert?.args?.[0] ?? error.reason ?? error.data?.reason ?? String(error)
         });
-
-        throw new Error(`Function "${taskId}" failed to execute:${error}`);
+        // Do not re-throw — the failure is recorded in the transaction log.
+        // Rethrowing causes the child process to exit with an error, which prevents
+        // the parent from reading and returning the logged transaction entry.
     }
 }
 
-// Helper to append to the transaction log
-function appendTransactionLog(logEntry) {
-
-    // Path to the transaction log file
-    const logFilePath = path.resolve(__dirname, '../transactionslog.json');
-
-
-    let logs = [];
-
-    if (fs.existsSync(logFilePath)) {
-        try {
-            logs = JSON.parse(fs.readFileSync(logFilePath, 'utf8'));
-        } catch (err) {
-            console.warn('Could not parse existing transactionslog.json:', err);
-        }
-    }
-
-    logs.push(logEntry);
-
-    fs.writeFileSync(logFilePath, JSON.stringify(logs, null, 2), 'utf8');
+// Helper to append to the transaction log stored on the instance
+function appendTransactionLog(contractManager, logEntry) {
+    contractManager.appendTransaction(logEntry);
 }
 
 // Function to generate a random value based on the type

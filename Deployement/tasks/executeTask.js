@@ -14,14 +14,14 @@ task('execute-task', 'Execute a contracts task')
       return;
     }
 
-    const { contractName, taskId, sender,  inputs, value } = args;
+    const { contractName, taskId, sender, inputs, value, instanceId } = args;
 
-    if (!contractName || !taskId || !sender || !Array.isArray(inputs)) {
+    if (!contractName || !taskId || !sender || !Array.isArray(inputs) || !instanceId) {
       console.error('Invalid task arguments.');
       return;
     }
 
-    const contractManager = createContractManager();
+    const contractManager = createContractManager(parseInt(instanceId));
 
     const contract = contractManager.getContractByName(contractName);
 

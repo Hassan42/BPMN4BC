@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>BPMN4BC – Diagram Viewer</title>
+  <meta charset="utf-8" />
+  <link rel="stylesheet" href="vendor/bpmn-js/assets/diagram-js.css" />
+  <link rel="stylesheet" href="vendor/bpmn-js/assets/bpmn-font/css/bpmn-embedded.css" />
+  <link rel="stylesheet" href="css/app.css" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; }
+    #canvas { width: 100%; height: 100%; }
+  </style>
+</head>
+
+<body class="bg-gray-100">
+
+  <div id="canvas"></div>
+
+  <!-- Toolbar -->
+  <ul class="fixed bottom-4 left-1/2 transform -translate-x-1/2 flex gap-2 bg-white border border-gray-300 p-2 rounded shadow">
+    <li>
+      <span id="instance-label" class="px-3 py-1 text-sm text-gray-500 italic"></span>
+    </li>
+    <li>
+      <a id="js-download-diagram" href="#"
+        class="px-3 py-1 bg-[#d8d9d9] text-black text-sm rounded border border-[#b1b1b1] cursor-pointer hover:bg-[#c4c5c5]">
+        Download BPMN
+      </a>
+    </li>
+  </ul>
+
+  <script src="diagram-viewer.js"></script>
+
+</body>
+
+</html>

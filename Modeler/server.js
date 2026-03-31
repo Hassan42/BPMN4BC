@@ -43,11 +43,33 @@ async function safeFetch(url, options = {}) {
   }
 }
 
-// **Relay GET request to fetch data**
+// **Relay GET request to fetch all instances**
+app.get('/api/instances', async (req, res) => {
+  try {
+    const data = await safeFetch(`${DEP_API_BASE_URL}/instances`);
+    res.json(data);
+  } catch (error) {
+    res.status(500).json({ error: `${error.message}` });
+  }
+});
+
+// **Relay GET request to fetch a single instance by id**
+app.get('/api/instances/:id', async (req, res) => {
+  try {
+    const data = await safeFetch(`${DEP_API_BASE_URL}/instances/${req.params.id}`);
+    res.json(data);
+  } catch (error) {
+    res.status(500).json({ error: `${error.message}` });
+  }
+});
+
+// **Relay GET request to fetch data for a specific instance**
 app.get('/api/query', async (req, res) => {
   try {
-    console.log('Fetching data from external API...');
-    const data = await safeFetch(`${DEP_API_BASE_URL}/query`);
+    const { instanceId } = req.query;
+    if (!instanceId) return res.status(400).json({ error: 'Missing instanceId query parameter' });
+    console.log(`Fetching data for instance ${instanceId}...`);
+    const data = await safeFetch(`${DEP_API_BASE_URL}/query?instanceId=${instanceId}`);
     res.json(data);
   } catch (error) {
     res.status(500).json({ error: `${error.message}` });
@@ -69,10 +91,10 @@ app.post('/api/executeTask', async (req, res) => {
   }
 });
 
-// **Relay POST request to deploy BPMN diagram**
+// **Relay POST request to deploy BPMN diagram as a new instance**
 app.post('/api/deploy', async (req, res) => {
   try {
-    const { xml } = req.body;
+    const { xml, name } = req.body;
 
     if (!xml) {
       return res.status(400).json({ error: 'Missing XML in request body' });
@@ -88,17 +110,14 @@ app.post('/api/deploy', async (req, res) => {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const filePath = path.join(attemptsDir, `attempt-${timestamp}.bpmn`);
 
-    // Save the BPMN XML to file
     fs.writeFileSync(filePath, xml, 'utf8');
-
     console.log(`Saved deployment attempt to: ${filePath}`);
-    console.log('Deploying BPMN diagram...');
+    console.log('Deploying BPMN diagram as new instance...');
 
-    // Deployment call
-    const data = await safeFetch(`${DEP_API_BASE_URL}/deploy`, {
+    const data = await safeFetch(`${DEP_API_BASE_URL}/deploy_instance`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ xml })
+      body: JSON.stringify({ xml, name })
     });
 
     res.json(data);

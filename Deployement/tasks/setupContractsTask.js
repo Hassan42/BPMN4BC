@@ -15,9 +15,8 @@ task('setup-contracts', 'Execute the contracts setup')
       return;
     }
     
-    const { contractNames } = args;
-    const { network } = args;
-    const contractManager = createContractManager();
+    const { contractNames, network, instanceId } = args;
+    const contractManager = createContractManager(parseInt(instanceId));
 
     // Fetch all contracts from contracts.json
     const contracts = contractManager.getAllContracts();

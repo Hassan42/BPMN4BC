@@ -16,7 +16,6 @@ const port = 3000;
 const compilerPort = 8000;
 const contractsDir = path.resolve('./contracts');
 const artifactsDir = path.resolve('./artifacts');
-const transactionLogPath = path.join(__dirname, 'transactionslog.json');
 
 const COM_API_BASE_URL = process.env.COM_API_BASE_URL || 'http://localhost:8000';
 
@@ -141,216 +140,86 @@ app.post('/stop', async (req, res) => {
 // Query Contracts on Ganache network
 app.get('/query', async (req, res) => {
   try {
-    const contractManager = createContractManager();
-    const networks = contractManager.getNetworks(); // Get the list of networks
+    const instanceId = parseInt(req.query.instanceId);
+    if (!instanceId) return res.status(400).json({ message: 'Missing instanceId query parameter.' });
 
-    // Ensure we have networks to query
+    const contractManager = createContractManager(instanceId);
+    const networks = contractManager.getNetworks();
+
     if (networks.length === 0) {
       return res.status(200).json({ message: 'No networks found.' });
     }
 
-    // Object to store results
     const results = {};
 
-    // Read hardhat.config.js and parse networks
-    const hardhatConfigPath = path.join(__dirname, 'hardhat.config.js');
-    const hardhatConfig = require(hardhatConfigPath);
-    const availableNetworks = new Set(Object.keys(hardhatConfig.networks || {}));
-
-    // Iterate over each network and execute the query-contracts task
     for (const network of networks) {
-      if (!availableNetworks.has(network)) {
-        continue;
-      }
-
       try {
-        // Execute the Hardhat task for the current network
-        await executeHardhatTask('query-contracts', network, { network: network });
-
-        // Retrieve and store the contracts state for the current network
+        await executeHardhatTask('query-contracts', network, { network, instanceId });
         const contractsState = contractManager.getContractsState(network);
         results[network] = contractsState;
       } catch (err) {
-        // Handle errors specific to the network
-        console.error(`Error executing Hardhat task for network ${network}:`, err);
+        console.error(`Error querying network ${network}:`, err);
         results[network] = { error: 'Failed to retrieve contracts state.' };
       }
     }
 
-    const logFilePath = path.resolve(__dirname, 'transactionslog.json');
-    let transactions = [];
+    const transactions = contractManager.getTransactions();
 
-    if (fs.existsSync(logFilePath)) {
-      try {
-        transactions = JSON.parse(fs.readFileSync(logFilePath, 'utf8'));
-        if (!Array.isArray(transactions)) transactions = [];
-      } catch (err) {
-        console.warn('Could not parse transactionslog.json. Using empty list.');
-        transactions = [];
-      }
-    }
-
-    // Send successful response with the results for all networks
     res.status(200).json({ result: results, transactions });
   } catch (err) {
-    // Handle unexpected errors
     console.error('Error executing query:', err);
     res.status(500).json({ message: 'An error occurred.' });
   }
 });
 
-//Deploy route to compile and save the generated contracts
-app.post('/deploy', async (req, res) => {
-  const { xml } = req.body;
-
-  await cleanOutputDirectories();
-
-  // removeSolFiles(contractsDir);
-
-  try {
-    // Call the compile route to generate the contracts
-    const response = await axios.post(`${COM_API_BASE_URL}/compile`, { xml });
-    const contracts = response.data;
-
-    // Ensure the contracts directory exists
-    if (!fs.existsSync(contractsDir)) {
-      fs.mkdirSync(contractsDir, { recursive: true });
-    }
-
-    const contractsJsonPath = path.join(contractsDir, 'contracts_meta.json');
-
-    // Read existing contracts if the file exists
-    let existingContracts = [];
-    if (fs.existsSync(contractsJsonPath)) {
-      const existingData = fs.readFileSync(contractsJsonPath, 'utf8');
-      existingContracts = JSON.parse(existingData);
-    }
-
-    // Merge the existing contracts with the new contracts
-    const mergedContracts = [...existingContracts];
-    contracts.forEach(newContract => {
-      const existingIndex = mergedContracts.findIndex(
-        contract => contract.contractName === newContract.contractName && contract.networkId === newContract.networkId
-      );
-
-      if (existingIndex !== -1) {
-        // Check if contract code is different before overwriting
-        if (mergedContracts[existingIndex].contractCode !== newContract.contractCode) {
-          mergedContracts[existingIndex] = newContract;
-        } else {
-          console.log(`Contract ${newContract.contractName} on network ${newContract.networkId} has the same code. Skipping update.`);
-        }
-      } else {
-        // Add the new contract
-        mergedContracts.push(newContract);
-      }
-    });
-
-    // Convert the merged contracts object to a JSON string
-    const contractsJson = JSON.stringify(mergedContracts, null, 2);
-
-    // Write the JSON string to a file
-    fs.writeFileSync(contractsJsonPath, contractsJson, 'utf8');
-    console.log(`Updated JSON file at ${contractsJsonPath}`);
-
-    // Save the contracts and interfaces in the specified folder
-    contracts.forEach(contract => {
-      const contractPath = path.join(contractsDir, `${contract.contractName}.sol`);
-      fs.writeFileSync(contractPath, contract.contractCode, 'utf8');
-      console.log(`Wrote contract file to ${contractPath}`);
-
-      const interfacePath = path.join(contractsDir, `I${contract.contractName}.sol`);
-      fs.writeFileSync(interfacePath, contract.contractInterface, 'utf8');
-      console.log(`Wrote interface file to ${interfacePath}`);
-    });
-
-    const contractManager = createContractManager();
-
-    const contractNames = contracts.map(contract => contract.contractName);
-    const networks = [...new Set(contractNames.map(name => contractManager.getNetworkByContractName(name)))];
-    const networkResults = {};
-
-    for (const network of networks) {
-
-
-      // Compile contracts for each network
-      console.log(`Compiling started for network ${network}...`);
-      const compileResult = await executeHardhatTask('compile', network);
-      console.log(`Compilation successful for network ${network}!`);
-      console.log('Compile Output:', compileResult);
-      networkResults[network] = { compile: compileResult };
-
-      // Deploy contracts to each network
-      console.log(`Deployment started for network ${network}...`);
-      const deployResult = await executeHardhatTask('deploy-contracts', network, { contractNames, network: network });
-      console.log(`Deployment successful for network ${network}!`);
-      console.log('Deploy Output:', deployResult);
-      networkResults[network].deploy = deployResult;
-
-      // Setup contracts for each network
-      console.log(`Setup started for network ${network}...`);
-      const setupResult = await executeHardhatTask('setup-contracts', network, { contractNames, network: network });
-      console.log(`Setup successful for network ${network}!`);
-      console.log('Setup Output:', setupResult);
-      networkResults[network].setup = setupResult;
-    }
-
-    res.status(200).json({ message: 'Contracts deployment successful', results: networkResults });
-  } catch (err) {
-    console.error('Error during deployment:', err);
-    res.status(500).send(err);
-  }
-});
 
 //Execute task in contract
 app.post('/executeTask', async (req, res) => {
   try {
     const taskArgs = req.body;
 
-    // Validate the structure of taskArgs
     if (
       typeof taskArgs !== 'object' ||
       !taskArgs.taskId ||
       !taskArgs.contractName ||
       !taskArgs.network ||
       !taskArgs.sender ||
-      !Array.isArray(taskArgs.inputs)
+      !Array.isArray(taskArgs.inputs) ||
+      !taskArgs.instanceId
     ) {
-      console.log(taskArgs);
       return res.status(400).json({
-        message:
-          'Invalid request. Please provide taskArgs with taskId, contractName, network, sender, and inputs.',
+        message: 'Invalid request. Please provide taskId, contractName, network, sender, inputs, and instanceId.',
       });
     }
 
     const network = taskArgs.network;
 
-    // Execute the Hardhat task
     await executeHardhatTask('execute-task', network, taskArgs);
 
-    // Read the transaction log file
-    const logFilePath = path.resolve(__dirname, 'transactionslog.json');
-    const logs = JSON.parse(fs.readFileSync(logFilePath, 'utf8'));
-
-    // Get the last log entry
-    // const lastLog = logs[logs.length - 1];
+    const contractManager = createContractManager(parseInt(taskArgs.instanceId));
+    const transactions = contractManager.getTransactions();
 
     res.status(200).json({
       message: 'Task executed successfully.',
-      transactions: logs,
+      transactions,
     });
   } catch (err) {
     console.error('Error executing Hardhat task:', err);
-
     let errorMessage = 'Unknown error occurred';
     const match = typeof err === 'string' && err.match(/Error: (.*?)(\n|$)/);
-    if (match) {
-      errorMessage = match[1];
-    } else if (err.message) {
-      errorMessage = err.message;
-    }
+    if (match) errorMessage = match[1];
+    else if (err.message) errorMessage = err.message;
 
-    res.status(500).json({ message: 'Error executing task.', error: errorMessage });
+    // The child process may have already logged the failed transaction to instances.json
+    // before it exited — include those transactions in the error response so the
+    // frontend can still display them.
+    let transactions = [];
+    try {
+      const contractManager = createContractManager(parseInt(taskArgs.instanceId));
+      transactions = contractManager.getTransactions();
+    } catch (_) { /* ignore — instanceId may be invalid */ }
+
+    res.status(500).json({ message: 'Error executing task.', error: errorMessage, transactions });
   }
 });
 
@@ -392,28 +261,115 @@ app.post('/executeAll', async (req, res) => {
   }
 });
 
+// ── Instance helpers ────────────────────────────────────────────────────────
+
+const instancesPath = path.join(__dirname, 'instances.json');
+
+const readInstances = () => {
+  if (!fs.existsSync(instancesPath)) {
+    fs.writeFileSync(instancesPath, JSON.stringify([], null, 2), 'utf8');
+  }
+  return JSON.parse(fs.readFileSync(instancesPath, 'utf8'));
+};
+
+const writeInstances = (instances) => {
+  fs.writeFileSync(instancesPath, JSON.stringify(instances, null, 2), 'utf8');
+};
+
+const nextInstanceId = (instances) => {
+  if (instances.length === 0) return 1;
+  return Math.max(...instances.map(i => i.id)) + 1;
+};
+
+// ── POST /deploy_instance ────────────────────────────────────────────────────
+
+app.post('/deploy_instance', async (req, res) => {
+  const { xml, name } = req.body;
+
+  if (!xml) {
+    return res.status(400).json({ message: 'Missing xml in request body.' });
+  }
+
+  try {
+    // Step 1: Calculate instanceId first so compiler can suffix contract names
+    const instances = readInstances();
+    const instanceId = nextInstanceId(instances);
+
+    // Step 2: Compile BPMN XML → Solidity with unique contract names via instanceId
+    const response = await axios.post(`${COM_API_BASE_URL}/compile`, { xml, instanceId });
+    const contracts = response.data;
+
+    // Step 3: Ensure contracts dir exists — do NOT clean it so past artifacts are preserved
+    await fs.ensureDir(contractsDir);
+
+    // Step 4: Write .sol + interface files to disk for Hardhat
+    contracts.forEach(contract => {
+      fs.writeFileSync(path.join(contractsDir, `${contract.contractName}.sol`), contract.contractCode, 'utf8');
+      fs.writeFileSync(path.join(contractsDir, `I${contract.contractName}.sol`), contract.contractInterface, 'utf8');
+    });
+
+    // Step 5: Initialize instance in instances.json BEFORE Hardhat tasks
+    // contractsManager reads from here during deploy/setup tasks
+    const instance = {
+      id: instanceId,
+      name: name || `Instance #${instanceId}`,
+      createdAt: new Date().toISOString(),
+      bpmn: xml,
+      contracts
+    };
+    instances.push(instance);
+    writeInstances(instances);
+
+    // Step 6: Run Hardhat tasks — they update instances.json via contractsManager(instanceId)
+    const contractNames = contracts.map(c => c.contractName);
+    const networks = [...new Set(contracts.map(c => c.networkId))];
+
+    for (const network of networks) {
+      await executeHardhatTask('compile', network);
+      await executeHardhatTask('deploy-contracts', network, { contractNames, network, instanceId });
+      await executeHardhatTask('setup-contracts', network, { contractNames, network, instanceId });
+    }
+
+    // Step 7: Read back final instance state (now includes contract addresses)
+    const updatedInstances = readInstances();
+    const updatedInstance = updatedInstances.find(i => i.id === instanceId);
+
+    res.status(200).json({ message: 'Instance deployed successfully.', instanceId, instance: updatedInstance });
+  } catch (err) {
+    console.error('Error during deploy_instance:', err);
+    res.status(500).send(err);
+  }
+});
+
+// ── GET /instances ───────────────────────────────────────────────────────────
+
+app.get('/instances', (req, res) => {
+  const instances = readInstances();
+  res.status(200).json(instances);
+});
+
+// ── GET /instances/:id ───────────────────────────────────────────────────────
+
+app.get('/instances/:id', (req, res) => {
+  const instances = readInstances();
+  const instance = instances.find(i => i.id === parseInt(req.params.id));
+  if (!instance) {
+    return res.status(404).json({ message: `Instance ${req.params.id} not found.` });
+  }
+  res.status(200).json(instance);
+});
+
 app.listen(port, async () => {
   console.log(`Server listening at http://localhost:${port}`);
 });
 
-//Clean contracts dir
+//Clean contracts dir only (artifacts preserved for querying past instances)
 const cleanOutputDirectories = async () => {
-
   try {
-    // Ensure directories exist
     await fs.ensureDir(contractsDir);
     await fs.ensureDir(artifactsDir);
-    // Clean directories
     await fs.emptyDir(contractsDir);
     await fs.emptyDir(artifactsDir);
-
-     // Delete transaction log if it exists
-     if (await fs.pathExists(transactionLogPath)) {
-      await fs.remove(transactionLogPath);
-      console.log('Deleted transactionslog.json');
-    }
-
-    
   } catch (err) {
     console.error('Error cleaning output directories:', err);
   }

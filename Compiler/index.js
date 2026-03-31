@@ -13,7 +13,7 @@ app.use(cors());
 app.use(express.json());
 
 app.post('/compile', async (req, res) => {
-  const { xml } = req.body;
+  const { xml, instanceId } = req.body;
 
   const moddle = new BpmnModdle({ bpmnbc: bpmnbcDescriptor });
 
@@ -22,7 +22,7 @@ app.post('/compile', async (req, res) => {
     await cleanOutputDirectories();
 
     const { rootElement: definitions } = await moddle.fromXML(xml);
-    const contracts = await generateContracts(definitions);
+    const contracts = await generateContracts(definitions, instanceId);
     res.status(200).json(contracts);
   } catch (err) {
     console.error('Error during compilation:', err);

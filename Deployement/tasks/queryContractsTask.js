@@ -17,9 +17,9 @@ task('query-contracts', 'query all contracts and updates contracts.json')
         console.error('Error parsing taskArgs:', e);
         return;
     }
-    const { network } = args;
+    const { network, instanceId } = args;
     const { ethers } = hre;
-    const contractManager = createContractManager(); // Create an instance of the contract manager
+    const contractManager = createContractManager(parseInt(instanceId));
 
     const contracts = contractManager.getAllContracts();
     const networkContracts = contracts.filter(contract => contract.networkId === network);

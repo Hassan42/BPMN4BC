@@ -1,6 +1,6 @@
 import { renderContract, renderRoleBalances } from './renderer.js';
 
-export function renderTabs(networks) {
+export function renderTabs(networks, instanceId) {
   const tabsContainer = document.getElementById('tabsContainer');
   tabsContainer.innerHTML = '';
 
@@ -10,7 +10,7 @@ export function renderTabs(networks) {
     tabButton.innerText = networkKey;
 
     tabButton.onclick = () => {
-      renderContract(networks[networkKey], networkKey);
+      renderContract(networks[networkKey], networkKey, instanceId);
       renderRoleBalances({ [networkKey]: networks[networkKey] });
     }
     tabsContainer.appendChild(tabButton);
@@ -19,7 +19,7 @@ export function renderTabs(networks) {
   renderRoleBalances(networks);
 
   const firstNetwork = Object.keys(networks)[0];
-  renderContract(networks[firstNetwork], firstNetwork);
+  renderContract(networks[firstNetwork], firstNetwork, instanceId);
   renderRoleBalances({ [firstNetwork]: networks[firstNetwork] });
 }
 

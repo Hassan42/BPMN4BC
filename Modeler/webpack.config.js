@@ -3,8 +3,9 @@ const CopyWebpackPlugin = require('copy-webpack-plugin');
 
 module.exports = {
   entry: {
-    app: './app/app.js',                         // Main app entry
-    'execution-panel': './app/scripts/execution-panel.js' // Corrected path
+    app: './app/app.js',
+    'execution-panel': './app/scripts/execution-panel.js',
+    'diagram-viewer': './app/scripts/diagram-viewer.js'
   },
   output: {
     path: path.resolve(__dirname, 'public'),

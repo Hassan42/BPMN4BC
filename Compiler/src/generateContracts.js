@@ -235,7 +235,7 @@ async function generateInterfaceFromCode(contractName, solidityCode) {
  * @param definitions - The root definitions element from the BPMN XML.
  * @throws {Error} If no collaboration element is found in the BPMN XML.
  */
-async function generateContracts(definitions) {
+async function generateContracts(definitions, instanceId) {
   const collaboration = findCollaboration(definitions);
   const roles = extractRolesFromCollaboration(collaboration);
   const contracts = [];
@@ -256,7 +256,7 @@ async function generateContracts(definitions) {
         const lanes = findLanesForProcess(process);
         if (lanes.length === 0) {
           const contractParams = {
-            contractName: `${process.id.replace(/\s+/g, '')}_DefaultContract_${participant.id}_${collaboration.id}`,
+            contractName: `${process.id.replace(/\s+/g, '')}_DefaultContract_${participant.id}_${collaboration.id}_${instanceId}`,
             networkId,
             activities: findActivitiesForProcess(process),
             gateways: findGatewaysForProcess(process),
@@ -273,7 +273,7 @@ async function generateContracts(definitions) {
         } else {
           for (const lane of lanes) {
             const contractParams = {
-              contractName: lane.id.replace(/\s+/g, '') + '_Contract' + '_' + collaboration.id,
+              contractName: lane.id.replace(/\s+/g, '') + '_Contract' + '_' + collaboration.id + '_' + instanceId,
               networkId,
               activities: findActivitiesForLane(lane),
               gateways: findGatewaysForLane(lane),

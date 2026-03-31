@@ -34,6 +34,9 @@ const containerEl = document.getElementById('container');
 // create modeler
 const bpmnModeler = new BpmnModeler({
   container: containerEl,
+  keyboard: {
+    bindTo: document
+  },
   propertiesPanel: {
     parent: '#js-properties-panel'
   },
@@ -53,6 +56,7 @@ const bpmnModeler = new BpmnModeler({
 
 // Access the event bus
 const eventBus = bpmnModeler.get('eventBus');
+
 
 const lanes = [];
 const ParametersArray = [];
@@ -298,10 +302,25 @@ $(function () {
     }
   });
 
-  $('#js-compile-deploy').click(async function (event) {
-    event.preventDefault(); // Prevents accidental page reloa
-
+  // Deploy button opens name modal first
+  $('#js-compile-deploy').click(function (event) {
+    event.preventDefault();
     if (compileDeployButton.prop('disabled')) return;
+    $('#deploy-instance-name').val('');
+    $('#deploy-modal').removeClass('hidden');
+  });
+
+  $('#deploy-modal-cancel').click(function () {
+    $('#deploy-modal').addClass('hidden');
+  });
+
+  $('#deploy-modal-confirm').click(async function () {
+    const instanceName = $('#deploy-instance-name').val().trim();
+    if (!instanceName) {
+      $('#deploy-instance-name').focus();
+      return;
+    }
+    $('#deploy-modal').addClass('hidden');
     toggleLockButton(true, true);
 
     try {
@@ -319,7 +338,6 @@ $(function () {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ xml })
       });
-      console.log("ERROR", compileResponse)
       let compileData;
       try {
         compileData = await compileResponse.json();
@@ -336,11 +354,11 @@ $(function () {
 
       console.log('Compilation successful! Proceeding to deployment...');
 
-      // Step 2: Deploy
+      // Step 2: Deploy (include instance name)
       const deployResponse = await fetch(deployUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ xml })
+        body: JSON.stringify({ xml, name: instanceName })
       });
 
       let deployData;
@@ -357,26 +375,21 @@ $(function () {
         return;
       }
 
-      alert('Deployment successful.');
+      // Open the new instance's workflow panel
+      const instanceId = deployData.instanceId;
+      window.open(`${baseUrl}/execute-panel.html?instanceId=${instanceId}`, '_blank');
+      toggleLockButton(false);
     } catch (err) {
       console.error('Unexpected error:', err);
       alert(`An unexpected error occurred:\n${err.message || 'Unknown error'}`);
       toggleLockButton(false);
     }
-    toggleLockButton(true, false);
   });
 
   $('#js-execute-panel').click(function (e) {
     e.preventDefault();
-
-    // Serialize the lanes array
-    const lanesParam = encodeURIComponent(JSON.stringify(lanes));
-
-    // Open execute-panel.html with lanes as a query parameter
-    const url = `execute-panel.html?lanes=${lanesParam}`;
-
-    // Open in a new tab
-    window.open(url, '_blank');
+    const baseUrl = `${window.location.origin}${window.location.pathname.replace(/\/$/, '')}`;
+    window.open(`${baseUrl}/execute-panel.html`, '_blank');
   });
   $('#js-open-floating-window').click(() => {
     processAllElements();

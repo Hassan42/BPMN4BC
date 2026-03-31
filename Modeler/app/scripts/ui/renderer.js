@@ -2,7 +2,7 @@ import { createCollapsibleSection } from './collapsible.js';
 import { executeTask } from '../api.js';
 import { toggleVisibility } from '../utils/helper.js';
 
-export function renderContract(data, networkKey) {
+export function renderContract(data, networkKey, instanceId) {
   const container = document.getElementById('jsonContainer');
   container.innerHTML = `<h2 class='text-xl font-bold mb-2'>${networkKey}</h2>`;
 
@@ -26,7 +26,7 @@ export function renderContract(data, networkKey) {
     contractContent.className = 'mt-2';
 
     if (Array.isArray(contract.receiveTasks) && contract.receiveTasks.length > 0) {
-      contractContent.appendChild(createCollapsibleSection('Tasks', createReceiveTaskSection(networkKey, contractKey, contract.receiveTasks)));
+      contractContent.appendChild(createCollapsibleSection('Tasks', createReceiveTaskSection(networkKey, contractKey, contract.receiveTasks, instanceId)));
     }
     if (Array.isArray(contract.localStorage) && contract.localStorage.length > 0) {
       contractContent.appendChild(createCollapsibleSection('Data', createLocalStorageSection(contract.localStorage)));
@@ -39,7 +39,7 @@ export function renderContract(data, networkKey) {
   });
 }
 
-function createReceiveTaskSection(network, contractName, tasks) {
+function createReceiveTaskSection(network, contractName, tasks, instanceId) {
   const sectionDiv = document.createElement('div');
 
   tasks.forEach(task => {
@@ -144,7 +144,7 @@ function createReceiveTaskSection(network, contractName, tasks) {
       const ethAmount = parseFloat(amountInput.value) || 0;
     
       try {
-        await executeTask(network, contractName, task, form, senderInput.value, ethAmount);
+        await executeTask(network, contractName, task, form, senderInput.value, ethAmount, instanceId);
       } catch (err) {
         console.error('Task execution failed:', err);
       } finally {

@@ -17,13 +17,19 @@ function getBaseUrl() {
   return origin;
 }
 
-export async function fetchData() {
-  const response = await fetch(`${getBaseUrl()}/api/query`); // Construct full URL dynamically
+export async function fetchInstances() {
+  const response = await fetch(`${getBaseUrl()}/api/instances`);
   if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
   return await response.json();
 }
 
-export async function executeTask(network, contractName, task, form, sender, ethAmount) {
+export async function fetchData(instanceId) {
+  const response = await fetch(`${getBaseUrl()}/api/query?instanceId=${instanceId}`);
+  if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+  return await response.json();
+}
+
+export async function executeTask(network, contractName, task, form, sender, ethAmount, instanceId) {
   const inputs = Array.from(form.elements)
     .filter(input => input.name)
     .map(input => input.value);
@@ -34,33 +40,51 @@ export async function executeTask(network, contractName, task, form, sender, eth
     taskId: task.id,
     sender: sender,
     inputs: inputs,
-    value: ethAmount
+    value: ethAmount,
+    instanceId: instanceId
   };
 
   try {
-    const response = await fetch(`${getBaseUrl()}/api/executeTask`, { // Construct full URL dynamically
+    // Step 1: Execute the task
+    const response = await fetch(`${getBaseUrl()}/api/executeTask`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
 
-    const data = await fetchData();
+    const responseData = await response.json();
 
-    if (response.ok) {
-      renderTabs(data.result);
+    if (!response.ok) {
+      console.error('Task execution failed:', responseData);
+      // Still render the transaction log — the failed/reverted tx was logged server-side
+      if (responseData.transactions && responseData.transactions.length > 0) {
+        renderTransactionLog(responseData.transactions);
+        showTransactionModal(responseData.transactions[responseData.transactions.length - 1]);
+      }
+      alert(`Error executing task: ${responseData.error || responseData.message || 'Unknown error'}`);
+      return;
     }
 
-    // Render the transaction popup
-    if (data.transactions && data.transactions.length > 0) {
-      renderTransactionLog(data.transactions);
-      const latestTx = data.transactions[data.transactions.length - 1];
-      showTransactionModal(latestTx);
+    // Step 2: Show transaction modal from the execute response
+    if (responseData.transactions && responseData.transactions.length > 0) {
+      renderTransactionLog(responseData.transactions);
+      showTransactionModal(responseData.transactions[responseData.transactions.length - 1]);
     }
 
   } catch (error) {
     console.error('Error executing task:', error);
-    alert('Error executing task. Check the console for details.');
+    alert(`Error executing task: ${error.message || 'Unknown error'}`);
+    return;
+  }
+
+  // Step 3: Refresh UI — separate try/catch so a failed refresh doesn't mask a successful task
+  try {
+    const data = await fetchData(instanceId);
+    renderTabs(data.result, instanceId);
+    if (data.transactions && data.transactions.length > 0) {
+      renderTransactionLog(data.transactions);
+    }
+  } catch (refreshError) {
+    console.error('UI refresh failed after task execution (task was successful):', refreshError);
   }
 }

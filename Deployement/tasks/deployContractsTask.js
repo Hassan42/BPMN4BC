@@ -15,10 +15,9 @@ task('deploy-contracts', 'Deploys all contracts and updates contracts.json')
             return;
         }
 
-        const { contractNames } = args;
-        const { network } = args;
+        const { contractNames, network, instanceId } = args;
         const [deployer] = await ethers.getSigners();
-        const contractManager = createContractManager(); // Create an instance of the contract manager
+        const contractManager = createContractManager(parseInt(instanceId));
 
         console.log("Deploying contracts with the account:", deployer.address);
 
