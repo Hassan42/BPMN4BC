@@ -1,5 +1,6 @@
-import { fetchData, fetchInstances } from './api.js';
+import { fetchData, fetchInstances, deleteInstance } from './api.js';
 import { renderTabs, renderTransactionLog } from './ui/tabs.js';
+import { GAS_PRICE_GWEI, getEthChfRate, gasToCHF, formatCHF } from './pricing.js';
 
 const loadingSpinner = document.getElementById('loading-spinner');
 const toggleBtn = document.getElementById('toggleLogBtn');
@@ -21,7 +22,8 @@ function getBaseUrl() {
   return origin;
 }
 
-function renderInstanceList(instances) {
+
+function renderInstanceList(instances, ethChfRate) {
   const container = document.getElementById('instancesContainer');
   container.innerHTML = '';
 
@@ -31,16 +33,47 @@ function renderInstanceList(instances) {
   }
 
   instances.forEach(instance => {
+    const row = document.createElement('div');
+    row.className = 'flex items-center gap-2 mb-2';
+
     const btn = document.createElement('button');
-    btn.className = 'w-full text-left px-4 py-2 rounded border border-gray-300 bg-white hover:bg-blue-50 mb-2 flex justify-between items-center';
+    btn.className = 'flex-1 text-left px-4 py-2 rounded border border-gray-300 bg-white hover:bg-blue-50 flex justify-between items-center';
+
+    const totalGas = (instance.contracts || [])
+      .reduce((sum, c) => sum + (Number(c.deployGas) || 0), 0);
+
+    const chf = gasToCHF(totalGas, ethChfRate);
+    const costLabel = totalGas > 0
+      ? `${totalGas.toLocaleString()} gas${chf !== null ? ` · ${formatCHF(chf)}` : ''}`
+      : 'no gas data';
+
     btn.innerHTML = `
       <span class="font-semibold">${instance.name || `Instance #${instance.id}`}</span>
-      <span class="text-xs text-gray-500">#${instance.id} &middot; ${new Date(instance.createdAt).toLocaleString()}</span>
+      <span class="text-xs text-gray-500">#${instance.id} &middot; ${new Date(instance.createdAt).toLocaleString()} &middot; ${costLabel}</span>
     `;
     btn.onclick = () => {
       window.location.href = `${getBaseUrl()}/execute-panel.html?instanceId=${instance.id}`;
     };
-    container.appendChild(btn);
+
+    const delBtn = document.createElement('button');
+    delBtn.className = 'px-3 py-2 text-sm rounded border border-red-300 text-red-500 bg-white hover:bg-red-50';
+    delBtn.textContent = 'Delete';
+    delBtn.onclick = async () => {
+      if (!confirm(`Delete "${instance.name || `Instance #${instance.id}`}"? This cannot be undone.`)) return;
+      try {
+        await deleteInstance(instance.id);
+        row.remove();
+        if (container.children.length === 0) {
+          container.innerHTML = '<p class="text-gray-500 text-sm">No instances deployed yet.</p>';
+        }
+      } catch (err) {
+        alert(`Failed to delete instance: ${err.message}`);
+      }
+    };
+
+    row.appendChild(btn);
+    row.appendChild(delBtn);
+    container.appendChild(row);
   });
 }
 
@@ -74,9 +107,9 @@ if (instanceId) {
   (async () => {
     try {
       loadingSpinner.classList.remove('hidden');
-      const data = await fetchData(instanceId);
+      const [data, ethChfRate] = await Promise.all([fetchData(instanceId), getEthChfRate()]);
       renderTabs(data.result, instanceId);
-      renderTransactionLog(data.transactions);
+      renderTransactionLog(data.transactions, ethChfRate);
     } catch (error) {
       console.error('Error fetching instance data:', error);
     } finally {
@@ -96,8 +129,8 @@ if (instanceId) {
   (async () => {
     try {
       loadingSpinner.classList.remove('hidden');
-      const instances = await fetchInstances();
-      renderInstanceList(instances);
+      const [instances, ethChfRate] = await Promise.all([fetchInstances(), getEthChfRate()]);
+      renderInstanceList(instances, ethChfRate);
     } catch (error) {
       console.error('Error fetching instances:', error);
     } finally {

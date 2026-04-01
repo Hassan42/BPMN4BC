@@ -63,6 +63,18 @@ app.get('/api/instances/:id', async (req, res) => {
   }
 });
 
+// **Relay DELETE request to remove an instance**
+app.delete('/api/instances/:id', async (req, res) => {
+  try {
+    const data = await safeFetch(`${DEP_API_BASE_URL}/instances/${req.params.id}`, {
+      method: 'DELETE'
+    });
+    res.json(data);
+  } catch (error) {
+    res.status(500).json({ error: `${error.message}` });
+  }
+});
+
 // **Relay GET request to fetch data for a specific instance**
 app.get('/api/query', async (req, res) => {
   try {

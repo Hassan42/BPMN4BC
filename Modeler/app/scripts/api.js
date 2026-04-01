@@ -1,5 +1,6 @@
 import { renderTabs, renderTransactionLog } from './ui/tabs.js';
-import { showTransactionModal } from './ui/renderer.js'
+import { showTransactionModal } from './ui/renderer.js';
+import { getEthChfRate } from './pricing.js';
 
 function getBaseUrl() {
   const origin = window.location.origin;
@@ -19,6 +20,14 @@ function getBaseUrl() {
 
 export async function fetchInstances() {
   const response = await fetch(`${getBaseUrl()}/api/instances`);
+  if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+  return await response.json();
+}
+
+export async function deleteInstance(instanceId) {
+  const response = await fetch(`${getBaseUrl()}/api/instances/${instanceId}`, {
+    method: 'DELETE'
+  });
   if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
   return await response.json();
 }
@@ -54,11 +63,13 @@ export async function executeTask(network, contractName, task, form, sender, eth
 
     const responseData = await response.json();
 
+    const ethChfRate = await getEthChfRate();
+
     if (!response.ok) {
       console.error('Task execution failed:', responseData);
       // Still render the transaction log — the failed/reverted tx was logged server-side
       if (responseData.transactions && responseData.transactions.length > 0) {
-        renderTransactionLog(responseData.transactions);
+        renderTransactionLog(responseData.transactions, ethChfRate);
         showTransactionModal(responseData.transactions[responseData.transactions.length - 1]);
       }
       alert(`Error executing task: ${responseData.error || responseData.message || 'Unknown error'}`);
@@ -67,7 +78,7 @@ export async function executeTask(network, contractName, task, form, sender, eth
 
     // Step 2: Show transaction modal from the execute response
     if (responseData.transactions && responseData.transactions.length > 0) {
-      renderTransactionLog(responseData.transactions);
+      renderTransactionLog(responseData.transactions, ethChfRate);
       showTransactionModal(responseData.transactions[responseData.transactions.length - 1]);
     }
 
@@ -79,10 +90,10 @@ export async function executeTask(network, contractName, task, form, sender, eth
 
   // Step 3: Refresh UI — separate try/catch so a failed refresh doesn't mask a successful task
   try {
-    const data = await fetchData(instanceId);
+    const [data, ethChfRate] = await Promise.all([fetchData(instanceId), getEthChfRate()]);
     renderTabs(data.result, instanceId);
     if (data.transactions && data.transactions.length > 0) {
-      renderTransactionLog(data.transactions);
+      renderTransactionLog(data.transactions, ethChfRate);
     }
   } catch (refreshError) {
     console.error('UI refresh failed after task execution (task was successful):', refreshError);

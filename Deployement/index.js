@@ -164,8 +164,10 @@ app.get('/query', async (req, res) => {
     }
 
     const transactions = contractManager.getTransactions();
+    const totalDeployGas = contractManager.getAllContracts()
+      .reduce((sum, c) => sum + (Number(c.deployGas) || 0), 0);
 
-    res.status(200).json({ result: results, transactions });
+    res.status(200).json({ result: results, transactions, totalDeployGas });
   } catch (err) {
     console.error('Error executing query:', err);
     res.status(500).json({ message: 'An error occurred.' });
@@ -290,10 +292,12 @@ app.post('/deploy_instance', async (req, res) => {
     return res.status(400).json({ message: 'Missing xml in request body.' });
   }
 
+  let instanceId; // hoisted so the catch block can roll back on failure
+
   try {
     // Step 1: Calculate instanceId first so compiler can suffix contract names
     const instances = readInstances();
-    const instanceId = nextInstanceId(instances);
+    instanceId = nextInstanceId(instances);
 
     // Step 2: Compile BPMN XML → Solidity with unique contract names via instanceId
     const response = await axios.post(`${COM_API_BASE_URL}/compile`, { xml, instanceId });
@@ -337,7 +341,31 @@ app.post('/deploy_instance', async (req, res) => {
     res.status(200).json({ message: 'Instance deployed successfully.', instanceId, instance: updatedInstance });
   } catch (err) {
     console.error('Error during deploy_instance:', err);
-    res.status(500).send(err);
+
+    // Roll back: remove the partially-saved instance and its .sol files
+    if (instanceId !== undefined) {
+      try {
+        const current = readInstances();
+        writeInstances(current.filter(i => i.id !== instanceId));
+        console.log(`Rolled back failed instance #${instanceId} from instances.json`);
+      } catch (rollbackErr) {
+        console.error('Failed to roll back instance from instances.json:', rollbackErr);
+      }
+
+      // Delete any .sol files belonging to this instance — they all end with _${instanceId}.sol
+      try {
+        const suffix = `_${instanceId}.sol`;
+        const files = fs.readdirSync(contractsDir).filter(f => f.endsWith(suffix));
+        files.forEach(f => {
+          fs.removeSync(path.join(contractsDir, f));
+          console.log(`Removed failed contract file: ${f}`);
+        });
+      } catch (cleanupErr) {
+        console.error('Failed to clean up contract files:', cleanupErr);
+      }
+    }
+
+    res.status(500).json({ message: 'Deployment failed.', error: String(err) });
   }
 });
 
@@ -357,6 +385,19 @@ app.get('/instances/:id', (req, res) => {
     return res.status(404).json({ message: `Instance ${req.params.id} not found.` });
   }
   res.status(200).json(instance);
+});
+
+// ── DELETE /instances/:id ─────────────────────────────────────────────────────
+
+app.delete('/instances/:id', (req, res) => {
+  const instances = readInstances();
+  const idx = instances.findIndex(i => i.id === parseInt(req.params.id));
+  if (idx === -1) {
+    return res.status(404).json({ message: `Instance ${req.params.id} not found.` });
+  }
+  instances.splice(idx, 1);
+  writeInstances(instances);
+  res.status(200).json({ message: `Instance ${req.params.id} deleted.` });
 });
 
 app.listen(port, async () => {

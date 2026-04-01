@@ -81,11 +81,15 @@ function generateScriptFunction(activity, process, collaborationId) {
   const storageAssignments = outputParams
     .filter(param => String(param.transactional).trim().toLowerCase() !== "true")
     .map(param => {
-      const { name, value } = param;
+      const { type, name, value } = param;
       if(!value){
         throw new Error(`Variable ${name} has missing value.`);
       }
-      return `localStorage.${name} = ${generateExpression(value, collaborationId)};`;
+      const raw = generateExpression(value, collaborationId);
+      const formatted = (type === 'string' && !value.includes('${') && !raw.startsWith('"'))
+        ? `"${raw}"`
+        : raw;
+      return `localStorage.${name} = ${formatted};`;
     })
     .join('\n');
 
@@ -153,7 +157,7 @@ function generateEntryFunction(activity, process, roles, collaborationId) {
   const storageAssignments = outputParameters
     .filter(param => String(param.transactional).trim().toLowerCase() !== "true")
     .map(param => {
-      const { name, value, external } = param;
+      const { type, name, value, external } = param;
 
       if(!value && String(param.external).trim().toLowerCase() !== "true"){
         throw new Error(`Variable ${name} has missing value.`);
@@ -162,7 +166,11 @@ function generateEntryFunction(activity, process, roles, collaborationId) {
         return `localStorage.${name} = ${name};`;
       }
 
-      return `localStorage.${name} = ${generateExpression(value, collaborationId)};`;
+      const raw = generateExpression(value, collaborationId);
+      const formatted = (type === 'string' && !value.includes('${') && !raw.startsWith('"'))
+        ? `"${raw}"`
+        : raw;
+      return `localStorage.${name} = ${formatted};`;
     })
     .join('\n');
 

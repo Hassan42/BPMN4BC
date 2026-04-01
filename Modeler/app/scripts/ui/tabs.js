@@ -1,4 +1,5 @@
 import { renderContract, renderRoleBalances } from './renderer.js';
+import { gasToCHF, formatCHF } from '../pricing.js';
 
 export function renderTabs(networks, instanceId) {
   const tabsContainer = document.getElementById('tabsContainer');
@@ -23,13 +24,16 @@ export function renderTabs(networks, instanceId) {
   renderRoleBalances({ [firstNetwork]: networks[firstNetwork] });
 }
 
-export function renderTransactionLog(logs) {
+export function renderTransactionLog(logs, ethChfRate) {
   const logContent = document.getElementById('logContent');
   logContent.innerHTML = ''; // Clear previous logs
 
   logs.forEach((tx, index) => {
     const txDiv = document.createElement('div');
     txDiv.className = 'bg-gray-100 p-3 rounded border mb-4';
+
+    const chf = gasToCHF(tx.gasUsed, ethChfRate);
+    const chfLabel = chf !== null ? ` <span class="text-gray-500">(≈ ${formatCHF(chf)})</span>` : '';
 
     txDiv.innerHTML = `
       <div><strong>#${index + 1}</strong> [<span class="font-medium ${tx.status === 'failed' ? 'text-red-600' : 'text-green-600'}">${tx.status}</span>]</div>
@@ -41,7 +45,7 @@ export function renderTransactionLog(logs) {
       ? `<div><strong>Inputs:</strong> ${tx.inputs.map(i => `<code class="bg-white px-1 rounded">${i}</code>`).join(', ')}</div>`
       : ''}
       <div><strong>Value:</strong> ${tx.value} ETH</div>
-      <div><strong>Gas Used:</strong> ${tx.gasUsed || 'N/A'}</div>
+      <div><strong>Gas Used:</strong> ${tx.gasUsed || 'N/A'}${chfLabel}</div>
       <div><strong>Tx Hash:</strong> <code class="break-all">${tx.txHash || 'N/A'}</code></div>
     `;
 

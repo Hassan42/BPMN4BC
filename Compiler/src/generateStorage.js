@@ -71,7 +71,11 @@ function generateStorage(activities, participant, lane) {
     // Generate initialization code
     const initializationCode = Object.keys(initialValues).length > 0
         ? Object.entries(initialValues)
-            .map(([name, value]) => `localStorage.${name} = ${value};`)
+            .map(([name, value]) => {
+                const param = outputParamsArray.find(p => p.name === name);
+                const formattedValue = param?.type === 'string' ? `"${value}"` : value;
+                return `localStorage.${name} = ${formattedValue};`;
+            })
             .join('\n        ')
         : '';
 
