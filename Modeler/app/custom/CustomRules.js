@@ -37,7 +37,8 @@ CustomRules.prototype.init = function () {
         is(shapeBo, "bpmn:ExclusiveGateway") ||
         is(shapeBo, "bpmn:StartEvent") ||
         is(shapeBo, "bpmn:EndEvent") ||
-        is(shapeBo, "bpmn:DataObjectReference")) &&
+        is(shapeBo, "bpmn:DataObjectReference") ||
+        is(shapeBo, "bpmn:DataStoreReference")) &&
         (!is(shapeBo, "bpmn:SendTask")) &&
         (!is(shapeBo, "bpmn:IntermediateCatchEvent")) &&
         (!is(shapeBo, "bpmn:Participant"));
@@ -148,6 +149,67 @@ CustomRules.prototype.init = function () {
         sourceBo.bcid = targetBo.bcid;
       }
     }
+    
+    const sourceIsDataObj = is(sourceBo, 'bpmn:DataObjectReference');
+    const targetIsDataObj = is(targetBo, 'bpmn:DataObjectReference');
+
+    if (sourceIsDataObj || targetIsDataObj) {
+      const dataEl = sourceIsDataObj ? source : target;
+      const taskEl = sourceIsDataObj ? target : source;
+
+      const inBlockchain =
+        dataEl.parent?.businessObject?.bc === 'true' ||
+        taskEl.parent?.businessObject?.bc === 'true' ||
+        taskEl.businessObject?.bc === 'true';
+      if (!inBlockchain) return undefined;
+
+      // Task-in-blockchain check: only enforce write/read rules when the task itself is in a blockchain pool
+      const taskInBlockchain =
+        taskEl.parent?.businessObject?.bc === 'true' ||
+        taskEl.businessObject?.bc === 'true';
+
+      if (taskInBlockchain) {
+        // Only a blockchain ReceiveTask or ScriptTask can write to a DataObject
+        if (targetIsDataObj &&
+            !(is(sourceBo, 'bpmn:ReceiveTask') && sourceBo.bc === 'true') &&
+            !(is(sourceBo, 'bpmn:ScriptTask') && sourceBo.bc === 'true')) {
+          return false;
+        }
+        // A blockchain ReceiveTask cannot read from a DataObject (DO → ReceiveTask blocked)
+        if (sourceIsDataObj && is(targetBo, 'bpmn:ReceiveTask') && targetBo.bc === 'true') {
+          return false;
+        }
+      }
+
+      function getBoundaryReceiveTask(element) {
+        const visited = new Set();
+        const queue = [element];
+        while (queue.length > 0) {
+          const current = queue.shift();
+          if (!current || !current.id || visited.has(current.id)) continue;
+          visited.add(current.id);
+          const bo = current.businessObject;
+          if (!bo) continue;
+          if (is(bo, 'bpmn:ReceiveTask') && bo.bc === 'true') return current.id;
+          for (const conn of (current.incoming || [])) {
+            const src = conn.source;
+            if (!src || is(src.businessObject, 'bpmn:DataObjectReference')) continue;
+            if (!visited.has(src.id)) queue.push(src);
+          }
+        }
+        return null;
+      }
+
+      const currentBoundary = getBoundaryReceiveTask(taskEl);
+
+      for (const conn of [...(dataEl.incoming || []), ...(dataEl.outgoing || [])]) {
+        const other = conn.source !== dataEl ? conn.source : conn.target;
+        if (!other || is(other.businessObject, 'bpmn:DataObjectReference')) continue;
+        if (getBoundaryReceiveTask(other) !== currentBoundary) return false;
+      }
+      return undefined;
+    }
+
     return;
   });
 };

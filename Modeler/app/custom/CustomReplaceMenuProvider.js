@@ -15,7 +15,7 @@ export default function CustomReplaceMenuProvider(
 ) {
   ReplaceMenuProvider.call(this, bpmnFactory, popupMenu, modeling, moddle, bpmnReplace, rules, translate, moddleCopy);
 
-  // ✅ Safe original reference directly from prototype, avoids recursion trap
+  // Safe original reference directly from prototype, avoids recursion trap
   const baseGetPopupMenuEntries = ReplaceMenuProvider.prototype.getPopupMenuEntries.bind(this);
 
   this.getPopupMenuEntries = function (element) {
