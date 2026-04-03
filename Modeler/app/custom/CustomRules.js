@@ -150,6 +150,27 @@ CustomRules.prototype.init = function () {
       }
     }
     
+    // ReceiveTask cannot read from a DataStore
+    if (
+      is(sourceBo, 'bpmn:DataStoreReference') &&
+      is(targetBo, 'bpmn:ReceiveTask') && targetBo.bc === 'true'
+    ) {
+      return false;
+    }
+
+    // Allow DataObject/DataStore → ExclusiveGateway (read only)
+    const sourceIsData = is(sourceBo, 'bpmn:DataObjectReference') || is(sourceBo, 'bpmn:DataStoreReference');
+    const targetIsXOR = is(targetBo, 'bpmn:ExclusiveGateway');
+    const sourceIsXOR = is(sourceBo, 'bpmn:ExclusiveGateway');
+    const targetIsData = is(targetBo, 'bpmn:DataObjectReference') || is(targetBo, 'bpmn:DataStoreReference');
+
+    if (sourceIsData && targetIsXOR) {
+      return { type: 'bpmn:DataInputAssociation' };
+    }
+    if (sourceIsXOR && targetIsData) {
+      return false;
+    }
+
     const sourceIsDataObj = is(sourceBo, 'bpmn:DataObjectReference');
     const targetIsDataObj = is(targetBo, 'bpmn:DataObjectReference');
 

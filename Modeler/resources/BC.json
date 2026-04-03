@@ -75,6 +75,110 @@
         ]
       },
       {
+        "name": "GatewayDataIO",
+        "extends": ["bpmn:ExclusiveGateway"],
+        "properties": [
+          {
+            "name": "dataInputAssociations",
+            "isMany": true,
+            "type": "Element"
+          }
+        ]
+      },
+      {
+        "name": "DataObjectVariables",
+        "superClass": [ "Element" ],
+        "properties": [
+          {
+            "name": "values",
+            "isMany": true,
+            "type": "DataObjectVariable"
+          }
+        ]
+      },
+      {
+        "name": "DataObjectVariable",
+        "properties": [
+          {
+            "name": "name",
+            "isAttr": true,
+            "type": "String"
+          },
+          {
+            "name": "type",
+            "isAttr": true,
+            "type": "String"
+          },
+          {
+            "name": "value",
+            "isAttr": true,
+            "type": "String"
+          },
+          {
+            "name": "external",
+            "isAttr": true,
+            "type": "Boolean"
+          }
+        ]
+      },
+      {
+        "name": "DataStoreVariables",
+        "superClass": [ "Element" ],
+        "properties": [
+          {
+            "name": "values",
+            "isMany": true,
+            "type": "DataStoreVariable"
+          }
+        ]
+      },
+      {
+        "name": "DataStoreVariable",
+        "properties": [
+          {
+            "name": "name",
+            "isAttr": true,
+            "type": "String"
+          },
+          {
+            "name": "type",
+            "isAttr": true,
+            "type": "String"
+          },
+          {
+            "name": "value",
+            "isAttr": true,
+            "type": "String"
+          }
+        ]
+      },
+      {
+        "name": "DataStoreVarSelections",
+        "superClass": [ "Element" ],
+        "properties": [
+          {
+            "name": "values",
+            "isMany": true,
+            "type": "DataStoreVarSelection"
+          }
+        ]
+      },
+      {
+        "name": "DataStoreVarSelection",
+        "properties": [
+          {
+            "name": "varname",
+            "isAttr": true,
+            "type": "String"
+          },
+          {
+            "name": "value",
+            "isAttr": true,
+            "type": "String"
+          }
+        ]
+      },
+      {
         "name": "OutputParameters",
         "superClass": [ "Element" ],
         "properties": [

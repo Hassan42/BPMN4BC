@@ -97,6 +97,59 @@ html, body, #container {
 .djs-palette {
   width: 95px !important; /* Set your desired width */
 }
+/* Toast notifications */
+.bpmnbc-toast {
+  position: fixed;
+  bottom: 24px;
+  left: 24px;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #c0392b;
+  color: #fff;
+  padding: 10px 14px;
+  border-radius: 5px;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.3);
+  font-size: 13px;
+  max-width: 320px;
+  animation: bpmnbc-toast-in 0.2s ease;
+}
+
+.bpmnbc-toast--out {
+  animation: bpmnbc-toast-out 0.2s ease forwards;
+}
+
+.bpmnbc-toast-message {
+  flex: 1;
+  line-height: 1.4;
+}
+
+.bpmnbc-toast-close {
+  background: none;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0 2px;
+  opacity: 0.8;
+  flex-shrink: 0;
+}
+
+.bpmnbc-toast-close:hover {
+  opacity: 1;
+}
+
+@keyframes bpmnbc-toast-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes bpmnbc-toast-out {
+  from { opacity: 1; transform: translateY(0); }
+  to   { opacity: 0; transform: translateY(10px); }
+}
+
 .custom-palette-label {
   font-size: 12px;
   font-weight: bold;
@@ -106,3 +159,4 @@ html, body, #container {
   margin-top: 10px;
   border-bottom: 1px solid #ccc;
 }
+

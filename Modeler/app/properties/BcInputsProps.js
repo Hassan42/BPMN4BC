@@ -1,5 +1,6 @@
 import {
-  getBusinessObject
+  getBusinessObject,
+  is
 } from 'bpmn-js/lib/util/ModelUtil';
 
 import {
@@ -7,8 +8,11 @@ import {
   createInputParameters,
   getInputParameters,
   getInputParametersExtension,
+  getDataStoreVarSelections,
+  getDataObjectVariables,
   nextId
 } from '../util';
+
 
 import InputParameterProps from './BcInputProp';
 
@@ -38,9 +42,46 @@ export default function InputParametersProps({ element, injector }) {
     };
   });
 
+  const doReads = (element.incoming || [])
+    .filter(conn => conn.businessObject?.$type === 'bpmn:DataInputAssociation')
+    .filter(conn => conn.source && is(conn.source.businessObject, 'bpmn:DataObjectReference'));
+
+  doReads.forEach(conn => {
+    const doEl = conn.source;
+    const doLabel = doEl.businessObject.name || doEl.businessObject.id;
+    const vars = getDataObjectVariables(doEl) || [];
+    vars.forEach((variable, vi) => {
+      items.push({
+        id: `do-read-${doEl.id}-v${vi}`,
+        label: `${variable.name || '?'} : ${variable.type || 'uint'} [${doLabel}]`,
+        entries: [],
+      });
+    });
+  });
+
+  // DataStore read connections (DataStoreReference → task)
+  const dsReads = (element.incoming || [])
+    .filter(conn => conn.businessObject?.$type === 'bpmn:DataInputAssociation')
+    .filter(conn => conn.source && is(conn.source.businessObject, 'bpmn:DataStoreReference'));
+
+  dsReads.forEach(conn => {
+    const selections = getDataStoreVarSelections(conn) || [];
+    selections.forEach((sel, idx) => {
+      if (!sel.varname) return;
+      items.push({
+        id: `ds-read-${conn.id}-${idx}`,
+        label: `${sel.varname} [Data Store]`,
+        entries: [],
+      });
+    });
+  });
+
+  const bo = getBusinessObject(element);
+  const manualAddAllowed = !is(bo, 'bpmn:ReceiveTask') && !is(bo, 'bpmn:ScriptTask') && !is(bo, 'bpmn:ExclusiveGateway');
+
   return {
     items,
-    add: addFactory({ element, bpmnFactory, commandStack })
+    ...(manualAddAllowed && { add: addFactory({ element, bpmnFactory, commandStack }) })
   };
 }
 

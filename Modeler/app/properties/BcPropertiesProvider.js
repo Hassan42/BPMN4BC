@@ -6,6 +6,9 @@ import BcProps from './BcProps';
 import OutputParametersProps from './BcOutputsProps';
 import InputParametersProps from './BcInputsProps';
 import RoleParametersProps from './BcRolesProp';
+import DataStoreVariablesProps from './DataStoreVariablesProps';
+import DataStoreConnectionProps from './DataStoreConnectionProp';
+import DataObjectVariablesProps from './DataObjectVariablesProps';
 
 import { ListGroup } from '@bpmn-io/properties-panel';
 import { is } from 'bpmn-js/lib/util/ModelUtil';
@@ -57,7 +60,7 @@ export default function BcPropertiesProvider(propertiesPanel, injector, translat
       if (businessObject.bc === "true") {
         groups.push(createBcGroup(element, translate));
 
-        if (isSendTask || isScriptTask) {
+        if (isScriptTask) {
           groups.push(createBcInputGroup(element, injector, translate));
         }
 
@@ -92,6 +95,47 @@ export default function BcPropertiesProvider(propertiesPanel, injector, translat
       if (isLane && (elementParent.bc === "true")) {
         groups.push(createBcGroup(element, translate));
         groups.push(createBcOutputGroup(element, injector, translate));
+      }
+
+      if (is(businessObject, 'bpmn:DataObjectReference')) {
+        groups.push({
+          id: 'BCDataObject',
+          label: translate('Data Object Variables'),
+          component: ListGroup,
+          ...DataObjectVariablesProps({ element, injector })
+        });
+      }
+
+      if (is(businessObject, 'bpmn:DataStoreReference')) {
+        groups.push({
+          id: 'BCDataStore',
+          label: translate('Data Store Variables'),
+          component: ListGroup,
+          ...DataStoreVariablesProps({ element, injector })
+        });
+      }
+
+      if (is(businessObject, 'bpmn:ExclusiveGateway')) {
+        const hasDataInputs = (element.incoming || []).some(
+          conn => conn.businessObject?.$type === 'bpmn:DataInputAssociation'
+        );
+        if (hasDataInputs) {
+          groups.push(createBcInputGroup(element, injector, translate));
+        }
+      }
+
+      if (is(businessObject, 'bpmn:DataInputAssociation') || is(businessObject, 'bpmn:DataOutputAssociation')) {
+        const connSrc = element.source?.businessObject;
+        const connTgt = element.target?.businessObject;
+        const isDataStoreConn = is(connSrc, 'bpmn:DataStoreReference') || is(connTgt, 'bpmn:DataStoreReference');
+        if (isDataStoreConn) {
+          groups.push({
+            id: 'BCDataStoreConn',
+            label: translate(is(businessObject, 'bpmn:DataInputAssociation') ? 'Read Variables' : 'Write Variables'),
+            component: ListGroup,
+            ...DataStoreConnectionProps({ element, injector })
+          });
+        }
       }
 
       //Using custom condition properties

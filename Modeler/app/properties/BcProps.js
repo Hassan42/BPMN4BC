@@ -1,9 +1,8 @@
 import { html } from 'htm/preact';
 
-import { TextFieldEntry, isTextFieldEntryEdited, CheckboxEntry, TextAreaEntry } from '@bpmn-io/properties-panel';
+import { TextFieldEntry, isTextFieldEntryEdited, SelectEntry, isSelectEntryEdited, CheckboxEntry, TextAreaEntry } from '@bpmn-io/properties-panel';
 import { useService } from 'bpmn-js-properties-panel';
 import { is } from 'bpmn-js/lib/util/ModelUtil';
-
 export default function (element) {
 
   // Initialize props array with the bcId object
@@ -322,3 +321,5 @@ function Returns(props) {
     debounce=${debounce}
   />`;
 }
+
+

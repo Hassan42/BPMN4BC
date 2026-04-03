@@ -128,7 +128,6 @@ function processAllElements() {
           }
 
           if (extElement.$type && extElement.$type === 'bpmnbc:InputParameters') {
-            console.log("test")
             if (Array.isArray(extElement.values)) {
               extElement.values.forEach(param => {
                 ParametersArray.push({

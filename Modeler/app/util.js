@@ -1,6 +1,6 @@
 import Ids from 'ids';
 
-import { getBusinessObject } from 'bpmn-js/lib/util/ModelUtil';
+import { getBusinessObject, is } from 'bpmn-js/lib/util/ModelUtil';
 
 export function getOutputParametersExtension(element) {
   const businessObject = getBusinessObject(element);
@@ -63,6 +63,56 @@ export function createInputParameters(properties, parent, bpmnFactory) {
 
 export function createRoleParameters(properties, parent, bpmnFactory) {
   return createElement('bpmnbc:RoleParameters', properties, parent, bpmnFactory);
+}
+
+export function getSameNameDataObjects(element, elementRegistry) {
+  const bo = getBusinessObject(element);
+  const name = bo.name;
+  if (!name) return [element];
+  return elementRegistry.getAll()
+    .filter(el => is(el.businessObject, 'bpmn:DataObjectReference') && el.businessObject.name === name);
+}
+
+export function getDataObjectVariablesExtension(element) {
+  const businessObject = getBusinessObject(element);
+  return getExtension(businessObject, 'bpmnbc:DataObjectVariables');
+}
+
+export function getDataObjectVariables(element) {
+  const ext = getDataObjectVariablesExtension(element);
+  return ext && ext.get('values');
+}
+
+export function createDataObjectVariables(properties, parent, bpmnFactory) {
+  return createElement('bpmnbc:DataObjectVariables', properties, parent, bpmnFactory);
+}
+
+export function getDataStoreVariablesExtension(element) {
+  const businessObject = getBusinessObject(element);
+  return getExtension(businessObject, 'bpmnbc:DataStoreVariables');
+}
+
+export function getDataStoreVariables(element) {
+  const ext = getDataStoreVariablesExtension(element);
+  return ext && ext.get('values');
+}
+
+export function createDataStoreVariables(properties, parent, bpmnFactory) {
+  return createElement('bpmnbc:DataStoreVariables', properties, parent, bpmnFactory);
+}
+
+export function getDataStoreVarSelectionsExtension(element) {
+  const businessObject = getBusinessObject(element);
+  return getExtension(businessObject, 'bpmnbc:DataStoreVarSelections');
+}
+
+export function getDataStoreVarSelections(element) {
+  const ext = getDataStoreVarSelectionsExtension(element);
+  return ext && ext.get('values');
+}
+
+export function createDataStoreVarSelections(properties, parent, bpmnFactory) {
+  return createElement('bpmnbc:DataStoreVarSelections', properties, parent, bpmnFactory);
 }
 
 export function nextId(prefix) {
