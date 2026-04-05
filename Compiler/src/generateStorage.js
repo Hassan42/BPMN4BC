@@ -1,88 +1,87 @@
-const { extractOutputParameters, capitalize, isValueType } = require('./utils.js');
+const { extractOutputParameters, capitalize, isValueType, findDataStoreReferencesForProcess, findDataStoreReferencesForLane, extractDataStoreVariables, extractDataObjectVariables } = require('./utils.js');
 
 
 /**
- * Generates the Solidity struct for local storage based on the output parameters of activities in a specific lane.
- * @param {Array} activities - The list of activities in the lane.
- * @returns {string} The Solidity code for the LocalStorage struct, or an empty string if there are no non-transactional output parameters.
+ * Generates Solidity struct declarations, constructor init code, and read functions
+ * for the DataStore in a lane or process.
+ * @param {Object} process - The process object.
+ * @param {Object} [lane] - The lane object (if undefined, searches the whole process).
+ * @returns {{ dataStoreStructs: string, dataStoreInitCode: string, dataStoreReadFunctions: string }}
  */
-function generateStorage(activities, participant, lane) {
-    const outputParamsArray = [];  // Use an array instead of a Set
-    const initialValues = {};
+function generateDataStoreStructs(process, lane) {
+    const allDataStores = lane
+        ? findDataStoreReferencesForLane(lane)
+        : findDataStoreReferencesForProcess(process);
 
-    // Helper function to check if a parameter is not transactional
-    function isNotTransactional(param) {
-        return String(param?.transactional).trim().toLowerCase() !== "true";
+    if (allDataStores.length === 0) return { dataStoreStructs: '', dataStoreInitCode: '', dataStoreReadFunctions: '' };
+
+    // All DataStores in a lane share the same variables — use the first one only
+    const ds = allDataStores[0];
+    const vars = extractDataStoreVariables(ds);
+    if (vars.length === 0) return { dataStoreStructs: '', dataStoreInitCode: '', dataStoreReadFunctions: '' };
+
+    // Fixed struct name: "DataStore" / "dataStore" — one per lane contract
+    const structName = 'DataStore';
+    const instanceName = 'dataStore';
+
+    const fields = vars.map(v => `${v.type || 'uint'} ${v.name};`).join('\n        ');
+    const dataStoreStructs = `
+    struct ${structName} {
+        ${fields}
     }
+    ${structName} public ${instanceName};
+    `;
 
-    // Helper function to check if a parameter already exists in the array
-    function paramExists(paramsArray, param) {
-        return paramsArray.some(existingParam =>
-            existingParam.type === param.type && existingParam.name === param.name
-        );
-    }
-
-
-    // Function to add parameters to outputParamsArray
-    function addParams(params, initialValue = true) {
-        params.forEach(param => {
-            if (isNotTransactional(param) && !paramExists(outputParamsArray, param)) {
-                // Add the type and name as an object to the array
-                outputParamsArray.push({ type: param.type, name: param.name });
-                // If there's an initial value, store it
-                if (param.value && initialValue) {
-                    initialValues[param.name] = param.value;
-                }
-            }
-        });
-    }
-
-    // Extract and add output parameters based on lane or participant
-    if (lane) {
-        addParams(extractOutputParameters(lane));
-    } else {
-        addParams(extractOutputParameters(participant));
-    }
-
-    // Extract and add output parameters from activities
-    activities.forEach(activity => {
-        addParams(extractOutputParameters(activity), false);
+    const initLines = [];
+    vars.forEach(v => {
+        if (v.value) {
+            const formattedValue = (v.type || 'uint') === 'string' ? `"${v.value}"` : v.value;
+            initLines.push(`${instanceName}.${v.name} = ${formattedValue};`);
+        }
     });
 
-    // Generate the storage structure
-    if (outputParamsArray.length === 0) {
-        return { storageStruct: '', initializationCode: '', readFunctions: '' };
-    }
-
-    // Generate read functions for each output parameter
-    const readFunctions = outputParamsArray.map(({ type, name }) => `
+    // Generate public getter functions for each DataStore variable
+    const dataStoreReadFunctions = vars.map(({ type, name }) => `
     function get${capitalize(name)}() public view returns (${type}${isValueType(name, type) ? '' : ' memory'}) {
-        return localStorage.${name};
+        return ${instanceName}.${name};
     }
     `).join('');
 
-    const storageStruct = `
-    struct LocalStorage {
-        ${outputParamsArray.map(param => `${param.type} ${param.name};`).join('\n        ')}
-    }
-    LocalStorage public localStorage;
-    `;
-
-    // Generate initialization code
-    const initializationCode = Object.keys(initialValues).length > 0
-        ? Object.entries(initialValues)
-            .map(([name, value]) => {
-                const param = outputParamsArray.find(p => p.name === name);
-                const formattedValue = param?.type === 'string' ? `"${value}"` : value;
-                return `localStorage.${name} = ${formattedValue};`;
-            })
-            .join('\n        ')
-        : '';
-
-    return { storageStruct, initializationCode, readFunctions };
+    return {
+        dataStoreStructs,
+        dataStoreInitCode: initLines.join('\n        '),
+        dataStoreReadFunctions
+    };
 }
 
 
+/**
+ * Generates Solidity struct declarations for all DataObjects used in a process.
+ * DataObjects are memory-only (not stored on-chain); one struct per unique DO name.
+ * @param {Object} process - The process object.
+ * @returns {string} Solidity struct declarations.
+ */
+function generateDataObjectStructs(process) {
+    const doRefs = (process.flowElements || []).filter(el => el.$type === 'bpmn:DataObjectReference');
+    if (doRefs.length === 0) return '';
 
+    const seen = new Set();
+    const structs = [];
 
-module.exports = { generateStorage };
+    doRefs.forEach(doRef => {
+        const rawName = doRef.name || doRef.id;
+        const structName = capitalize(rawName.replace(/\s+/g, ''));
+        if (seen.has(structName)) return;
+        seen.add(structName);
+
+        const vars = extractDataObjectVariables(doRef);
+        if (vars.length === 0) return;
+
+        const fields = vars.map(v => `${v.type || 'uint'} ${v.name};`).join('\n        ');
+        structs.push(`struct ${structName} {\n        ${fields}\n    }`);
+    });
+
+    return structs.join('\n\n    ');
+}
+
+module.exports = { generateDataStoreStructs, generateDataObjectStructs };

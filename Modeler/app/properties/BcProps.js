@@ -36,14 +36,6 @@ export default function (element) {
       isEdited: isTextFieldEntryEdited
     }
   );
-  props.push(
-    {
-      id: 'returns',
-      element,
-      component: Returns,
-      isEdited: isTextFieldEntryEdited
-    }
-  );
   } else if(is(element, 'bpmn:EndEvent')){
     props.push(
       {

@@ -1,12 +1,12 @@
 import { TextFieldEntry, SelectEntry } from '@bpmn-io/properties-panel';
 import { useService } from 'bpmn-js-properties-panel';
+import { showErrorToast } from '../util/toast';
 
 import {
   getDataObjectVariables,
   getDataObjectVariablesExtension,
   getSameNameDataObjects
 } from '../util';
-import { showErrorToast } from '../util/toast';
 
 export default function DataObjectVariableProp({ idPrefix, element, variable, index, elementRegistry }) {
   return [
@@ -23,6 +23,10 @@ function VariableName({ idPrefix, element, variable, index, elementRegistry }) {
   const getValue = () => variable.name || '';
 
   const setValue = newName => {
+    if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(newName)) {
+      showErrorToast('Invalid variable name. Use only letters, digits, and underscores, starting with a letter or underscore.');
+      return;
+    }
     const vars = getDataObjectVariables(element) || [];
     if (vars.some(v => v !== variable && v.name === newName && (v.type || 'uint') === (variable.type || 'uint'))) {
       showErrorToast('A variable with this name and type already exists.');
@@ -82,3 +86,4 @@ function VariableType({ idPrefix, element, variable, index, elementRegistry }) {
     ]
   });
 }
+

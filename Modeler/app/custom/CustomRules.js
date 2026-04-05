@@ -1,6 +1,7 @@
 import inherits from 'inherits-browser';
 import RuleProvider from 'diagram-js/lib/features/rules/RuleProvider';
 import { is } from 'bpmn-js/lib/util/ModelUtil';
+import { showErrorToast } from '../util/toast';
 
 const HIGH_PRIORITY = 2500;
 
@@ -184,6 +185,32 @@ CustomRules.prototype.init = function () {
         taskEl.businessObject?.bc === 'true';
       if (!inBlockchain) return undefined;
 
+      // Enforce: a task may only write to a given DataObject once and read from it once
+      if (targetIsDataObj) {
+        const alreadyWrites = (taskEl.outgoing || []).some(
+          conn => is(conn.target.businessObject, 'bpmn:DataObjectReference') &&
+                  conn.target.id === dataEl.id
+        );
+        if (alreadyWrites) {
+          setTimeout(() => showErrorToast(
+            'A task can only write to the same DataObject once.'
+          ), 0);
+          return false;
+        }
+      }
+      if (sourceIsDataObj) {
+        const alreadyReads = (taskEl.incoming || []).some(
+          conn => is(conn.source.businessObject, 'bpmn:DataObjectReference') &&
+                  conn.source.id === dataEl.id
+        );
+        if (alreadyReads) {
+          setTimeout(() => showErrorToast(
+            'A task can only read from the same DataObject once.'
+          ), 0);
+          return false;
+        }
+      }
+
       // Task-in-blockchain check: only enforce write/read rules when the task itself is in a blockchain pool
       const taskInBlockchain =
         taskEl.parent?.businessObject?.bc === 'true' ||
@@ -202,7 +229,10 @@ CustomRules.prototype.init = function () {
         }
       }
 
-      function getBoundaryReceiveTask(element) {
+      // Returns the SET of all boundary ReceiveTasks reachable walking backwards.
+      // A ScriptTask after an XOR join will resolve to multiple ReceiveTasks.
+      function getBoundaryReceiveTasks(element) {
+        const result = new Set();
         const visited = new Set();
         const queue = [element];
         while (queue.length > 0) {
@@ -211,22 +241,37 @@ CustomRules.prototype.init = function () {
           visited.add(current.id);
           const bo = current.businessObject;
           if (!bo) continue;
-          if (is(bo, 'bpmn:ReceiveTask') && bo.bc === 'true') return current.id;
+          if (is(bo, 'bpmn:ReceiveTask') && bo.bc === 'true') {
+            result.add(current.id);
+            continue; // stop traversal at a ReceiveTask — it IS the boundary
+          }
           for (const conn of (current.incoming || [])) {
             const src = conn.source;
             if (!src || is(src.businessObject, 'bpmn:DataObjectReference')) continue;
             if (!visited.has(src.id)) queue.push(src);
           }
         }
-        return null;
+        return result;
       }
 
-      const currentBoundary = getBoundaryReceiveTask(taskEl);
+      const taskBoundaries = getBoundaryReceiveTasks(taskEl);
 
       for (const conn of [...(dataEl.incoming || []), ...(dataEl.outgoing || [])]) {
         const other = conn.source !== dataEl ? conn.source : conn.target;
         if (!other || is(other.businessObject, 'bpmn:DataObjectReference')) continue;
-        if (getBoundaryReceiveTask(other) !== currentBoundary) return false;
+        const otherBoundaries = getBoundaryReceiveTasks(other);
+        // Allow if the two boundary sets share at least one ReceiveTask.
+        // This covers the XOR-join case: taskBoundaries = {A, B},
+        // otherBoundaries = {A} → overlap exists → allowed.
+        const hasOverlap = taskBoundaries.size === 0 || otherBoundaries.size === 0
+          || [...taskBoundaries].some(b => otherBoundaries.has(b));
+        if (!hasOverlap) {
+          setTimeout(() => showErrorToast(
+            'DataObject cannot be connected outside its boundary. ' +
+            'A DataObject can only be shared with tasks that belong to the same entry transaction.'
+          ), 0);
+          return false;
+        }
       }
       return undefined;
     }

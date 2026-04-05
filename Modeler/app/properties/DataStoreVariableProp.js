@@ -23,6 +23,10 @@ function VariableName({ idPrefix, element, variable }) {
   const getValue = () => variable.name || '';
 
   const setValue = newName => {
+    if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(newName)) {
+      showErrorToast('Invalid variable name. Use only letters, digits, and underscores, starting with a letter or underscore.');
+      return;
+    }
     const vars = getDataStoreVariables(element) || [];
     if (vars.some(v => v !== variable && v.name === newName && (v.type || 'uint') === (variable.type || 'uint'))) {
       showErrorToast('A variable with this name and type already exists.');

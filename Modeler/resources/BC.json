@@ -175,6 +175,11 @@
             "name": "value",
             "isAttr": true,
             "type": "String"
+          },
+          {
+            "name": "external",
+            "isAttr": true,
+            "type": "Boolean"
           }
         ]
       },

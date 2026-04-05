@@ -28,8 +28,8 @@ export function renderContract(data, networkKey, instanceId) {
     if (Array.isArray(contract.receiveTasks) && contract.receiveTasks.length > 0) {
       contractContent.appendChild(createCollapsibleSection('Tasks', createReceiveTaskSection(networkKey, contractKey, contract.receiveTasks, instanceId)));
     }
-    if (Array.isArray(contract.localStorage) && contract.localStorage.length > 0) {
-      contractContent.appendChild(createCollapsibleSection('Data', createLocalStorageSection(contract.localStorage)));
+    if (Array.isArray(contract.dataStore) && contract.dataStore.length > 0) {
+      contractContent.appendChild(createCollapsibleSection('Data', createDataStoreSection(contract.dataStore)));
     }
 
     contractDiv.appendChild(contractHeader);
@@ -165,7 +165,7 @@ function createReceiveTaskSection(network, contractName, tasks, instanceId) {
 }
 
 
-function createLocalStorageSection(dataArray) {
+function createDataStoreSection(dataArray) {
   const sectionDiv = document.createElement('div');
   sectionDiv.className = 'grid grid-cols-2 gap-4';
 

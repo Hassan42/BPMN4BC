@@ -139,15 +139,15 @@ const createContractManager = (instanceId) => {
 
     const getAllContracts = () => readContracts();
 
-    const updateLocalStorage = (contractName, inputs) => {
+    const updateDataStore = (contractName, inputs) => {
         const contracts = readContracts();
         const contract = contracts.find(c => c.contractName === contractName);
         if (!contract) throw new Error(`Contract "${contractName}" not found.`);
-        const localStorage = contract.localStorage;
-        if (inputs.length !== localStorage.length) {
-            throw new Error(`Input count mismatch: got ${inputs.length}, expected ${localStorage.length}`);
+        const dataStore = contract.dataStore;
+        if (inputs.length !== dataStore.length) {
+            throw new Error(`Input count mismatch: got ${inputs.length}, expected ${dataStore.length}`);
         }
-        localStorage.forEach((param, index) => {
+        dataStore.forEach((param, index) => {
             if (param.type) {
                 const value = inputs[index];
                 if (value !== undefined) {
@@ -200,8 +200,8 @@ const createContractManager = (instanceId) => {
         const contracts = readContracts();
         const networkContracts = contracts.filter(c => c.networkId === network);
         return networkContracts.reduce((acc, contract) => {
-            const { contractName, contractRoles, contractText, balance, receiveTasks, localStorage } = contract;
-            acc[contractName] = { contractText, receiveTasks, localStorage, contractRoles, balance };
+            const { contractName, contractRoles, contractText, balance, receiveTasks, dataStore } = contract;
+            acc[contractName] = { contractText, receiveTasks, dataStore, contractRoles, balance };
             return acc;
         }, {});
     };
@@ -297,7 +297,7 @@ const createContractManager = (instanceId) => {
         updateTaskState,
         getTaskById,
         getAddressByRole,
-        updateLocalStorage,
+        updateDataStore,
         getContractAddressByName,
         getContractsState,
         updateTaskGas,

@@ -1,13 +1,15 @@
 const {
   getProceedingElementsFromFlow,
-  extractOutputParameters,
-  extractInputParameters,
   isValueType,
   getContractNameForElement,
   getEntryFunctions,
   capitalize,
   generateExpression,
-  parseReturnValues
+  extractDataStoreVariables,
+  extractDataStoreVarSelections,
+  extractDataObjectVariables,
+  getTaskDataObjectReads,
+  getTaskDataObjectWrites
 } = require('./utils.js');
 
 /**
@@ -38,89 +40,113 @@ function generateFunctionSignatures(solidityCode) {
 }
 
 /**
- * Generates logic for a Solidity script function.
+ * Generates DataStore write assignments for a task's outgoing DataOutputAssociations.
  * @param {Object} activity - The activity object.
+ * @param {string} collaborationId - The collaboration ID.
+ * @returns {string} Solidity assignment statements.
+ */
+function generateDataStoreAssignments(activity, collaborationId) {
+  if (!activity.dataOutputAssociations || activity.dataOutputAssociations.length === 0) return '';
+  const lines = [];
+  activity.dataOutputAssociations.forEach(conn => {
+    const target = conn.targetRef;
+    if (!target || target.$type !== 'bpmn:DataStoreReference') return;
+    // All DataStores in a lane share one struct named "DataStore" / "dataStore"
+    const instanceName = 'dataStore';
+    const selections = extractDataStoreVarSelections(conn);
+    selections.forEach(sel => {
+      if (!sel.varname) return;
+      const dsVars = extractDataStoreVariables(target);
+      const dsVar = dsVars.find(v => v.name === sel.varname);
+      const varType = dsVar ? (dsVar.type || 'uint') : 'uint';
+      if (String(sel.external).trim() === 'true') {
+        lines.push(`${instanceName}.${sel.varname} = ${sel.varname};`);
+      } else if (sel.value) {
+        const raw = generateExpression(sel.value, collaborationId);
+        const formatted = (varType === 'string' && !sel.value.includes('${') && !raw.startsWith('"'))
+          ? `"${raw}"`
+          : raw;
+        lines.push(`${instanceName}.${sel.varname} = ${formatted};`);
+      }
+    });
+  });
+  return lines.join('\n');
+}
+
+/**
+ * Generates logic for a Solidity script function.
+ * Input params come from DataObject reads; return type from DataObject writes.
+ * @param {Object} activity - The activity object.
+ * @param {Object} process - The process object.
+ * @param {string} collaborationId - The collaboration ID.
  * @returns {string} The logic for the script function.
  */
 function generateScriptFunction(activity, process, collaborationId) {
   const solidityScript = activity.solidityscript || '';
-  const returnParams = parseReturnValues(activity.returns || '');
-  const inputParams = extractInputParameters(activity);
-  const outputParams = extractOutputParameters(activity);
   const entryFunctions = getEntryFunctions(activity, process);
   const contractName = getContractNameForElement(activity, process, collaborationId);
 
   const requireState = `require(${entryFunctions.map((entryFunction) => {
     const entryFunctionContractName = getContractNameForElement(entryFunction, process, collaborationId);
-
     const entryFunctionState = entryFunctionContractName !== contractName
       ? `I${entryFunctionContractName}(contracts["${entryFunctionContractName}"]).getState("${entryFunction.id}")`
       : `state["${entryFunction.id}"]`;
-
-
     return `uint256(${entryFunctionState}) == uint256(State.Open)`;
   }).join(' || ')});`;
 
-  const inputTypes = inputParams.map(param => {
-    const memoryKeyword = isValueType(param.name, param.type) ? '' : 'memory ';
-    return `${param.type} ${memoryKeyword}${param.name}`;
+  // DataObject reads → function input params
+  const doReads = getTaskDataObjectReads(activity, process);
+  const doWrites = getTaskDataObjectWrites(activity);
+
+  const inputTypes = doReads.map(doRef => {
+    const rawName = doRef.name || doRef.id;
+    const structName = capitalize(rawName.replace(/\s+/g, ''));
+    const instanceName = structName.charAt(0).toLowerCase() + structName.slice(1);
+    return `${structName} memory ${instanceName}`;
   }).join(', ');
 
-  const combinedReturnParams = [...returnParams, ...outputParams.filter(param => String(param.transactional).trim().toLowerCase() == "true")];
-  const returnTypes = combinedReturnParams
-    .map(param => {
-      const typeWithMemory = isValueType(param.name, param.type) ? param.type : `${param.type} memory`;
-      return typeWithMemory;
+  // DataObject writes → return type and return statement
+  let returnClause = '';
+  let returnStatement = '';
+  if (doWrites.length > 0) {
+    const returnTypes = doWrites.map(doRef => {
+      const rawName = doRef.name || doRef.id;
+      const structName = capitalize(rawName.replace(/\s+/g, ''));
+      return `${structName} memory`;
+    }).join(', ');
+    returnClause = `returns (${returnTypes})`;
+
+    const returnValues = doWrites.map(doRef => {
+      const rawName = doRef.name || doRef.id;
+      const structName = capitalize(rawName.replace(/\s+/g, ''));
+      const vars = extractDataObjectVariables(doRef);
+      const fieldAssignments = vars.map(v => {
+        if (v.value) {
+          const expr = generateExpression(v.value, collaborationId);
+          const formatted = (v.type === 'string' && !v.value.includes('${') && !expr.startsWith('"'))
+            ? `"${expr}"` : expr;
+          return `${v.name}: ${formatted}`;
+        }
+        // No explicit value — use type default
+        const defaultVal = (v.type || 'uint').startsWith('string') ? '""'
+          : (v.type || 'uint').startsWith('address') ? 'address(0)'
+          : '0';
+        return `${v.name}: ${defaultVal}`;
+      }).join(', ');
+      return `${structName}({${fieldAssignments}})`;
     }).join(', ');
 
-  const returnClause = returnTypes ? `returns (${returnTypes})` : '';
-
-  // const definedVariables = new Set(inputParams.map(param => param.name));
-
-  // Storage assignments: Assign values to localStorage for non-transactional output parameters
-  const storageAssignments = outputParams
-    .filter(param => String(param.transactional).trim().toLowerCase() !== "true")
-    .map(param => {
-      const { type, name, value } = param;
-      if(!value){
-        throw new Error(`Variable ${name} has missing value.`);
-      }
-      const raw = generateExpression(value, collaborationId);
-      const formatted = (type === 'string' && !value.includes('${') && !raw.startsWith('"'))
-        ? `"${raw}"`
-        : raw;
-      return `localStorage.${name} = ${formatted};`;
-    })
-    .join('\n');
-
-  // Transactional assignments: Declare variables for transactional output parameters
-  const transactionalAssignments = outputParams
-    .filter(param => String(param.transactional).trim().toLowerCase() === "true")
-    .map(param => {
-      const { type, name, value } = param;
-      if(!value){
-        throw new Error(`Variable ${name} has missing value.`);
-      }
-      const memoryKeyword = isValueType(name,type) ? '' : 'memory ';
-      return `${type} ${memoryKeyword}${name} = ${generateExpression(value, collaborationId)};`;
-    })
-    .join('\n');
-
-  // Check if solidityScript contains "localStorage" and determine visibility
-  const hasLocalStorageAssignment = /localStorage\.[\w_]+\s*[\+\-\*\/%]?\s*=[^;]*;/.test(solidityScript);
-  const functionVisibility = hasLocalStorageAssignment ? '' : '';
+    returnStatement = doWrites.length > 1 ? `return (${returnValues});` : `return ${returnValues};`;
+  }
 
   const scriptWithoutReturn = solidityScript.replace(/return\s+.*?;/g, '').trim();
-  const returnStatement = combinedReturnParams.length > 0
-    ? `return (${combinedReturnParams.map(param => param.name).join(', ')});`
-    : '';
+  const dataStoreAssignments = generateDataStoreAssignments(activity, collaborationId);
 
   return `
-    function ${activity.id.replace(/\s+/g, '')}(${inputTypes}) public payable ${functionVisibility} ${returnClause} {
+    function ${activity.id.replace(/\s+/g, '')}(${inputTypes}) public payable ${returnClause} {
         ${requireState}
         ${scriptWithoutReturn}
-        ${transactionalAssignments}
-        ${storageAssignments}
+        ${dataStoreAssignments}
         ${returnStatement}
     }
   `;
@@ -128,74 +154,90 @@ function generateScriptFunction(activity, process, collaborationId) {
 
 /**
  * Generates logic for a Solidity entry function.
+ * External params come from DataObject writes (external=true) and DataStore external writes.
+ * DO structs are created at the top of the function body.
+ * ScriptTask calls use DO reads as inputs and capture DO writes as return values.
  * @param {Object} activity - The activity object.
  * @param {Object} process - The process object containing flow elements.
+ * @param {Array} roles - The roles array.
+ * @param {string} collaborationId - The collaboration ID.
  * @returns {string} The logic for the entry function.
  */
 function generateEntryFunction(activity, process, roles, collaborationId) {
   const contractName = getContractNameForElement(activity, process, collaborationId);
   const senderRole = activity.bcsender?.replace(/\s+/g, '') || '';
-  // We assign addresses dynamically on deployment
-  // const senderAddress = roles.find(r => r.role === senderRole)?.address.replace(/\s+/g, '') || '';
 
   if (!senderRole) {
-    throw new Error(`Initiator is not defined in actvitiy "${activity.name || activity.id}".`);
+    throw new Error(`Initiator is not defined in activity "${activity.name || activity.id}".`);
   }
 
   const proceedingElements = activity.outgoing?.flatMap(flow => getProceedingElementsFromFlow(flow, process)) || [];
-  const outputParameters = extractOutputParameters(activity);
 
-  const externalParams = outputParameters
-    .filter(param => String(param.external).trim() === "true")
-    .map(param => {
-      const memoryKeyword = isValueType(param.name,param.type) ? '' : 'memory ';
-      return `${param.type} ${memoryKeyword}${param.name}`;
-    })
-    .join(', ');
+  // --- DataStore external write params ---
+  const dsExternalParamsList = [];
+  (activity.dataOutputAssociations || []).forEach(conn => {
+    const target = conn.targetRef;
+    if (!target || target.$type !== 'bpmn:DataStoreReference') return;
+    const dsVars = extractDataStoreVariables(target);
+    extractDataStoreVarSelections(conn).forEach(sel => {
+      if (String(sel.external).trim() !== 'true' || !sel.varname) return;
+      const dsVar = dsVars.find(v => v.name === sel.varname);
+      const varType = dsVar ? (dsVar.type || 'uint') : 'uint';
+      const memoryKeyword = isValueType(sel.varname, varType) ? '' : 'memory ';
+      dsExternalParamsList.push(`${varType} ${memoryKeyword}${sel.varname}`);
+    });
+  });
 
-  // Storage assignments: Assign values to localStorage for non-transactional output parameters
-  const storageAssignments = outputParameters
-    .filter(param => String(param.transactional).trim().toLowerCase() !== "true")
-    .map(param => {
-      const { type, name, value, external } = param;
+  // --- DataObject write params and struct creation code ---
+  const doExternalParamsList = [];
+  const doStructCreations = [];
+  // Track declared DO struct instances so ScriptTask calls can reference them
+  const definedVariables = new Set();
 
-      if(!value && String(param.external).trim().toLowerCase() !== "true"){
-        throw new Error(`Variable ${name} has missing value.`);
+  (activity.dataOutputAssociations || []).forEach(conn => {
+    const target = conn.targetRef;
+    if (!target || target.$type !== 'bpmn:DataObjectReference') return;
+    const rawName = target.name || target.id;
+    const structName = capitalize(rawName.replace(/\s+/g, ''));
+    const instanceName = structName.charAt(0).toLowerCase() + structName.slice(1);
+    const vars = extractDataObjectVariables(target);
+
+    // Collect external variables as function params
+    vars.filter(v => String(v.external).trim() === 'true').forEach(v => {
+      const vType = v.type || 'uint';
+      const memKeyword = isValueType(v.name, vType) ? '' : 'memory ';
+      doExternalParamsList.push(`${vType} ${memKeyword}${v.name}`);
+    });
+
+    // Build struct field assignments
+    const fieldAssignments = vars.map(v => {
+      if (String(v.external).trim() === 'true') {
+        return `${v.name}: ${v.name}`;
+      } else if (v.value) {
+        const expr = generateExpression(v.value, collaborationId);
+        const formatted = (v.type === 'string' && !v.value.includes('${') && !expr.startsWith('"'))
+          ? `"${expr}"` : expr;
+        return `${v.name}: ${formatted}`;
       }
-      if (String(external).trim().toLowerCase() === "true") {
-        return `localStorage.${name} = ${name};`;
-      }
+      // No explicit value — use type default
+      const defaultVal = (v.type || 'uint').startsWith('string') ? '""'
+        : (v.type || 'uint').startsWith('address') ? 'address(0)'
+        : '0';
+      return `${v.name}: ${defaultVal}`;
+    });
 
-      const raw = generateExpression(value, collaborationId);
-      const formatted = (type === 'string' && !value.includes('${') && !raw.startsWith('"'))
-        ? `"${raw}"`
-        : raw;
-      return `localStorage.${name} = ${formatted};`;
-    })
-    .join('\n');
+    if (vars.length > 0) {
+      doStructCreations.push(`${structName} memory ${instanceName} = ${structName}({${fieldAssignments.join(', ')}});`);
+      definedVariables.add(instanceName);
+    }
+  });
 
-  // Transactional assignments: Declare variables for transactional output parameters
-  const transactionalAssignments = outputParameters
-    .filter(param => String(param.transactional).trim().toLowerCase() === "true" && String(param.external).trim().toLowerCase() !== "true")
-    .map(param => {
-      const { type, name, value } = param;
-      if(!value){
-        throw new Error(`Variable ${name} has missing value.`);
-      }
-      const memoryKeyword = isValueType(name, type) ? '' : 'memory ';
-      if (value.startsWith('${') && value.endsWith('}')) {
-        const varName = value.slice(2, -1);
-        return `${type} ${memoryKeyword}${name} = localStorage.${varName};`;
-      } else {
-        return `${type} ${memoryKeyword}${name} = ${value};`;
-      }
-    })
-    .join('\n');
+  // Combined function signature params: DataStore external + DataObject external
+  const externalParams = [...dsExternalParamsList, ...doExternalParamsList].join(', ');
 
   let proceedingLogic = '';
-  const definedVariables = new Set(outputParameters.filter(param => String(param.transactional).trim().toLowerCase() == "true").map(param => param.name));
-
   let hasLoop = false;
+
   function processElement(element) {
     const elementContractName = getContractNameForElement(element, process, collaborationId);
 
@@ -212,73 +254,69 @@ function generateEntryFunction(activity, process, roles, collaborationId) {
         break;
       }
       case 'bpmn:ScriptTask': {
-        const inputParameters = extractInputParameters(element);
-        // const inputs = inputParameters.map(param => {
-        //   // if (param.value.startsWith('${') && param.value.endsWith('}')) {
-        //     // const varName = param.value.slice(2, -1);
-        //     // return definedVariables.has(varName) ? varName : `localStorage.${varName}`;
-        //   // } else {
-        //     return param.value;
-        //   // }
-        // }).join(', ');
+        // DataObject reads → pass as arguments
+        const doReads = getTaskDataObjectReads(element, process);
+        // DataObject writes → capture as return values
+        const doWrites = getTaskDataObjectWrites(element);
 
-        const inputs = inputParameters.map(param => {
-          let value = param.value;
-          return value.replace(/\${([^}]+)}/g, (_, varName) => {
-            const parts = varName.split('.');
-
-            // If parts.length === 2 and the second part is "localStorage", return localStorage.varName
-            if (parts.length === 2 && parts[0] === "localStorage") {
-              return `localStorage.${parts[1]}`;
+        // For any DO read not yet in scope, create it with default values now (inline before the call)
+        doReads.forEach(doRef => {
+          const rawName = doRef.name || doRef.id;
+          const structName = capitalize(rawName.replace(/\s+/g, ''));
+          const instanceName = structName.charAt(0).toLowerCase() + structName.slice(1);
+          if (definedVariables.has(instanceName)) return;
+          const vars = extractDataObjectVariables(doRef);
+          if (vars.length === 0) return;
+          const fieldAssignments = vars.map(v => {
+            if (v.value) {
+              const expr = generateExpression(v.value, collaborationId);
+              const formatted = (v.type === 'string' && !v.value.includes('${') && !expr.startsWith('"'))
+                ? `"${expr}"` : expr;
+              return `${v.name}: ${formatted}`;
             }
-
-            // If parts.length === 2, handle <string>.varname for contract retrieval
-            if (parts.length === 2) {
-              const [prefix, variable] = parts;
-              return `I${prefix}_Contract_${collaborationId}(contracts["${prefix}_Contract_${collaborationId}"]).get${capitalize(variable)}()`;
-            }
-
-            // Handle simple ${varname} case
-            return varName;
+            const defaultVal = (v.type || 'uint').startsWith('string') ? '""'
+              : (v.type || 'uint').startsWith('address') ? 'address(0)'
+              : '0';
+            return `${v.name}: ${defaultVal}`;
           });
+          proceedingLogic += `${structName} memory ${instanceName} = ${structName}({${fieldAssignments.join(', ')}});\n`;
+          definedVariables.add(instanceName);
+        });
+
+        // Declare DO write struct variables (if not already in scope)
+        doWrites.forEach(doRef => {
+          const rawName = doRef.name || doRef.id;
+          const structName = capitalize(rawName.replace(/\s+/g, ''));
+          const instanceName = structName.charAt(0).toLowerCase() + structName.slice(1);
+          if (!definedVariables.has(instanceName)) {
+            definedVariables.add(instanceName);
+            proceedingLogic += `${structName} memory ${instanceName};\n`;
+          }
+        });
+
+        // Build call arguments from DO reads
+        const inputs = doReads.map(doRef => {
+          const rawName = doRef.name || doRef.id;
+          const structName = capitalize(rawName.replace(/\s+/g, ''));
+          return structName.charAt(0).toLowerCase() + structName.slice(1);
         }).join(', ');
 
-        const returnParams = parseReturnValues(element.returns || '');
-        const elementOutputParameters = extractOutputParameters(element);
-        const combinedElementOutputParams = [
-          ...returnParams.map(param => ({ ...param, transactional: 'true' })),
-          ...elementOutputParameters
-        ];
-
-        const scriptOutputDeclarations = combinedElementOutputParams
-          .filter(param => String(param.transactional).trim().toLowerCase() === "true")
-          .map(param => {
-            if (!definedVariables.has(param.name)) {
-              definedVariables.add(param.name);
-              const declaration = isValueType(param.name, param.type) ? `${param.type} ${param.name};` : `${param.type} memory ${param.name};`;
-              return declaration;
-            }
-            return '';
-          })
-          .filter(Boolean)
-          .join('\n');
-
-        const scriptOutputAssignments = combinedElementOutputParams
-          .filter(param => String(param.transactional).trim().toLowerCase() === "true")
-          .map(param => param.name)
-          .join(', ');
-
-        proceedingLogic += `${scriptOutputDeclarations}\n`;
+        // Build return assignment targets
+        const writeAssignments = doWrites.map(doRef => {
+          const rawName = doRef.name || doRef.id;
+          const structName = capitalize(rawName.replace(/\s+/g, ''));
+          return structName.charAt(0).toLowerCase() + structName.slice(1);
+        }).join(', ');
 
         if (elementContractName !== contractName) {
-          if (scriptOutputAssignments) {
-            proceedingLogic += `(${scriptOutputAssignments}) = I${elementContractName}(contracts["${elementContractName}"]).${element.id}(${inputs});\n`;
+          if (writeAssignments) {
+            proceedingLogic += `(${writeAssignments}) = I${elementContractName}(contracts["${elementContractName}"]).${element.id}(${inputs});\n`;
           } else {
             proceedingLogic += `I${elementContractName}(contracts["${elementContractName}"]).${element.id}(${inputs});\n`;
           }
         } else {
-          if (scriptOutputAssignments) {
-            proceedingLogic += `(${scriptOutputAssignments}) = ${element.id}(${inputs});\n`;
+          if (writeAssignments) {
+            proceedingLogic += `(${writeAssignments}) = ${element.id}(${inputs});\n`;
           } else {
             proceedingLogic += `${element.id}(${inputs});\n`;
           }
@@ -286,9 +324,7 @@ function generateEntryFunction(activity, process, roles, collaborationId) {
         break;
       }
       case 'bpmn:ParallelGateway': {
-        //if join AND gateway
         if (element.incoming.length > 1) {
-          const elementContractName = getContractNameForElement(element, process, collaborationId);
           const gatewayFunctionName = elementContractName !== contractName
             ? `I${elementContractName}(contracts["${elementContractName}"]).checkGateway_${element.id}`
             : `checkGateway_${element.id}`;
@@ -307,43 +343,29 @@ function generateEntryFunction(activity, process, roles, collaborationId) {
         if (outgoingFlows.length === 1) {
           const branchProceedingElements = getProceedingElementsFromFlow(outgoingFlows[0], process);
           branchProceedingElements.forEach(branchElement => processElement(branchElement));
-        }
-        else {
-          const elementContractName = getContractNameForElement(element, process, collaborationId);
-
-          // Define the XOR function name
+        } else {
           const xorFunctionName = elementContractName !== contractName
             ? `I${elementContractName}(contracts["${elementContractName}"]).checkXOR_${element.id}`
             : `checkXOR_${element.id}`;
 
-          // Extract variables from the outgoing flows' condition expressions
           const variablesInConditions = new Set();
           element.outgoing.forEach(flow => {
             const condition = flow.conditionExpression?.body || '';
             const regex = /\${([^}]+)}/g;
-
             const matches = [...condition.matchAll(regex)]
-            .map(match => match[1]) // Extract only the variable name inside ${}
-            .filter(varName => varName.split('.').length !== 2); // Exclude those with exactly one dot
-
-
-            matches.forEach(variable =>
-              variablesInConditions.add(variable));
+              .map(match => match[1])
+              .filter(varName => varName.split('.').length !== 2);
+            matches.forEach(variable => variablesInConditions.add(variable));
           });
 
-          // Collect the parameter list for the XOR function, passing only the variable names
           const parameters = Array.from(variablesInConditions).join(', ');
-
-          // Invoke the XOR function with the parameter list (variable names)
           proceedingLogic += `uint256 branch = ${xorFunctionName}(${parameters});\n`;
 
-          // Process the proceeding elements based on the XOR branch result
           element.outgoing.forEach((flow, index) => {
             const branchProceedingElements = getProceedingElementsFromFlow(flow, process);
             proceedingLogic += index === 0
               ? `if ((branch & (1 << ${index})) != 0) {\n`
               : `else if ((branch & (1 << ${index})) != 0) {\n`;
-
             branchProceedingElements.forEach(branchElement => processElement(branchElement));
             proceedingLogic += `}\n`;
           });
@@ -354,11 +376,9 @@ function generateEntryFunction(activity, process, roles, collaborationId) {
         const eventName = element.bceventname?.replace(/\s+/g, '') || element.id.replace(/\s+/g, '');
         if (elementContractName !== contractName) {
           proceedingLogic += `I${elementContractName}(contracts["${elementContractName}"]).emit_${eventName}();\n`;
-        }
-        else {
+        } else {
           proceedingLogic += `emit_${eventName}();\n`;
         }
-
         break;
       }
       case 'bpmn:EndEvent': {
@@ -370,22 +390,18 @@ function generateEntryFunction(activity, process, roles, collaborationId) {
     }
   }
 
-
   // Check for any incoming connections to an EventBasedGateway
   const incomingFlows = activity.incoming || [];
   incomingFlows.forEach(flow => {
     const previousElement = process.flowElements.find(el => el.id === flow.sourceRef.id);
-    if (previousElement) {
-      if (previousElement.$type === 'bpmn:EventBasedGateway') {
-        const outgoingFlows = previousElement.outgoing;
-        const targetElements = outgoingFlows.map(flow => process.flowElements.find(el => el.id === flow.targetRef.id));
-
-        targetElements.forEach(target => {
-          if (target && target.$type === 'bpmn:ReceiveTask' && target.id !== activity.id) {
-            proceedingLogic += `state["${target.id.replace(/\s+/g, '')}"] = State.Closed;\n`;
-          }
-        });
-      }
+    if (previousElement && previousElement.$type === 'bpmn:EventBasedGateway') {
+      const outgoingFlows = previousElement.outgoing;
+      const targetElements = outgoingFlows.map(flow => process.flowElements.find(el => el.id === flow.targetRef.id));
+      targetElements.forEach(target => {
+        if (target && target.$type === 'bpmn:ReceiveTask' && target.id !== activity.id) {
+          proceedingLogic += `state["${target.id.replace(/\s+/g, '')}"] = State.Closed;\n`;
+        }
+      });
     }
   });
 
@@ -393,14 +409,16 @@ function generateEntryFunction(activity, process, roles, collaborationId) {
     processElement(element);
   });
 
-
-  // Determine if the current activity has a subsequent ReceiveTask with the same ID
+  // Determine if the current activity loops back to itself
   const hasNextReceiveTask = proceedingElements.some(element => element.$type === 'bpmn:ReceiveTask' && element.id === activity.id);
+
+  const dataStoreAssignments = generateDataStoreAssignments(activity, collaborationId);
+  const doStructCreationsCode = doStructCreations.join('\n        ');
 
   return `
     function ${activity.id.replace(/\s+/g, '')}(${externalParams}) public payable isAccessible("${activity.id.replace(/\s+/g, '')}") {
-        ${storageAssignments}
-        ${transactionalAssignments}
+        ${doStructCreationsCode}
+        ${dataStoreAssignments}
         ${proceedingLogic}
         ${!hasNextReceiveTask && !hasLoop ? `state["${activity.id.replace(/\s+/g, '')}"] = State.Completed;` : ''}
     }

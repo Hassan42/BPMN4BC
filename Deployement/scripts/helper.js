@@ -84,11 +84,11 @@ const queryContract = async (contractManager, contractName, contractInstance) =>
 
     const taskIds = contractManager.getAllTaskIds(contractName);
 
-    // Update localStorage
-    if (typeof contractInstance.localStorage === 'function') {
-        const newData = await contractInstance.localStorage();
+    // Update dataStore
+    if (typeof contractInstance.dataStore === 'function') {
+        const newData = await contractInstance.dataStore();
         const newDataArray = Array.isArray(newData) ? newData : [newData];
-        contractManager.updateLocalStorage(contractName, newDataArray);
+        contractManager.updateDataStore(contractName, newDataArray);
     }
 
     // Update task states
@@ -145,14 +145,14 @@ const queryContracts = async (contractManager) => {
         // Attach to the contract
         const contractInstance = contractFactory.attach(contractAddress);
 
-        if (typeof contractInstance.localStorage === 'function') {
-            // Fetch localStorage if the method exists
-            const newData = await contractInstance.localStorage();
+        if (typeof contractInstance.dataStore === 'function') {
+            // Fetch dataStore if the method exists
+            const newData = await contractInstance.dataStore();
 
             // Ensure newData is an array
             const newDataArray = Array.isArray(newData) ? newData : [newData];
 
-            contractManager.updateLocalStorage(contractName, newDataArray);
+            contractManager.updateDataStore(contractName, newDataArray);
         }
 
         const taskIds = contractManager.getAllTaskIds(contractName);

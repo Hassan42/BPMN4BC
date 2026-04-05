@@ -60,7 +60,7 @@ import {
       vars.forEach((variable, vi) => {
         const doItemId = `do-write-${doEl.id}-v${vi}`;
         const entries = [
-          { id: `${doItemId}-value`, element: doEl, variable, component: DoWriteVarValue, isEdited: isTextFieldEntryEdited }
+          { id: `${doItemId}-value`, element: doEl, variable, isReceiveTask, component: DoWriteVarValue, isEdited: isTextFieldEntryEdited }
         ];
         if (isReceiveTask) {
           entries.push({ id: `${doItemId}-external`, element: doEl, variable, component: DoWriteVarExternal });
@@ -85,18 +85,27 @@ import {
         if (!sel.varname) return;
         const dsItemId = `ds-write-${conn.id}-${idx}`;
         const varType = (dsVars.find(v => v.name === sel.varname) || {}).type || 'uint';
+        const entries = [
+          {
+            id: `${dsItemId}-value`,
+            element: conn,
+            selection: sel,
+            component: DsWriteValue,
+            isEdited: isTextFieldEntryEdited,
+          }
+        ];
+        if (isReceiveTask) {
+          entries.push({
+            id: `${dsItemId}-external`,
+            element: conn,
+            selection: sel,
+            component: DsWriteExternal,
+          });
+        }
         items.push({
           id: dsItemId,
           label: `${sel.varname} : ${varType} [Data Store]`,
-          entries: [
-            {
-              id: `${dsItemId}-value`,
-              element: conn,
-              selection: sel,
-              component: DsWriteValue,
-              isEdited: isTextFieldEntryEdited,
-            }
-          ],
+          entries,
         });
       });
     });
@@ -202,12 +211,14 @@ import {
     };
   }
 
-  function DoWriteVarValue({ id, element, variable }) {
+  function DoWriteVarValue({ id, element, variable, isReceiveTask }) {
     const commandStack = useService('commandStack');
     const translate = useService('translate');
     const debounce = useService('debounceInput');
 
-    if (variable.external) return null;
+    // Only hide the value field when the variable is external AND we're on a ReceiveTask.
+    // ScriptTasks always need a value expression regardless of the external flag.
+    if (isReceiveTask && variable.external) return null;
 
     const getValue = () => variable.value || '';
     const setValue = value => commandStack.execute('element.updateModdleProperties', {
@@ -229,6 +240,8 @@ import {
     const translate = useService('translate');
     const debounce = useService('debounceInput');
 
+    if (selection.external) return null;
+
     const getValue = () => selection.value || '';
     const setValue = value => {
       commandStack.execute('element.updateModdleProperties', {
@@ -245,6 +258,26 @@ import {
       getValue=${getValue}
       setValue=${setValue}
       debounce=${debounce}
+    />`;
+  }
+
+  function DsWriteExternal({ id, element, selection }) {
+    const commandStack = useService('commandStack');
+    const translate = useService('translate');
+
+    const getValue = () => selection.external || false;
+    const setValue = value => commandStack.execute('element.updateModdleProperties', {
+      element,
+      moddleElement: selection,
+      properties: { external: value }
+    });
+
+    return html`<${CheckboxEntry}
+      id=${id}
+      element=${selection}
+      label=${translate('External')}
+      getValue=${getValue}
+      setValue=${setValue}
     />`;
   }
 

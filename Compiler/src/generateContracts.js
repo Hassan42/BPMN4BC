@@ -1,6 +1,6 @@
 const { getParentLaneOrPool, generateContractConfig, findCollaboration, findProcessForParticipant, findLanesForProcess, findActivitiesForLane, findActivitiesForProcess, findGatewaysForProcess, findGatewaysForLane, formatSolidityCode, findEventsForProcess, findEventsForLane, extractRolesFromCollaboration, findReceiveTask } = require('./utils.js');
 const { generateFunctions, generateFunctionSignatures } = require('./generateFunctions.js');
-const { generateStorage } = require('./generateStorage.js');
+const { generateDataStoreStructs, generateDataObjectStructs } = require('./generateStorage.js');
 const { generateGateways } = require('./generateGateways.js');
 const { generateEvents, generateEmitFunctions } = require('./generateEvents.js');
 const fs = require('fs');
@@ -29,7 +29,8 @@ async function generateContract(contractParams) {
     contractText
   } = contractParams;
 
-  const { storageStruct, initializationCode, readFunctions } = generateStorage(activities, participant, lane);
+  const { dataStoreStructs, dataStoreInitCode, dataStoreReadFunctions } = generateDataStoreStructs(process, lane);
+  const dataObjectStructs = generateDataObjectStructs(process);
   const functions = generateFunctions(activities, process, roles, collaborationId).join('\n');
   const gatewayFunctions = generateGateways(gateways, process, collaborationId);
   const solidityEvents = generateEvents(events);
@@ -131,12 +132,13 @@ async function generateContract(contractParams) {
       ${customScript}
 
       ${solidityEvents}
-      ${storageStruct}
+      ${dataObjectStructs}
+      ${dataStoreStructs}
 
       constructor() {
           ${stateMappings}
           ${activityToRoleMappings}
-          ${initializationCode}
+          ${dataStoreInitCode}
       }
 
       function setContracts(address[] memory addresses) public{
@@ -144,7 +146,7 @@ async function generateContract(contractParams) {
       }
       
       ${emitFunctions}
-      ${readFunctions}
+      ${dataStoreReadFunctions}
 
       function setResources(string[] memory _roles, address[] memory _addresses) public {
         require(_roles.length == _addresses.length, "Roles and addresses arrays must be of the same length");
@@ -181,7 +183,7 @@ async function generateContract(contractParams) {
 
   try {
     const formattedSolidityCode = await formatSolidityCode(solidityCode);
-    const formattedSolidityInterface = await generateInterfaceFromCode(contractName, formattedSolidityCode);
+    const formattedSolidityInterface = await generateInterfaceFromCode(contractName, formattedSolidityCode, dataObjectStructs);
     const outputPath = path.resolve('./output/contracts', `${contractName}.sol`);
     fs.writeFileSync(outputPath, formattedSolidityCode, 'utf8');
     console.log(`Generated Solidity contract: ${contractName}`);
@@ -193,6 +195,7 @@ async function generateContract(contractParams) {
       roles,
       lane,
       participant,
+      process,
       startReceiveTaskIds,
       formattedSolidityCode,
       formattedSolidityInterface,
@@ -211,7 +214,7 @@ async function generateContract(contractParams) {
  * @param {string} solidityCode - The Solidity code of the contract.
  * @returns - The generated contract interface.
  */
-async function generateInterfaceFromCode(contractName, solidityCode) {
+async function generateInterfaceFromCode(contractName, solidityCode, dataObjectStructs = '') {
   const functionSignatures = generateFunctionSignatures(solidityCode);
   const solidityInterface = `
   // SPDX-License-Identifier: MIT
@@ -219,6 +222,7 @@ async function generateInterfaceFromCode(contractName, solidityCode) {
 
   interface I${contractName} {
       enum State { Closed, Open, Completed }
+      ${dataObjectStructs}
       ${functionSignatures}
   }
   `;

@@ -375,6 +375,7 @@ const generateContractConfig = ({
     roles,
     lane,
     participant,
+    process,
     startReceiveTaskIds,
     formattedSolidityCode,
     formattedSolidityInterface,
@@ -382,70 +383,55 @@ const generateContractConfig = ({
 }) => {
 
     const receiveTasks = activities.filter(activity => activity.$type === 'bpmn:ReceiveTask');
-    const receiveTaskRoles = new Set(receiveTasks.map(task => task.bcsender));
 
-    // Use an array to store unique output parameters
-    const localStorage = [];
-
-    // Extract and add output parameters based on lanes and participant
-    if (lane) {
-        const outputParameters = extractOutputParameters(lane);
-        outputParameters.forEach(param => {
-            if (String(param.transactional).trim().toLowerCase() !== "true") {
-                localStorage.push({ type: param.type, name: param.name });
-            }
-        });
-    } else {
-        const participantOutputParameters = extractOutputParameters(participant);
-        participantOutputParameters.forEach(param => {
-            if (String(param.transactional).trim().toLowerCase() !== "true") {
-                localStorage.push({ type: param.type, name: param.name });
-            }
-        });
-    }
-
-    activities.forEach(activity => {
-        const outputParameters = extractOutputParameters(activity);
-
-        outputParameters.forEach(param => {
-            if (String(param.transactional).trim().toLowerCase() !== "true") {
-                // Generate a unique key for the parameter
-                const paramKey = `${param.type}_${param.name}`;
-
-                // Check if the parameter is already added to the array
-                if (!localStorage.some(p => `${p.type}_${p.name}` === paramKey)) {
-                    localStorage.push({ type: param.type, name: param.name });
-                }
-            }
-        });
-    });
+    // Build dataStore array: variables from the lane's (or process's) DataStore
+    const dataStoreRefs = lane
+        ? findDataStoreReferencesForLane(lane)
+        : findDataStoreReferencesForProcess(process);
+    const dataStore = dataStoreRefs.length > 0
+        ? extractDataStoreVariables(dataStoreRefs[0]).map(v => ({ name: v.name, type: v.type || 'uint' }))
+        : [];
 
     // Filter roles based on those used in ReceiveTasks and format as an array of objects
     const contractRoles = roles
         .map(role => ({ role: role.role }));
 
-
     // Create an array to store receive tasks info
     const receiveTasksInfo = receiveTasks.map(task => {
-        const outputParameters = extractOutputParameters(task);
+        const externalParams = [];
 
-        // Filter external parameters
-        const externalParams = outputParameters.filter(param => String(param.external).trim() === "true")
-            .map(param => ({
-                name: param.name,
-                type: param.type
-            }));
+        // External DataStore write selections
+        (task.dataOutputAssociations || []).forEach(conn => {
+            const target = conn.targetRef;
+            if (!target) return;
+            if (target.$type === 'bpmn:DataStoreReference') {
+                const dsVars = extractDataStoreVariables(target);
+                extractDataStoreVarSelections(conn).forEach(sel => {
+                    if (String(sel.external).trim() !== 'true' || !sel.varname) return;
+                    const dsVar = dsVars.find(v => v.name === sel.varname);
+                    externalParams.push({
+                        name: sel.varname,
+                        type: dsVar ? (dsVar.type || 'uint') : 'uint'
+                    });
+                });
+            } else if (target.$type === 'bpmn:DataObjectReference') {
+                // External DataObject write variables (external: true on DataObjectVariable)
+                extractDataObjectVariables(target).forEach(v => {
+                    if (String(v.external).trim() === 'true' && v.name) {
+                        externalParams.push({ name: v.name, type: v.type || 'uint' });
+                    }
+                });
+            }
+        });
 
-        // Create task info object
         return {
-            id: task.id.replace(/\s+/g, ''), // Remove whitespace from task ID
+            id: task.id.replace(/\s+/g, ''),
             sender: task.bcsender,
             name: task.name || '',
             state: startReceiveTaskIds.includes(task.id.replace(/\s+/g, '')) ? 'Open' : 'Closed',
-            externalParams // Add external parameters to task info
+            externalParams
         };
     });
-
 
     return {
         contractName: contractName,
@@ -454,7 +440,7 @@ const generateContractConfig = ({
         receiveTasks: receiveTasksInfo,
         contractCode: formattedSolidityCode,
         contractInterface: formattedSolidityInterface,
-        localStorage: localStorage,
+        dataStore: dataStore,
         contractText
     };
 }
@@ -479,9 +465,9 @@ function generateExpression(expression, collaborationId) {
     return expression.replace(/\${([^}]+)}/g, (_, varName) => {
         const parts = varName.split('.');
 
-        // If parts.length === 2 and the second part is "localStorage", return localStorage.varName
-        if (parts.length === 2 && parts[0] === "localStorage") {
-            return `localStorage.${parts[1]}`;
+        // If parts.length === 2 and the second part is "dataStore" (or legacy "localStorage"), return dataStore.varName
+        if (parts.length === 2 && (parts[0] === "dataStore" || parts[0] === "localStorage")) {
+            return `dataStore.${parts[1]}`;
         }
 
         // If parts.length === 2, handle <string>.varname for contract retrieval
@@ -521,6 +507,98 @@ function capitalize(str) {
     return str.charAt(0).toUpperCase() + str.slice(1);
 }
 
+/**
+ * Finds all DataStoreReference elements in a given process.
+ * @param {Object} process - The process object.
+ * @returns {Array} The list of DataStoreReference elements.
+ */
+const findDataStoreReferencesForProcess = (process) => {
+    return (process.flowElements || []).filter(el => el.$type === 'bpmn:DataStoreReference');
+};
+
+/**
+ * Finds DataStoreReference elements within a given lane.
+ * @param {Object} lane - The lane object.
+ * @returns {Array} The list of DataStoreReference elements in the lane.
+ */
+const findDataStoreReferencesForLane = (lane) => {
+    return (lane.flowNodeRef || []).filter(node => node.$type === 'bpmn:DataStoreReference');
+};
+
+/**
+ * Extracts DataStoreVariable entries from a DataStoreReference element.
+ * @param {Object} dataStore - The DataStoreReference business object.
+ * @returns {Array} The list of DataStoreVariable objects (name, type, value).
+ */
+const extractDataStoreVariables = (dataStore) => {
+    if (!dataStore.extensionElements || !dataStore.extensionElements.values) return [];
+    const ext = dataStore.extensionElements.values.find(e => e.$type === 'bpmnbc:DataStoreVariables');
+    if (!ext || !ext.values) return [];
+    return ext.values.filter(v => v.$type === 'bpmnbc:DataStoreVariable');
+};
+
+/**
+ * Extracts DataStoreVarSelection entries from a DataOutputAssociation connection.
+ * @param {Object} dataOutputAssociation - The DataOutputAssociation BPMN element.
+ * @returns {Array} The list of DataStoreVarSelection objects (varname, value).
+ */
+const extractDataStoreVarSelections = (dataOutputAssociation) => {
+    if (!dataOutputAssociation.extensionElements || !dataOutputAssociation.extensionElements.values) return [];
+    const ext = dataOutputAssociation.extensionElements.values.find(e => e.$type === 'bpmnbc:DataStoreVarSelections');
+    if (!ext || !ext.values) return [];
+    return ext.values.filter(v => v.$type === 'bpmnbc:DataStoreVarSelection');
+};
+
+/**
+ * Extracts DataObjectVariable entries from a DataObjectReference element.
+ * @param {Object} doRef - The DataObjectReference business object.
+ * @returns {Array} The list of DataObjectVariable objects (name, type, value, external).
+ */
+const extractDataObjectVariables = (doRef) => {
+    if (!doRef.extensionElements || !doRef.extensionElements.values) return [];
+    const ext = doRef.extensionElements.values.find(e => e.$type === 'bpmnbc:DataObjectVariables');
+    if (!ext || !ext.values) return [];
+    return ext.values.filter(v => v.$type === 'bpmnbc:DataObjectVariable');
+};
+
+/**
+ * Returns all DataObjectReferences that a task reads from (via DataInputAssociation).
+ * @param {Object} task - The BPMN task element.
+ * @param {Object} [process] - The process object (optional fallback scan).
+ * @returns {Array} The list of DataObjectReference elements read by this task.
+ */
+const getTaskDataObjectReads = (task, process) => {
+    // Primary: task's own dataInputAssociations
+    const fromTask = (task.dataInputAssociations || [])
+        .flatMap(assoc => Array.isArray(assoc.sourceRef) ? assoc.sourceRef : (assoc.sourceRef ? [assoc.sourceRef] : []))
+        .filter(ref => ref && ref.$type === 'bpmn:DataObjectReference');
+
+    if (fromTask.length > 0) return fromTask;
+
+    // Fallback: scan process-level DataObjectReferences for any that have a
+    // dataOutputAssociation pointing to this task (some bpmn-js versions store
+    // the association on the DataObjectReference element rather than on the task)
+    if (!process) return [];
+    const doRefs = (process.flowElements || []).filter(el => el.$type === 'bpmn:DataObjectReference');
+    return doRefs.filter(doRef => {
+        return (doRef.dataOutputAssociations || []).some(assoc => {
+            const target = assoc.targetRef;
+            return target && (target.id === task.id || target === task);
+        });
+    });
+};
+
+/**
+ * Returns all DataObjectReferences that a task writes to (via DataOutputAssociation).
+ * @param {Object} task - The BPMN task element.
+ * @returns {Array} The list of DataObjectReference elements written by this task.
+ */
+const getTaskDataObjectWrites = (task) => {
+    return (task.dataOutputAssociations || [])
+        .map(assoc => assoc.targetRef)
+        .filter(ref => ref && ref.$type === 'bpmn:DataObjectReference');
+};
+
 module.exports = {
     findCollaboration,
     findProcessForParticipant,
@@ -545,5 +623,12 @@ module.exports = {
     getPreviousElementsFromFlow,
     getEntryFunctions,
     generateExpression,
-    parseReturnValues
+    parseReturnValues,
+    findDataStoreReferencesForProcess,
+    findDataStoreReferencesForLane,
+    extractDataStoreVariables,
+    extractDataStoreVarSelections,
+    extractDataObjectVariables,
+    getTaskDataObjectReads,
+    getTaskDataObjectWrites
 };
