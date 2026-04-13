@@ -1,4 +1,4 @@
-const { getPreviousElementsFromFlow, findFlowsForElement, extractOutputParameters, getEntryFunctions, getContractNameForElement, generateExpression } = require('./utils.js');
+const { getEntryFunctions, getContractNameForElement, getTaskDataObjectReads, getTaskDataStoreReadVars, isValueType, capitalize, findFlowsForElement } = require('./utils.js');
 
 /**
  * Generates Solidity functions for gateways.
@@ -45,22 +45,31 @@ function generateAndGateway(gateway) {
 function generateXORGateway(gateway, process, collaborationId) {
     const functionName = `checkXOR_${gateway.id}`;
 
-    // Collect condition expressions and variables from `${}`
+    // Parameters: DO reads as structs, DS selected read vars as individual params
+    const doReads = getTaskDataObjectReads(gateway, process);
+    const dsReadVars = getTaskDataStoreReadVars(gateway);
+
+    const paramParts = [];
+    const seenStructNames = new Set();
+    doReads.forEach(doRef => {
+        const rawName = doRef.name || doRef.id;
+        const structName = capitalize(rawName.replace(/\s+/g, ''));
+        if (seenStructNames.has(structName)) return;
+        seenStructNames.add(structName);
+        const instanceName = structName.charAt(0).toLowerCase() + structName.slice(1);
+        paramParts.push(`${structName} memory ${instanceName}`);
+    });
+    dsReadVars.forEach(({ varname, type }) => {
+        const mem = isValueType(varname, type) ? '' : 'memory ';
+        paramParts.push(`${type} ${mem}${varname}`);
+    });
+
+    const parameterList = paramParts.join(', ');
+
+    // Conditions are plain Solidity expressions taken directly from the branch
     const conditions = gateway.outgoing.map((flow) => {
-        const condition = flow.conditionExpression?.body || null;
-
-        if (condition) {
-            const regex = /\${([^}]+)}/g;
-            const matches = [...condition.matchAll(regex)]
-                .map(match => match[1])
-                .filter(fullVar => !fullVar.includes('.'));
-            return {
-                condition: generateExpression(condition, collaborationId),
-                variables: matches
-            };
-        }
-
-        return { condition: '0', variables: [] }; // Default to 0 for branches without conditions
+        const condition = flow.conditionExpression?.body?.trim() || null;
+        return { condition: condition || '0' };
     });
 
     const emptyConditionCount = conditions.filter(({ condition }) => condition === '0').length;
@@ -69,38 +78,6 @@ function generateXORGateway(gateway, process, collaborationId) {
     }
 
     const defaultIndex = conditions.findIndex(({ condition }) => condition === '0');
-
-
-    // Extract transactional parameters from preceding elements
-    const { incoming } = findFlowsForElement(gateway);
-    const transactionalParameters = new Map();
-
-    incoming.forEach(flow => {
-        const precedingElements = getPreviousElementsFromFlow(flow, process);
-
-        precedingElements.forEach(element => {
-            const params = extractOutputParameters(element);
-            params.forEach(param => {
-                if (String(param.transactional).trim().toLowerCase() === 'true') {
-                    transactionalParameters.set(param.name, param.type);
-                }
-            });
-        });
-    });
-
-    // Collect all the unique variables found in the conditions
-    const allVariables = new Set();
-    conditions.forEach(({ variables }) => {
-        variables.forEach(variable => allVariables.add(variable));
-    });
-
-    // Create the parameter list based on variables and their types from transactionalParameters
-    const parameterList = Array.from(allVariables)
-        .map(variable => {
-            const type = transactionalParameters.get(variable) || 'uint256';
-            return `${type} ${variable}`;
-        })
-        .join(', ');
 
 
     const hasFallback = defaultIndex !== -1;

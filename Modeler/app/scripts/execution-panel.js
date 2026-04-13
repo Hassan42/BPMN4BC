@@ -93,9 +93,24 @@ if (instanceId) {
   if (instancesSection) instancesSection.classList.add('hidden');
   if (instanceNavSection) instanceNavSection.classList.remove('hidden');
 
+  const viewerPane = document.getElementById('viewerPane');
+  const viewerFrame = document.getElementById('viewerFrame');
+  const closeViewerBtn = document.getElementById('close-viewer-btn');
+
   if (viewModelBtn) {
     viewModelBtn.addEventListener('click', () => {
-      window.open(`${getBaseUrl()}/diagram-viewer.html?instanceId=${instanceId}`, '_blank');
+      if (viewerFrame.src !== `${getBaseUrl()}/diagram-viewer.html?instanceId=${instanceId}`) {
+        viewerFrame.src = `${getBaseUrl()}/diagram-viewer.html?instanceId=${instanceId}`;
+      }
+      viewerPane.classList.remove('hidden');
+      viewerPane.classList.add('flex');
+    });
+  }
+
+  if (closeViewerBtn) {
+    closeViewerBtn.addEventListener('click', () => {
+      viewerPane.classList.add('hidden');
+      viewerPane.classList.remove('flex');
     });
   }
   if (backToInstancesBtn) {
@@ -108,7 +123,7 @@ if (instanceId) {
     try {
       loadingSpinner.classList.remove('hidden');
       const [data, ethChfRate] = await Promise.all([fetchData(instanceId), getEthChfRate()]);
-      renderTabs(data.result, instanceId);
+      renderTabs(data.result, instanceId, ethChfRate);
       renderTransactionLog(data.transactions, ethChfRate);
     } catch (error) {
       console.error('Error fetching instance data:', error);

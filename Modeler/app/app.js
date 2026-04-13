@@ -177,6 +177,89 @@ function processAllElements() {
   });
 }
 
+function collectDiagramData() {
+  const elementRegistry = bpmnModeler.get('elementRegistry');
+  const allElements = elementRegistry.getAll();
+
+  const doMap = new Map();
+  const dsMap = new Map();
+
+  // Collect all DataObjectReferences and DataStoreReferences
+  allElements.forEach(el => {
+    const bo = el.businessObject;
+    if (!bo) return;
+
+    if (el.type === 'bpmn:DataObjectReference') {
+      const varsExt = bo.extensionElements && bo.extensionElements.values
+        ? bo.extensionElements.values.find(v => v.$type === 'bpmnbc:DataObjectVariables')
+        : null;
+      const variables = varsExt ? (varsExt.values || []) : [];
+      doMap.set(el.id, { id: el.id, name: bo.name || el.id, variables, readers: [], writers: [] });
+    }
+
+    if (el.type === 'bpmn:DataStoreReference') {
+      const varsExt = bo.extensionElements && bo.extensionElements.values
+        ? bo.extensionElements.values.find(v => v.$type === 'bpmnbc:DataStoreVariables')
+        : null;
+      const variables = varsExt ? (varsExt.values || []) : [];
+      dsMap.set(el.id, { id: el.id, name: bo.name || el.id, variables, readers: [], writers: [] });
+    }
+  });
+
+  // Scan connections to find read/write relationships
+  allElements.forEach(el => {
+    if (!el.source || !el.target || !el.businessObject) return;
+    const connType = el.businessObject.$type;
+
+    if (connType === 'bpmn:DataInputAssociation') {
+      // source = DataObjectReference or DataStoreReference, target = Task (task reads from it)
+      const doEntry = doMap.get(el.source.id);
+      if (doEntry) {
+        const name = el.target.businessObject && el.target.businessObject.name
+          ? el.target.businessObject.name
+          : el.target.id;
+        if (!doEntry.readers.includes(name)) doEntry.readers.push(name);
+      }
+
+      const dsEntry = dsMap.get(el.source.id);
+      if (dsEntry) {
+        const name = el.target.businessObject && el.target.businessObject.name
+          ? el.target.businessObject.name
+          : el.target.id;
+        if (!dsEntry.readers.includes(name)) dsEntry.readers.push(name);
+      }
+    }
+
+    if (connType === 'bpmn:DataOutputAssociation') {
+      // source = Task, target = DataObjectReference or DataStoreReference (task writes to DO/DS)
+      const doEntry = doMap.get(el.target.id);
+      if (doEntry) {
+        const name = el.source.businessObject && el.source.businessObject.name
+          ? el.source.businessObject.name
+          : el.source.id;
+        if (!doEntry.writers.includes(name)) doEntry.writers.push(name);
+      }
+
+      const dsEntry = dsMap.get(el.target.id);
+      if (dsEntry) {
+        const name = el.source.businessObject && el.source.businessObject.name
+          ? el.source.businessObject.name
+          : el.source.id;
+        const selExt = el.businessObject.extensionElements && el.businessObject.extensionElements.values
+          ? el.businessObject.extensionElements.values.find(v => v.$type === 'bpmnbc:DataStoreVarSelections')
+          : null;
+        const vars = selExt ? (selExt.values || []).map(s => s.varname).filter(Boolean) : [];
+        dsEntry.writers.push({ task: name, vars });
+      }
+    }
+  });
+
+  return {
+    dataObjects: [...doMap.values()],
+    dataStores: [...dsMap.values()]
+  };
+}
+
 const compileDeployButton = $('#js-compile-deploy');
 // Function to toggle button state (lock/unlock & show loading animation)
 function toggleLockButton(isDisabled, isLoading = false) {
@@ -391,11 +474,7 @@ $(function () {
     window.open(`${baseUrl}/execute-panel.html`, '_blank');
   });
   $('#js-open-floating-window').click(() => {
-    processAllElements();
-    if (ParametersArray.length > 0) {
-      $('#floating-window').remove();
-      renderVariablesWindow(ParametersArray);
-      $('#floating-window').show();
-    }
+    $('#floating-window').remove();
+    renderVariablesWindow(collectDiagramData());
   });
 });

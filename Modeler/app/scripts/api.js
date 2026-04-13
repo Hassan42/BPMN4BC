@@ -91,10 +91,12 @@ export async function executeTask(network, contractName, task, form, sender, eth
   // Step 3: Refresh UI — separate try/catch so a failed refresh doesn't mask a successful task
   try {
     const [data, ethChfRate] = await Promise.all([fetchData(instanceId), getEthChfRate()]);
-    renderTabs(data.result, instanceId);
+    renderTabs(data.result, instanceId, ethChfRate);
     if (data.transactions && data.transactions.length > 0) {
       renderTransactionLog(data.transactions, ethChfRate);
     }
+    // Notify the diagram viewer iframe of the updated state
+    new BroadcastChannel('bc-diagram-state').postMessage({ type: 'stateUpdate', result: data.result });
   } catch (refreshError) {
     console.error('UI refresh failed after task execution (task was successful):', refreshError);
   }

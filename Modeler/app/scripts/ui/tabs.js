@@ -1,7 +1,7 @@
 import { renderContract, renderRoleBalances } from './renderer.js';
 import { gasToCHF, formatCHF } from '../pricing.js';
 
-export function renderTabs(networks, instanceId) {
+export function renderTabs(networks, instanceId, ethChfRate) {
   const tabsContainer = document.getElementById('tabsContainer');
   tabsContainer.innerHTML = '';
 
@@ -12,16 +12,16 @@ export function renderTabs(networks, instanceId) {
 
     tabButton.onclick = () => {
       renderContract(networks[networkKey], networkKey, instanceId);
-      renderRoleBalances({ [networkKey]: networks[networkKey] });
-    }
+      renderRoleBalances({ [networkKey]: networks[networkKey] }, ethChfRate);
+    };
     tabsContainer.appendChild(tabButton);
   });
 
-  renderRoleBalances(networks);
+  renderRoleBalances(networks, ethChfRate);
 
   const firstNetwork = Object.keys(networks)[0];
   renderContract(networks[firstNetwork], firstNetwork, instanceId);
-  renderRoleBalances({ [firstNetwork]: networks[firstNetwork] });
+  renderRoleBalances({ [firstNetwork]: networks[firstNetwork] }, ethChfRate);
 }
 
 export function renderTransactionLog(logs, ethChfRate) {

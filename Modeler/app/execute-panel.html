@@ -7,85 +7,99 @@
   <title>Blockchain Workflow Panel</title>
   <script type="module" src="./execution-panel.js" defer></script>
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- <style>
-  @media print {
-    #transactionLogPanel,
-    #transactionModal {
-      display: none !important;
-    }
-  }
-</style> -->
+  <style>
+    html, body { height: 100%; overflow: hidden; }
+  </style>
 </head>
 
-<body class="bg-gray-100 min-h-screen flex items-center justify-center">
-  <div class="max-w-4xl w-full bg-white p-6 rounded-lg shadow-lg">
-    <h1 class="text-2xl font-bold mb-4">Blockchain Workflow Panel</h1>
+<body class="bg-gray-100 h-full">
 
-    <!-- Back to Modeler button — shown on instances list -->
-    <div id="backToModelerSection" class="hidden mb-4">
-      <button id="back-to-modeler-btn"
-        class="px-4 py-2 text-sm rounded border border-gray-300 bg-white hover:bg-blue-50">
-        ← Back to Modeler
-      </button>
-    </div>
+  <!-- Top-level split container -->
+  <div id="splitContainer" class="flex h-full">
 
-    <!-- Back to Instances + View Model buttons — shown when viewing a specific instance -->
-    <div id="instanceNavSection" class="hidden flex gap-2 mb-4">
-      <button id="back-to-instances-btn"
-        class="px-4 py-2 text-sm rounded border border-gray-300 bg-white hover:bg-blue-50">
-        ← All Instances
-      </button>
-      <button id="view-model-btn"
-        class="px-4 py-2 text-sm rounded border border-gray-300 bg-white hover:bg-blue-50">
-        View BPMN Model
-      </button>
-    </div>
+    <!-- ── Left: Workflow pane ── -->
+    <div id="workflowPane" class="flex-1 overflow-y-auto flex justify-center items-start p-6 transition-all duration-300">
+      <div class="max-w-4xl w-full bg-white p-6 rounded-lg shadow-lg">
+        <h1 class="text-2xl font-bold mb-4">Blockchain Workflow Panel</h1>
 
-    <!-- Instances List (hidden when viewing a specific instance) -->
-    <div id="instancesSection" class="mb-4">
-      <h2 class="text-lg font-semibold mb-2">Deployed Instances</h2>
-      <div id="instancesContainer" class="space-y-1"></div>
-    </div>
+        <!-- Back to Modeler button — shown on instances list -->
+        <div id="backToModelerSection" class="hidden mb-4">
+          <button id="back-to-modeler-btn"
+            class="px-4 py-2 text-sm rounded border border-gray-300 bg-white hover:bg-blue-50">
+            ← Back to Modeler
+          </button>
+        </div>
 
-    <hr class="mb-4" />
+        <!-- Back to Instances + View Model buttons — shown when viewing a specific instance -->
+        <div id="instanceNavSection" class="hidden flex gap-2 mb-4">
+          <button id="back-to-instances-btn"
+            class="px-4 py-2 text-sm rounded border border-gray-300 bg-white hover:bg-blue-50">
+            ← All Instances
+          </button>
+          <button id="view-model-btn"
+            class="px-4 py-2 text-sm rounded border border-gray-300 bg-white hover:bg-blue-50">
+            View BPMN Model
+          </button>
+        </div>
 
-    <!-- Spinner -->
-    <div id="loading-spinner" class="hidden flex justify-center items-center mb-4">
-      <svg class="animate-spin h-8 w-8 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none"
-        viewBox="0 0 24 24">
-        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
-      </svg>
-    </div>
+        <!-- Instances List -->
+        <div id="instancesSection" class="mb-4">
+          <h2 class="text-lg font-semibold mb-2">Deployed Instances</h2>
+          <div id="instancesContainer" class="space-y-1"></div>
+        </div>
 
-    <!-- Tab container -->
-    <div id="tabsContainer" class="flex space-x-2 mb-4"></div>
+        <hr class="mb-4" />
 
-    <!-- JSON output or content -->
-    <div id="jsonContainer"></div>
-
-    <!-- Floating Transaction Log Panel -->
-    <div id="transactionLogPanel"
-      class="w-full bg-gray-100 mt-6 rounded-lg overflow-hidden border border-gray-300 text-sm">
-      <div class="flex items-center justify-between bg-blue-500 text-white px-4 py-2">
-        <button id="toggleLogBtn" class="text-left font-semibold">
-          Transaction Log
-        </button>
-        <button id="downloadAllLogs" class="p-1 hover:bg-blue-600 rounded" title="Download All Logs">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"
-            stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round"
-              d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4" />
+        <!-- Spinner -->
+        <div id="loading-spinner" class="hidden flex justify-center items-center mb-4">
+          <svg class="animate-spin h-8 w-8 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none"
+            viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
           </svg>
+        </div>
+
+        <!-- Tab container -->
+        <div id="tabsContainer" class="flex space-x-2 mb-4"></div>
+
+        <!-- JSON output or content -->
+        <div id="jsonContainer"></div>
+
+        <!-- Transaction Log Panel -->
+        <div id="transactionLogPanel"
+          class="w-full bg-gray-100 mt-6 rounded-lg overflow-hidden border border-gray-300 text-sm">
+          <div class="flex items-center justify-between bg-blue-500 text-white px-4 py-2">
+            <button id="toggleLogBtn" class="text-left font-semibold">
+              Transaction Log
+            </button>
+            <button id="downloadAllLogs" class="p-1 hover:bg-blue-600 rounded" title="Download All Logs">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round"
+                  d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4" />
+              </svg>
+            </button>
+          </div>
+          <div id="logContent" class="max-h-96 overflow-y-auto hidden p-4 space-y-4"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Right: BPMN Viewer pane (hidden by default) ── -->
+    <div id="viewerPane" class="hidden flex-col w-1/2 border-l border-gray-300 bg-white flex-shrink-0">
+      <!-- Viewer header -->
+      <div class="flex items-center justify-between bg-gray-100 px-4 py-2 border-b border-gray-300 flex-shrink-0">
+        <span class="font-semibold text-sm text-gray-700">BPMN Model</span>
+        <button id="close-viewer-btn"
+          class="px-3 py-1 text-sm rounded border border-gray-300 bg-white hover:bg-gray-50 cursor-pointer">
+          ✕ Close
         </button>
       </div>
-      <div id="logContent" class="max-h-96 overflow-y-auto hidden p-4 space-y-4"></div>
+      <!-- Viewer iframe fills remaining height -->
+      <iframe id="viewerFrame" src="" class="flex-1 w-full border-none" style="min-height:0"></iframe>
     </div>
 
-
   </div>
-
-
 
   <!-- Transaction Popup Modal -->
   <div id="transactionModal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 hidden">

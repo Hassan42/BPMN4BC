@@ -116,7 +116,7 @@
       <bpmn2:outgoing>Flow_10lxbaz</bpmn2:outgoing>
     </bpmn2:exclusiveGateway>
     <bpmn2:sequenceFlow id="Flow_0cig0kl" sourceRef="Activity_12grcqi" targetRef="Gateway_1c9ggbs" />
-    <bpmn2:scriptTask id="Activity_0p7wcde" bpmnbc:bc="true" bpmnbc:bctype="ScriptTask" bpmnbc:bcid="network-3" bpmnbc:solidityscript="(bool success, ) = roleToaddress[&#34;Buyer&#34;].call{value: address(this).balance}(&#34;&#34;);&#10;require(success, &#34;Transfer failed&#34;);" name="Refund Security Deposit">
+    <bpmn2:scriptTask id="Activity_0p7wcde" bpmnbc:bc="true" bpmnbc:bctype="ScriptTask" bpmnbc:bcid="network-3" bpmnbc:solidityscript="(bool success, ) = addressOf[&#34;Buyer&#34;].call{value: address(this).balance}(&#34;&#34;);&#10;require(success, &#34;Transfer failed&#34;);" name="Refund Security Deposit">
       <bpmn2:incoming>Flow_0nxxr1i</bpmn2:incoming>
       <bpmn2:outgoing>Flow_0aahece</bpmn2:outgoing>
     </bpmn2:scriptTask>
@@ -129,7 +129,7 @@
     <bpmn2:sequenceFlow id="Flow_10lxbaz" sourceRef="Gateway_1c9ggbs" targetRef="Activity_0t27ykx">
       <bpmn2:conditionExpression xsi:type="bpmn2:tFormalExpression">${response} == 1</bpmn2:conditionExpression>
     </bpmn2:sequenceFlow>
-    <bpmn2:scriptTask id="Activity_0t27ykx" bpmnbc:bc="true" bpmnbc:bctype="ScriptTask" bpmnbc:bcid="network-3" bpmnbc:solidityscript="(bool success, ) = roleToaddress[&#34;PropertyOwner&#34;].call{value: address(this).balance}(&#34;&#34;);&#10;require(success, &#34;Transfer failed&#34;);" name="Payout Owner">
+    <bpmn2:scriptTask id="Activity_0t27ykx" bpmnbc:bc="true" bpmnbc:bctype="ScriptTask" bpmnbc:bcid="network-3" bpmnbc:solidityscript="(bool success, ) = addressOf[&#34;PropertyOwner&#34;].call{value: address(this).balance}(&#34;&#34;);&#10;require(success, &#34;Transfer failed&#34;);" name="Payout Owner">
       <bpmn2:incoming>Flow_10lxbaz</bpmn2:incoming>
       <bpmn2:outgoing>Flow_1dewz85</bpmn2:outgoing>
     </bpmn2:scriptTask>

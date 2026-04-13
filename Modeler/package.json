@@ -26,6 +26,8 @@
     "axios": "^1.8.1",
     "bpmn-js": "^17.6.4",
     "bpmn-js-properties-panel": "^5.16.0",
+    "highlight.js": "^11.0.0",
+    "highlightjs-solidity": "^2.0.0",
     "cors": "^2.8.5",
     "express": "^4.21.2",
     "inherits-browser": "^0.1.0",

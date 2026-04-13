@@ -3,6 +3,7 @@ import { html } from 'htm/preact';
 import { TextFieldEntry, isTextFieldEntryEdited, SelectEntry, isSelectEntryEdited, CheckboxEntry, TextAreaEntry } from '@bpmn-io/properties-panel';
 import { useService } from 'bpmn-js-properties-panel';
 import { is } from 'bpmn-js/lib/util/ModelUtil';
+import { openScriptEditorWindow } from '../scripts/ui/scriptEditorWindow';
 export default function (element) {
 
   // Initialize props array with the bcId object
@@ -266,24 +267,31 @@ function Script(props) {
   const translate = useService('translate');
   const debounce = useService('debounceInput');
 
-  const getValue = () => {
-    return element.businessObject.solidityscript || '';
+  const getValue = () => element.businessObject.solidityscript || '';
+  const setValue = value => modeling.updateProperties(element, { solidityscript: value });
+
+  const openEditor = (e) => {
+    e.preventDefault();
+    openScriptEditorWindow(getValue, setValue, element.businessObject.name || element.id);
   };
 
-  const setValue = value => {
-    return modeling.updateProperties(element, {
-      solidityscript: value
-    });
-  };
-
-  return html`<${TextAreaEntry}
-    id=${id}
-    element=${element}
-    label=${translate('Solidity Script')}
-    getValue=${getValue}
-    setValue=${setValue}
-    debounce=${debounce}
-  />`;
+  return html`
+    <div>
+      <${TextAreaEntry}
+        id=${id}
+        element=${element}
+        label=${translate('Solidity Script')}
+        getValue=${getValue}
+        setValue=${setValue}
+        debounce=${debounce}
+      />
+      <button
+        type="button"
+        onClick=${openEditor}
+        style="margin-top:6px; padding:6px 0; font-size:12px; cursor:pointer; background:#d8d9d9; border:1px solid #b1b1b1; border-radius:3px; width:100%; text-align:center;"
+      >✎ Open Script Editor</button>
+    </div>
+  `;
 }
 
 function Returns(props) {

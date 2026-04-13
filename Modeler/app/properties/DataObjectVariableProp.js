@@ -12,6 +12,7 @@ export default function DataObjectVariableProp({ idPrefix, element, variable, in
   return [
     { id: idPrefix + '-name', component: VariableName, idPrefix, element, variable, index, elementRegistry },
     { id: idPrefix + '-type', component: VariableType, idPrefix, element, variable, index, elementRegistry },
+    { id: idPrefix + '-default', component: VariableDefault, idPrefix, element, variable },
   ];
 }
 
@@ -87,3 +88,26 @@ function VariableType({ idPrefix, element, variable, index, elementRegistry }) {
   });
 }
 
+function VariableDefault({ idPrefix, element, variable }) {
+  const commandStack = useService('commandStack');
+  const translate = useService('translate');
+  const debounce = useService('debounceInput');
+
+  const getValue = () => variable.value || '';
+  const setValue = value => {
+    commandStack.execute('element.updateModdleProperties', {
+      element,
+      moddleElement: variable,
+      properties: { value }
+    });
+  };
+
+  return TextFieldEntry({
+    element: variable,
+    id: idPrefix + '-default',
+    label: translate('Default Value'),
+    getValue,
+    setValue,
+    debounce
+  });
+}

@@ -460,23 +460,28 @@ function findReceiveTask(flowElement) {
     return []; // Return an empty array if no ReceiveTask is found
 }
 
-function generateExpression(expression, collaborationId) {
+function generateExpression(expression, collaborationId, localStructs = new Set()) {
 
     return expression.replace(/\${([^}]+)}/g, (_, varName) => {
         const parts = varName.split('.');
 
-        // If parts.length === 2 and the second part is "dataStore" (or legacy "localStorage"), return dataStore.varName
+        // dataStore.field access (state variable)
         if (parts.length === 2 && (parts[0] === "dataStore" || parts[0] === "localStorage")) {
             return `dataStore.${parts[1]}`;
         }
 
-        // If parts.length === 2, handle <string>.varname for contract retrieval
+        // DataObject struct field access (local memory param)
+        if (parts.length === 2 && localStructs.has(parts[0])) {
+            return `${parts[0]}.${parts[1]}`;
+        }
+
+        // Cross-contract getter call: <LaneName>.varname
         if (parts.length === 2) {
             const [prefix, variable] = parts;
             return `I${prefix}_Contract_${collaborationId}(contracts["${prefix}_Contract_${collaborationId}"]).get${capitalize(variable)}()`;
         }
 
-        // Handle simple ${varname} case
+        // Simple ${varname}
         return varName;
     });
 }
@@ -538,6 +543,19 @@ const extractDataStoreVariables = (dataStore) => {
 };
 
 /**
+ * Extracts DataObjectVarSelection entries from a DataOutputAssociation connection.
+ * These hold the per-task write value/external for each DataObject variable.
+ * @param {Object} conn - The DataOutputAssociation BPMN element.
+ * @returns {Array} The list of DataObjectVarSelection objects (varname, value, external).
+ */
+const extractDataObjectVarSelections = (conn) => {
+    if (!conn.extensionElements || !conn.extensionElements.values) return [];
+    const ext = conn.extensionElements.values.find(e => e.$type === 'bpmnbc:DataObjectVarSelections');
+    if (!ext || !ext.values) return [];
+    return ext.values.filter(v => v.$type === 'bpmnbc:DataObjectVarSelection');
+};
+
+/**
  * Extracts DataStoreVarSelection entries from a DataOutputAssociation connection.
  * @param {Object} dataOutputAssociation - The DataOutputAssociation BPMN element.
  * @returns {Array} The list of DataStoreVarSelection objects (varname, value).
@@ -589,6 +607,31 @@ const getTaskDataObjectReads = (task, process) => {
 };
 
 /**
+ * Returns the specifically selected DataStore read variables for a task/gateway,
+ * read from the DataStoreVarSelections extension on each DataInputAssociation.
+ * @param {Object} task - The BPMN task/gateway element.
+ * @returns {Array} Array of { varname, type } for each selected read variable.
+ */
+const getTaskDataStoreReadVars = (task) => {
+    const result = [];
+    (task.dataInputAssociations || []).forEach(assoc => {
+        const sources = Array.isArray(assoc.sourceRef)
+            ? assoc.sourceRef
+            : (assoc.sourceRef ? [assoc.sourceRef] : []);
+        sources.forEach(src => {
+            if (!src || src.$type !== 'bpmn:DataStoreReference') return;
+            const dsVars = extractDataStoreVariables(src);
+            extractDataStoreVarSelections(assoc).forEach(sel => {
+                if (!sel.varname) return;
+                const dsVar = dsVars.find(v => v.name === sel.varname);
+                result.push({ varname: sel.varname, type: dsVar ? (dsVar.type || 'uint') : 'uint' });
+            });
+        });
+    });
+    return result;
+};
+
+/**
  * Returns all DataObjectReferences that a task writes to (via DataOutputAssociation).
  * @param {Object} task - The BPMN task element.
  * @returns {Array} The list of DataObjectReference elements written by this task.
@@ -630,5 +673,7 @@ module.exports = {
     extractDataStoreVarSelections,
     extractDataObjectVariables,
     getTaskDataObjectReads,
-    getTaskDataObjectWrites
+    getTaskDataStoreReadVars,
+    getTaskDataObjectWrites,
+    extractDataObjectVarSelections
 };

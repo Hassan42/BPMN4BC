@@ -101,6 +101,20 @@ export function createDataStoreVariables(properties, parent, bpmnFactory) {
   return createElement('bpmnbc:DataStoreVariables', properties, parent, bpmnFactory);
 }
 
+export function getDataObjectVarSelectionsExtension(element) {
+  const businessObject = getBusinessObject(element);
+  return getExtension(businessObject, 'bpmnbc:DataObjectVarSelections');
+}
+
+export function getDataObjectVarSelections(element) {
+  const ext = getDataObjectVarSelectionsExtension(element);
+  return ext && ext.get('values');
+}
+
+export function createDataObjectVarSelections(properties, parent, bpmnFactory) {
+  return createElement('bpmnbc:DataObjectVarSelections', properties, parent, bpmnFactory);
+}
+
 export function getDataStoreVarSelectionsExtension(element) {
   const businessObject = getBusinessObject(element);
   return getExtension(businessObject, 'bpmnbc:DataStoreVarSelections');

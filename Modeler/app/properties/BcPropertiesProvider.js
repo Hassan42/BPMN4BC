@@ -46,6 +46,16 @@ export default function BcPropertiesProvider(propertiesPanel, injector, translat
      */
     return function (groups) {
 
+      // Remove unwanted standard panels globally
+      const REMOVE_GROUPS = new Set([
+        'message',                    // Message
+        'Zeebe__ExecutionListeners',  // Execution Listeners
+        'Zeebe__ExtensionProperties', // Extension Properties
+        'outputs',                    // Output Mapping (Zeebe)
+        'scriptImplementation',       // Implementation (ScriptTask)
+      ]);
+      groups = groups.filter(g => !REMOVE_GROUPS.has(g.id));
+
       const businessObject = element.businessObject;
       const isReceiveTask = is(businessObject, "bpmn:ReceiveTask");
       const isScriptTask = is(businessObject, "bpmn:ScriptTask");

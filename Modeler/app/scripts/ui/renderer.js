@@ -1,6 +1,7 @@
 import { createCollapsibleSection } from './collapsible.js';
 import { executeTask } from '../api.js';
 import { toggleVisibility } from '../utils/helper.js';
+import { formatCHF } from '../pricing.js';
 
 export function renderContract(data, networkKey, instanceId) {
   const container = document.getElementById('jsonContainer');
@@ -189,7 +190,7 @@ function createDataStoreSection(dataArray) {
   return sectionDiv;
 }
 
-export function renderRoleBalances(networks) {
+export function renderRoleBalances(networks, ethChfRate) {
   const container = document.getElementById('jsonContainer');
 
   Object.entries(networks).forEach(([networkName, contracts]) => {
@@ -209,7 +210,10 @@ export function renderRoleBalances(networks) {
 
       const balance = document.createElement('div');
       balance.className = 'text-blue-700 font-semibold';
-      balance.innerText = `Balance: ${contract.balance} ETH`;
+      const contractEth = parseFloat(contract.balance) || 0;
+      const contractChf = ethChfRate ? contractEth * ethChfRate : null;
+      const contractChfLabel = contractChf !== null ? `  ≈  ${contractEth === 0 ? 'CHF 0.00' : formatCHF(contractChf)}` : '';
+      balance.innerText = `Balance: ${contractEth.toFixed(4)} ETH${contractChfLabel}`;
 
       contractBalanceDiv.appendChild(name);
       contractBalanceDiv.appendChild(balance);
@@ -243,7 +247,10 @@ export function renderRoleBalances(networks) {
 
       const roleBalance = document.createElement('div');
       roleBalance.className = 'text-blue-700 font-semibold';
-      roleBalance.innerText = `Balance: ${balance} ETH`;
+      const roleEth = parseFloat(balance) || 0;
+      const roleChf = ethChfRate ? roleEth * ethChfRate : null;
+      const roleChfLabel = roleChf !== null ? `  ≈  ${roleEth === 0 ? 'CHF 0.00' : formatCHF(roleChf)}` : '';
+      roleBalance.innerText = `Balance: ${roleEth.toFixed(4)} ETH${roleChfLabel}`;
 
       roleCard.appendChild(roleName);
       roleCard.appendChild(roleBalance);

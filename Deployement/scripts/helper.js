@@ -30,21 +30,25 @@ const setResources = async (contractManager, network, contractName, contractInst
         // Fetch all roles used by contracts
         const roles = contractManager.getAllRoles(network);
 
-        // Get signers
-        const signers = await ethers.getSigners();
+        // Get deployer signer (index 0) to fund fresh participant wallets
+        const [deployer] = await ethers.getSigners();
+        const provider = deployer.provider;
 
-        // Ensure there are enough signers for the roles
-        if (roles.length > signers.length) {
-            throw new Error(`Not enough signers to assign all roles. Available signers: ${signers.length}, required: ${roles.length}`);
-        }
-
-        // Create a mapping of roles to signers
+        // Generate a fresh random wallet for each role and fund it
         const roleSignerMap = {};
-        roles.forEach((role, index) => {
-            roleSignerMap[role] = signers[index + 1].address;
-            // Update the role address in the contract manager
-            contractManager.updateRoleAddress(contractName, role, signers[index + 1].address);
-        });
+        for (const role of roles) {
+            const wallet = ethers.Wallet.createRandom().connect(provider);
+
+            // Fund the new wallet with 1 ETH from the deployer so it can pay gas
+            const fundTx = await deployer.sendTransaction({
+                to: wallet.address,
+                value: ethers.parseEther('1.0')
+            });
+            await fundTx.wait();
+
+            roleSignerMap[role] = wallet.address;
+            contractManager.updateRoleAddress(contractName, role, wallet.address, wallet.privateKey);
+        }
 
         // Convert the roleSignerMap to arrays
         const roleArray = Object.keys(roleSignerMap);
@@ -186,26 +190,22 @@ const executeTask = async (contractManager, contractName, contractInstance, task
 
 
 
-        // Get the address of the role associated with this task
+        // Get the address and private key of the role associated with this task
         const roleAddress = contractManager.getAddressByRole(contractName, sender);
+        const rolePrivateKey = contractManager.getPrivateKeyByRole(contractName, sender);
 
-        // Retrieve all available signers
-        const signers = await ethers.getSigners();
-
-        let roleSigner = signers.find(signer => signer.address === roleAddress);
-
-        if (!roleSigner) {
-            roleSigner = signers[0];
+        let roleSigner;
+        if (rolePrivateKey) {
+            // Reconstruct the wallet from the stored private key
+            const provider = (await ethers.getSigners())[0].provider;
+            roleSigner = new ethers.Wallet(rolePrivateKey, provider);
+        } else {
+            // Fallback: find among Hardhat signers (legacy / deployer roles)
+            const signers = await ethers.getSigners();
+            roleSigner = signers.find(s => s.address === roleAddress) || signers[0];
         }
 
-        // Find if the roleAddress exists among the signers
-
-        // if (!roleSigner) {
-        //     throw new Error(`Role address "${roleAddress}" is not in the list of available signers.`);
-        // }
-
-        // Attach to the contract instance with the role address as the signer
-        // We change the signer in the backend, in a deployment version the sender has to sign on their side
+        // Attach to the contract instance with the role signer
         const contractWithSigner = contractInstance.connect(roleSigner);
 
         // Create the transaction options object

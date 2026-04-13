@@ -81,7 +81,7 @@
           {
             "name": "dataInputAssociations",
             "isMany": true,
-            "type": "Element"
+            "type": "bpmn:DataInputAssociation"
           }
         ]
       },
@@ -149,6 +149,37 @@
             "name": "value",
             "isAttr": true,
             "type": "String"
+          }
+        ]
+      },
+      {
+        "name": "DataObjectVarSelections",
+        "superClass": [ "Element" ],
+        "properties": [
+          {
+            "name": "values",
+            "isMany": true,
+            "type": "DataObjectVarSelection"
+          }
+        ]
+      },
+      {
+        "name": "DataObjectVarSelection",
+        "properties": [
+          {
+            "name": "varname",
+            "isAttr": true,
+            "type": "String"
+          },
+          {
+            "name": "value",
+            "isAttr": true,
+            "type": "String"
+          },
+          {
+            "name": "external",
+            "isAttr": true,
+            "type": "Boolean"
           }
         ]
       },

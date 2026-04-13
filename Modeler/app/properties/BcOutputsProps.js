@@ -11,6 +11,9 @@ import {
     getDataStoreVarSelections,
     getDataStoreVariables,
     getDataObjectVariables,
+    getDataObjectVarSelections,
+    getDataObjectVarSelectionsExtension,
+    createDataObjectVarSelections,
     nextId
   } from '../util';
 
@@ -60,14 +63,14 @@ import {
       vars.forEach((variable, vi) => {
         const doItemId = `do-write-${doEl.id}-v${vi}`;
         const entries = [
-          { id: `${doItemId}-value`, element: doEl, variable, isReceiveTask, component: DoWriteVarValue, isEdited: isTextFieldEntryEdited }
+          { id: `${doItemId}-value`, conn, variable, isReceiveTask, component: DoWriteVarValue, isEdited: isTextFieldEntryEdited }
         ];
         if (isReceiveTask) {
-          entries.push({ id: `${doItemId}-external`, element: doEl, variable, component: DoWriteVarExternal });
+          entries.push({ id: `${doItemId}-external`, conn, variable, component: DoWriteVarExternal });
         }
         items.push({
           id: doItemId,
-          label: `${variable.name || '?'} : ${variable.type || 'uint'} [${doLabel}]`,
+          label: `${doLabel}.${variable.name || '?'} : ${variable.type || 'uint'} [DO]`,
           entries,
         });
       });
@@ -104,7 +107,7 @@ import {
         }
         items.push({
           id: dsItemId,
-          label: `${sel.varname} : ${varType} [Data Store]`,
+          label: `${sel.varname} : ${varType} [DS]`,
           entries,
         });
       });
@@ -211,23 +214,44 @@ import {
     };
   }
 
-  function DoWriteVarValue({ id, element, variable, isReceiveTask }) {
+  function DoWriteVarValue({ id, conn, variable, isReceiveTask }) {
     const commandStack = useService('commandStack');
     const translate = useService('translate');
     const debounce = useService('debounceInput');
+    const bpmnFactory = useService('bpmnFactory');
 
-    // Only hide the value field when the variable is external AND we're on a ReceiveTask.
-    // ScriptTasks always need a value expression regardless of the external flag.
-    if (isReceiveTask && variable.external) return null;
+    const getSel = () => (getDataObjectVarSelections(conn) || []).find(s => s.varname === variable.name);
 
-    const getValue = () => variable.value || '';
-    const setValue = value => commandStack.execute('element.updateModdleProperties', {
-      element, moddleElement: variable, properties: { value }
-    });
+    if (isReceiveTask && getSel()?.external) return null;
+
+    const getValue = () => getSel()?.value || '';
+
+    const setValue = value => {
+      const commands = [];
+      const bo = conn.businessObject;
+      let extElems = bo.get('extensionElements');
+      if (!extElems) {
+        extElems = createElement('bpmn:ExtensionElements', { values: [] }, bo, bpmnFactory);
+        commands.push({ cmd: 'element.updateModdleProperties', context: { element: conn, moddleElement: bo, properties: { extensionElements: extElems } } });
+      }
+      let selExt = getDataObjectVarSelectionsExtension(conn);
+      if (!selExt) {
+        selExt = createDataObjectVarSelections({ values: [] }, extElems, bpmnFactory);
+        commands.push({ cmd: 'element.updateModdleProperties', context: { element: conn, moddleElement: extElems, properties: { values: [...extElems.get('values'), selExt] } } });
+      }
+      let sel = selExt.get('values').find(s => s.varname === variable.name);
+      if (!sel) {
+        sel = bpmnFactory.create('bpmnbc:DataObjectVarSelection', { varname: variable.name });
+        sel.$parent = selExt;
+        commands.push({ cmd: 'element.updateModdleProperties', context: { element: conn, moddleElement: selExt, properties: { values: [...selExt.get('values'), sel] } } });
+      }
+      commands.push({ cmd: 'element.updateModdleProperties', context: { element: conn, moddleElement: sel, properties: { value } } });
+      commandStack.execute('properties-panel.multi-command-executor', commands);
+    };
 
     return html`<${TextFieldEntry}
       id=${id}
-      element=${variable}
+      element=${conn}
       label=${translate('Value')}
       getValue=${getValue}
       setValue=${setValue}
@@ -281,18 +305,41 @@ import {
     />`;
   }
 
-  function DoWriteVarExternal({ id, element, variable }) {
+  function DoWriteVarExternal({ id, conn, variable }) {
     const commandStack = useService('commandStack');
     const translate = useService('translate');
+    const bpmnFactory = useService('bpmnFactory');
 
-    const getValue = () => variable.external || false;
-    const setValue = value => commandStack.execute('element.updateModdleProperties', {
-      element, moddleElement: variable, properties: { external: value }
-    });
+    const getSel = () => (getDataObjectVarSelections(conn) || []).find(s => s.varname === variable.name);
+
+    const getValue = () => getSel()?.external || false;
+
+    const setValue = value => {
+      const commands = [];
+      const bo = conn.businessObject;
+      let extElems = bo.get('extensionElements');
+      if (!extElems) {
+        extElems = createElement('bpmn:ExtensionElements', { values: [] }, bo, bpmnFactory);
+        commands.push({ cmd: 'element.updateModdleProperties', context: { element: conn, moddleElement: bo, properties: { extensionElements: extElems } } });
+      }
+      let selExt = getDataObjectVarSelectionsExtension(conn);
+      if (!selExt) {
+        selExt = createDataObjectVarSelections({ values: [] }, extElems, bpmnFactory);
+        commands.push({ cmd: 'element.updateModdleProperties', context: { element: conn, moddleElement: extElems, properties: { values: [...extElems.get('values'), selExt] } } });
+      }
+      let sel = selExt.get('values').find(s => s.varname === variable.name);
+      if (!sel) {
+        sel = bpmnFactory.create('bpmnbc:DataObjectVarSelection', { varname: variable.name });
+        sel.$parent = selExt;
+        commands.push({ cmd: 'element.updateModdleProperties', context: { element: conn, moddleElement: selExt, properties: { values: [...selExt.get('values'), sel] } } });
+      }
+      commands.push({ cmd: 'element.updateModdleProperties', context: { element: conn, moddleElement: sel, properties: { external: value } } });
+      commandStack.execute('properties-panel.multi-command-executor', commands);
+    };
 
     return html`<${CheckboxEntry}
       id=${id}
-      element=${variable}
+      element=${conn}
       label=${translate('External')}
       getValue=${getValue}
       setValue=${setValue}

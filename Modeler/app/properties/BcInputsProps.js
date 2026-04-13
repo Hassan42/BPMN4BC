@@ -9,6 +9,7 @@ import {
   getInputParameters,
   getInputParametersExtension,
   getDataStoreVarSelections,
+  getDataStoreVariables,
   getDataObjectVariables,
   nextId
 } from '../util';
@@ -46,14 +47,17 @@ export default function InputParametersProps({ element, injector }) {
     .filter(conn => conn.businessObject?.$type === 'bpmn:DataInputAssociation')
     .filter(conn => conn.source && is(conn.source.businessObject, 'bpmn:DataObjectReference'));
 
+  const seenDoNames = new Set();
   doReads.forEach(conn => {
     const doEl = conn.source;
     const doLabel = doEl.businessObject.name || doEl.businessObject.id;
+    if (seenDoNames.has(doLabel)) return;
+    seenDoNames.add(doLabel);
     const vars = getDataObjectVariables(doEl) || [];
     vars.forEach((variable, vi) => {
       items.push({
         id: `do-read-${doEl.id}-v${vi}`,
-        label: `${variable.name || '?'} : ${variable.type || 'uint'} [${doLabel}]`,
+        label: `${doLabel}.${variable.name || '?'} : ${variable.type || 'uint'} [DO]`,
         entries: [],
       });
     });
@@ -66,11 +70,13 @@ export default function InputParametersProps({ element, injector }) {
 
   dsReads.forEach(conn => {
     const selections = getDataStoreVarSelections(conn) || [];
+    const dsVars = getDataStoreVariables(conn.source) || [];
     selections.forEach((sel, idx) => {
       if (!sel.varname) return;
+      const varType = (dsVars.find(v => v.name === sel.varname) || {}).type || 'uint';
       items.push({
         id: `ds-read-${conn.id}-${idx}`,
-        label: `${sel.varname} [Data Store]`,
+        label: `${sel.varname} : ${varType} [DS]`,
         entries: [],
       });
     });

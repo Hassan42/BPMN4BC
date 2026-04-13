@@ -166,10 +166,45 @@ CustomRules.prototype.init = function () {
     const targetIsData = is(targetBo, 'bpmn:DataObjectReference') || is(targetBo, 'bpmn:DataStoreReference');
 
     if (sourceIsData && targetIsXOR) {
+      // A task/gateway can only read from the same DataStore once
+      if (is(sourceBo, 'bpmn:DataStoreReference')) {
+        const alreadyReads = (target.incoming || []).some(
+          conn => is(conn.source.businessObject, 'bpmn:DataStoreReference') &&
+                  conn.source.id === source.id
+        );
+        if (alreadyReads) {
+          setTimeout(() => showErrorToast('A task can only read from the same DataStore once.'), 0);
+          return false;
+        }
+      }
       return { type: 'bpmn:DataInputAssociation' };
     }
     if (sourceIsXOR && targetIsData) {
       return false;
+    }
+
+    // DataStore → Task: enforce read-once rule
+    if (is(sourceBo, 'bpmn:DataStoreReference') && !is(targetBo, 'bpmn:ExclusiveGateway')) {
+      const alreadyReads = (target.incoming || []).some(
+        conn => is(conn.source.businessObject, 'bpmn:DataStoreReference') &&
+                conn.source.id === source.id
+      );
+      if (alreadyReads) {
+        setTimeout(() => showErrorToast('A task can only read from the same DataStore once.'), 0);
+        return false;
+      }
+    }
+
+    // Task → DataStore: enforce write-once rule
+    if (is(targetBo, 'bpmn:DataStoreReference')) {
+      const alreadyWrites = (source.outgoing || []).some(
+        conn => is(conn.target.businessObject, 'bpmn:DataStoreReference') &&
+                conn.target.id === target.id
+      );
+      if (alreadyWrites) {
+        setTimeout(() => showErrorToast('A task can only write to the same DataStore once.'), 0);
+        return false;
+      }
     }
 
     const sourceIsDataObj = is(sourceBo, 'bpmn:DataObjectReference');

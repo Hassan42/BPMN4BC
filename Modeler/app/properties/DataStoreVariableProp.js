@@ -1,5 +1,6 @@
 import { TextFieldEntry, SelectEntry } from '@bpmn-io/properties-panel';
 import { useService } from 'bpmn-js-properties-panel';
+import { is } from 'bpmn-js/lib/util/ModelUtil';
 import { getDataStoreVariables, getDataStoreVarSelectionsExtension } from '../util';
 import { showErrorToast } from '../util/toast';
 
@@ -31,6 +32,21 @@ function VariableName({ idPrefix, element, variable }) {
     if (vars.some(v => v !== variable && v.name === newName && (v.type || 'uint') === (variable.type || 'uint'))) {
       showErrorToast('A variable with this name and type already exists.');
       return;
+    }
+
+    // Check clash: DS variable name must not match any DataObject's Solidity instance name
+    // (DataObject "Foo Bar" → instance name "fooBar" in Solidity)
+    const allElements = elementRegistry.getAll();
+    for (const el of allElements) {
+      if (!is(el.businessObject, 'bpmn:DataObjectReference')) continue;
+      const doName = el.businessObject.name || '';
+      if (!doName) continue;
+      const stripped = doName.replace(/\s+/g, '');
+      const instanceName = stripped.charAt(0).toLowerCase() + stripped.slice(1);
+      if (instanceName === newName) {
+        showErrorToast(`DataStore variable name "${newName}" clashes with DataObject "${doName}". Choose a different name.`);
+        return;
+      }
     }
     const oldName = variable.name;
     const commands = [

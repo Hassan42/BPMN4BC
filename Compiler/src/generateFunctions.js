@@ -9,7 +9,12 @@ const {
   extractDataStoreVarSelections,
   extractDataObjectVariables,
   getTaskDataObjectReads,
-  getTaskDataObjectWrites
+  getTaskDataStoreReadVars,
+  getTaskDataObjectWrites,
+  extractDataObjectVarSelections,
+  extractOutputParameters,
+  extractInputParameters,
+  parseReturnValues
 } = require('./utils.js');
 
 /**
@@ -94,16 +99,30 @@ function generateScriptFunction(activity, process, collaborationId) {
     return `uint256(${entryFunctionState}) == uint256(State.Open)`;
   }).join(' || ')});`;
 
-  // DataObject reads → function input params
+  // DataObject reads → struct params; DataStore selected read vars → individual params
   const doReads = getTaskDataObjectReads(activity, process);
-  const doWrites = getTaskDataObjectWrites(activity);
+  const dsReadVars = getTaskDataStoreReadVars(activity);
+  // Pair each write connection with its target DO ref for value lookups
+  const doWriteConns = (activity.dataOutputAssociations || [])
+    .filter(conn => conn.targetRef && conn.targetRef.$type === 'bpmn:DataObjectReference')
+    .map(conn => ({ conn, doRef: conn.targetRef }));
+  const doWrites = doWriteConns.map(({ doRef }) => doRef);
 
-  const inputTypes = doReads.map(doRef => {
+  const inputParts = [];
+  const seenStructNames = new Set();
+  doReads.forEach(doRef => {
     const rawName = doRef.name || doRef.id;
     const structName = capitalize(rawName.replace(/\s+/g, ''));
+    if (seenStructNames.has(structName)) return;
+    seenStructNames.add(structName);
     const instanceName = structName.charAt(0).toLowerCase() + structName.slice(1);
-    return `${structName} memory ${instanceName}`;
-  }).join(', ');
+    inputParts.push(`${structName} memory ${instanceName}`);
+  });
+  dsReadVars.forEach(({ varname, type }) => {
+    const mem = isValueType(varname, type) ? '' : 'memory ';
+    inputParts.push(`${type} ${mem}${varname}`);
+  });
+  const inputTypes = inputParts.join(', ');
 
   // DataObject writes → return type and return statement
   let returnClause = '';
@@ -116,18 +135,29 @@ function generateScriptFunction(activity, process, collaborationId) {
     }).join(', ');
     returnClause = `returns (${returnTypes})`;
 
-    const returnValues = doWrites.map(doRef => {
+    const returnValues = doWriteConns.map(({ conn, doRef }) => {
       const rawName = doRef.name || doRef.id;
       const structName = capitalize(rawName.replace(/\s+/g, ''));
       const vars = extractDataObjectVariables(doRef);
+      const selections = extractDataObjectVarSelections(conn);
       const fieldAssignments = vars.map(v => {
-        if (v.value) {
-          const expr = generateExpression(v.value, collaborationId);
-          const formatted = (v.type === 'string' && !v.value.includes('${') && !expr.startsWith('"'))
+        // 1. Per-task write value from the connection selection
+        const sel = selections.find(s => s.varname === v.name);
+        const writeValue = sel ? sel.value : null;
+        if (writeValue) {
+          const expr = generateExpression(writeValue, collaborationId);
+          const formatted = (v.type === 'string' && !writeValue.includes('${') && !expr.startsWith('"'))
             ? `"${expr}"` : expr;
           return `${v.name}: ${formatted}`;
         }
-        // No explicit value — use type default
+        // 2. DO default value
+        // if (v.value) {
+        //   const expr = generateExpression(v.value, collaborationId);
+        //   const formatted = (v.type === 'string' && !v.value.includes('${') && !expr.startsWith('"'))
+        //     ? `"${expr}"` : expr;
+        //   return `${v.name}: ${formatted}`;
+        // }
+        // 3. Type default
         const defaultVal = (v.type || 'uint').startsWith('string') ? '""'
           : (v.type || 'uint').startsWith('address') ? 'address(0)'
           : '0';
@@ -201,25 +231,39 @@ function generateEntryFunction(activity, process, roles, collaborationId) {
     const structName = capitalize(rawName.replace(/\s+/g, ''));
     const instanceName = structName.charAt(0).toLowerCase() + structName.slice(1);
     const vars = extractDataObjectVariables(target);
+    const selections = extractDataObjectVarSelections(conn);
 
-    // Collect external variables as function params
-    vars.filter(v => String(v.external).trim() === 'true').forEach(v => {
-      const vType = v.type || 'uint';
-      const memKeyword = isValueType(v.name, vType) ? '' : 'memory ';
-      doExternalParamsList.push(`${vType} ${memKeyword}${v.name}`);
+    // Collect external variables as function params (from connection selections)
+    selections.filter(sel => String(sel.external).trim() === 'true' && sel.varname).forEach(sel => {
+      const v = vars.find(vv => vv.name === sel.varname);
+      const vType = v ? (v.type || 'uint') : 'uint';
+      const memKeyword = isValueType(sel.varname, vType) ? '' : 'memory ';
+      doExternalParamsList.push(`${vType} ${memKeyword}${sel.varname}`);
     });
 
     // Build struct field assignments
     const fieldAssignments = vars.map(v => {
-      if (String(v.external).trim() === 'true') {
+      const sel = selections.find(s => s.varname === v.name);
+      // 1. External (value comes from function param)
+      if (sel && String(sel.external).trim() === 'true') {
         return `${v.name}: ${v.name}`;
-      } else if (v.value) {
+      }
+      // 2. Per-task write value from connection selection
+      const writeValue = sel ? sel.value : null;
+      if (writeValue) {
+        const expr = generateExpression(writeValue, collaborationId);
+        const formatted = (v.type === 'string' && !writeValue.includes('${') && !expr.startsWith('"'))
+          ? `"${expr}"` : expr;
+        return `${v.name}: ${formatted}`;
+      }
+      // 3. DO default value
+      if (v.value) {
         const expr = generateExpression(v.value, collaborationId);
         const formatted = (v.type === 'string' && !v.value.includes('${') && !expr.startsWith('"'))
           ? `"${expr}"` : expr;
         return `${v.name}: ${formatted}`;
       }
-      // No explicit value — use type default
+      // 4. Type default
       const defaultVal = (v.type || 'uint').startsWith('string') ? '""'
         : (v.type || 'uint').startsWith('address') ? 'address(0)'
         : '0';
@@ -294,12 +338,19 @@ function generateEntryFunction(activity, process, roles, collaborationId) {
           }
         });
 
-        // Build call arguments from DO reads
-        const inputs = doReads.map(doRef => {
+        // Build call arguments: DO structs (deduplicated by name) + dataStore.varname for DS reads
+        const dsReadVarsForCall = getTaskDataStoreReadVars(element);
+        const inputArgParts = [];
+        const seenCallStructs = new Set();
+        doReads.forEach(doRef => {
           const rawName = doRef.name || doRef.id;
           const structName = capitalize(rawName.replace(/\s+/g, ''));
-          return structName.charAt(0).toLowerCase() + structName.slice(1);
-        }).join(', ');
+          if (seenCallStructs.has(structName)) return;
+          seenCallStructs.add(structName);
+          inputArgParts.push(structName.charAt(0).toLowerCase() + structName.slice(1));
+        });
+        dsReadVarsForCall.forEach(({ varname }) => inputArgParts.push(`dataStore.${varname}`));
+        const inputs = inputArgParts.join(', ');
 
         // Build return assignment targets
         const writeAssignments = doWrites.map(doRef => {
@@ -348,18 +399,48 @@ function generateEntryFunction(activity, process, roles, collaborationId) {
             ? `I${elementContractName}(contracts["${elementContractName}"]).checkXOR_${element.id}`
             : `checkXOR_${element.id}`;
 
-          const variablesInConditions = new Set();
-          element.outgoing.forEach(flow => {
-            const condition = flow.conditionExpression?.body || '';
-            const regex = /\${([^}]+)}/g;
-            const matches = [...condition.matchAll(regex)]
-              .map(match => match[1])
-              .filter(varName => varName.split('.').length !== 2);
-            matches.forEach(variable => variablesInConditions.add(variable));
+          // Build args: DO reads (structs) + selected DS read vars
+          const doReads = getTaskDataObjectReads(element, process);
+
+          // Ensure each read DO struct is in scope; create default if not yet defined
+          doReads.forEach(doRef => {
+            const rawName = doRef.name || doRef.id;
+            const structName = capitalize(rawName.replace(/\s+/g, ''));
+            const instanceName = structName.charAt(0).toLowerCase() + structName.slice(1);
+            if (definedVariables.has(instanceName)) return;
+            const vars = extractDataObjectVariables(doRef);
+            if (vars.length === 0) return;
+            const fieldAssignments = vars.map(v => {
+              if (v.value) {
+                const expr = generateExpression(v.value, collaborationId);
+                const formatted = (v.type === 'string' && !v.value.includes('${') && !expr.startsWith('"'))
+                  ? `"${expr}"` : expr;
+                return `${v.name}: ${formatted}`;
+              }
+              const defaultVal = (v.type || 'uint').startsWith('string') ? '""'
+                : (v.type || 'uint').startsWith('address') ? 'address(0)'
+                : '0';
+              return `${v.name}: ${defaultVal}`;
+            });
+            proceedingLogic += `${structName} memory ${instanceName} = ${structName}({${fieldAssignments.join(', ')}});\n`;
+            definedVariables.add(instanceName);
           });
 
-          const parameters = Array.from(variablesInConditions).join(', ');
-          proceedingLogic += `uint256 branch = ${xorFunctionName}(${parameters});\n`;
+          const argParts = [];
+          // DO reads → pass the whole struct instance, deduplicated by name
+          const seenXorStructs = new Set();
+          doReads.forEach(doRef => {
+            const rawName = doRef.name || doRef.id;
+            const structName = capitalize(rawName.replace(/\s+/g, ''));
+            if (seenXorStructs.has(structName)) return;
+            seenXorStructs.add(structName);
+            argParts.push(structName.charAt(0).toLowerCase() + structName.slice(1));
+          });
+          // DS reads → pass only the specifically selected read variables
+          const dsReadVarsForXor = getTaskDataStoreReadVars(element);
+          dsReadVarsForXor.forEach(({ varname }) => argParts.push(`dataStore.${varname}`));
+
+          proceedingLogic += `uint256 branch = ${xorFunctionName}(${argParts.join(', ')});\n`;
 
           element.outgoing.forEach((flow, index) => {
             const branchProceedingElements = getProceedingElementsFromFlow(flow, process);

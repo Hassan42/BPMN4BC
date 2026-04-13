@@ -123,7 +123,7 @@ const createContractManager = (instanceId) => {
         writeContracts(contracts);
     };
 
-    const updateRoleAddress = (contractName, roleName, address) => {
+    const updateRoleAddress = (contractName, roleName, address, privateKey) => {
         const contracts = readContracts();
         const contract = contracts.find(c => c.contractName === contractName);
         if (!contract) throw new Error(`Contract "${contractName}" not found.`);
@@ -131,10 +131,19 @@ const createContractManager = (instanceId) => {
         const existingRole = contract.contractRoles.find(r => r.role === roleName);
         if (existingRole) {
             existingRole.address = address;
+            if (privateKey) existingRole.privateKey = privateKey;
         } else {
-            contract.contractRoles.push({ role: roleName, address });
+            contract.contractRoles.push({ role: roleName, address, ...(privateKey && { privateKey }) });
         }
         writeContracts(contracts);
+    };
+
+    const getPrivateKeyByRole = (contractName, roleName) => {
+        const contracts = readContracts();
+        const contract = contracts.find(c => c.contractName === contractName);
+        if (!contract) throw new Error(`Contract "${contractName}" not found.`);
+        const role = contract.contractRoles && contract.contractRoles.find(r => r.role === roleName);
+        return role ? role.privateKey : undefined;
     };
 
     const getAllContracts = () => readContracts();
@@ -161,8 +170,16 @@ const createContractManager = (instanceId) => {
                             if (isNaN(uintValue) || uintValue < 0) throw new Error(`Invalid value for type 'uint': ${value}`);
                             param.value = uintValue;
                             break;
+                        case 'address':
+                            param.value = String(value);
+                            break;
+                        case 'bool':
+                            param.value = value === true || value === 'true' || value === 1;
+                            break;
                         default:
-                            throw new Error(`Unsupported type: ${param.type}`);
+                            // For bytes32, int, and other Solidity types — store as-is
+                            param.value = value;
+                            break;
                     }
                 } else {
                     throw new Error(`Missing input for parameter at index ${index}`);
@@ -297,6 +314,7 @@ const createContractManager = (instanceId) => {
         updateTaskState,
         getTaskById,
         getAddressByRole,
+        getPrivateKeyByRole,
         updateDataStore,
         getContractAddressByName,
         getContractsState,

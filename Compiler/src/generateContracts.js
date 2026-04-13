@@ -102,7 +102,7 @@ async function generateContract(contractParams) {
 
       mapping(address => string) public addressToRole;
 
-      mapping(string => address) public roleToaddress;
+      mapping(string => address) public addressOf;
 
       mapping(string => string[]) public activitytoRole;
 
@@ -153,13 +153,13 @@ async function generateContract(contractParams) {
       
         for (uint i = 0; i < _addresses.length; i++) {
             addressToRole[_addresses[i]] = _roles[i];
-            roleToaddress[_roles[i]] = _addresses[i];
+            addressOf[_roles[i]] = _addresses[i];
         }
       }
 
       function setResource(string memory _role, address _address) public {
         addressToRole[_address] = _role;
-        roleToaddress[_role] = _address;
+        addressOf[_role] = _address;
       }
 
       function setState(string memory _activity, uint8 _state) public {
