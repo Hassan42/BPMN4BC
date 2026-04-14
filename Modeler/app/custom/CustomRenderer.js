@@ -27,6 +27,7 @@ import BCRECEIVE from '../assets/BC-RECEIVE.svg';
 import BCREVTHROW from '../assets/THROW-REV.svg';
 import BCREVCATCH from '../assets/CATCH-REV.svg';
 import BCTIMER from '../assets/BC-TIMER.svg';
+import PAYABLE from '../assets/payable.svg';
 
 const HIGH_PRIORITY = 1500;
 
@@ -52,7 +53,7 @@ export default class CustomRenderer extends BaseRenderer {
 
     const businessObject = getBusinessObject(element);
 
-    const { bc, bctype, bcevent } = businessObject;
+    const { bc, bctype, bcevent, bcpayable } = businessObject;
 
     if (bc == "true") {
 
@@ -86,7 +87,18 @@ export default class CustomRenderer extends BaseRenderer {
             width: element.width / 3.5,
             height: element.height / 3.5,
             href: RECEIVE
-          }); break;
+          });
+          if (bcpayable) {
+            const payableSvg = svgCreate("image", {
+              x: element.width - element.width / 3.5 - 4,
+              y: 3,
+              width: element.width / 3.5,
+              height: element.height / 3.5,
+              href: PAYABLE
+            });
+            svgAppend(parentNode, payableSvg);
+          }
+          break;
         case "EventBasedGateway":
           // this.bpmnRenderer.drawShape(parentNode, element);
           bcSvg = svgCreate("image", {

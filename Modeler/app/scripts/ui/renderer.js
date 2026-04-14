@@ -93,7 +93,10 @@ function createReceiveTaskSection(network, contractName, tasks, instanceId) {
 
     amountDiv.appendChild(amountLabel);
     amountDiv.appendChild(amountInput);
-    taskContent.appendChild(amountDiv);
+
+    if (task.payable) {
+      taskContent.appendChild(amountDiv);
+    }
 
     // External Params Form (if available)
     const form = document.createElement('form');

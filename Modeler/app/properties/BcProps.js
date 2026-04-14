@@ -17,6 +17,11 @@ export default function (element) {
         element,
         component: Sender,
         isEdited: isTextFieldEntryEdited
+      },
+      {
+        id: 'payable',
+        element,
+        component: Payable
       }
     );
   } else if ((is(element, 'bpmn:IntermediateThrowEvent') || is(element, 'bpmn:IntermediateCatchEvent')) && element.businessObject.bc == "true") {
@@ -113,8 +118,8 @@ function Sender(props) {
   return html`<${TextFieldEntry}
     id=${id}
     element=${element}
-    description=${translate('Initiator role.')}
-    label=${translate('Initiator')}
+    description=${translate('Particiapant responsible to send this transaction.')}
+    label=${translate('Sender')}
     getValue=${getValue}
     setValue=${setValue}
     debounce=${debounce}
@@ -198,6 +203,33 @@ function Shared(props) {
     element=${element}
     description=${translate('Shared state')}
     label=${translate('Shared')}
+    getValue=${getValue}
+    setValue=${setValue}
+    debounce=${debounce}
+  />`;
+}
+
+function Payable(props) {
+  const { element, id } = props;
+
+  const modeling = useService('modeling');
+  const translate = useService('translate');
+  const debounce = useService('debounceInput');
+
+  const getValue = () => {
+    return element.businessObject.bcpayable || false;
+  };
+
+  const setValue = value => {
+    return modeling.updateProperties(element, {
+      bcpayable: value
+    });
+  };
+
+  return html`<${CheckboxEntry}
+    id=${id}
+    element=${element}
+    label=${translate('Payable')}
     getValue=${getValue}
     setValue=${setValue}
     debounce=${debounce}

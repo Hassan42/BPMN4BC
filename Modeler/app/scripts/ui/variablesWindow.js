@@ -8,7 +8,22 @@ export function renderVariablesWindow(data) {
 
   const hasData = dataObjects.length > 0 || dataStores.length > 0;
 
-  const doRows = dataObjects.map((item, i) => `
+  // ── DataObjects: group by name ──────────────────────────────────────────
+  const doGrouped = new Map();
+  dataObjects.forEach(item => {
+    const key = item.name || '(unnamed)';
+    if (!doGrouped.has(key)) {
+      doGrouped.set(key, { name: key, variables: [], readers: new Set(), writers: new Set() });
+    }
+    const g = doGrouped.get(key);
+    item.variables.forEach(v => {
+      if (!g.variables.some(existing => existing.name === v.name)) g.variables.push(v);
+    });
+    item.readers.forEach(r => g.readers.add(r));
+    item.writers.forEach(w => g.writers.add(w));
+  });
+
+  const doRows = [...doGrouped.values()].map((item, i) => `
     <tr class="border-b border-[#b1b1b1] ${i % 2 === 0 ? 'bg-white' : 'bg-[#f1f1f1]'}">
       <td class="p-2 border-r border-[#b1b1b1] font-medium align-top">${item.name}</td>
       <td class="p-2 border-r border-[#b1b1b1] align-top">
@@ -17,43 +32,52 @@ export function renderVariablesWindow(data) {
           : '<span class="text-gray-400">—</span>'}
       </td>
       <td class="p-2 border-r border-[#b1b1b1] align-top">
-        ${item.readers.length
-          ? item.readers.map(r => `<div>${r}</div>`).join('')
+        ${item.readers.size
+          ? [...item.readers].map(r => `<div>${r}</div>`).join('')
           : '<span class="text-gray-400">—</span>'}
       </td>
       <td class="p-2 align-top">
-        ${item.writers.length
-          ? item.writers.map(w => `<div>${w}</div>`).join('')
+        ${item.writers.size
+          ? [...item.writers].map(w => `<div>${w}</div>`).join('')
           : '<span class="text-gray-400">—</span>'}
       </td>
     </tr>
   `).join('');
 
-  const dsRows = dataStores.map((item, i) => `
+  // ── DataStores: one row per variable, filtered readers/writers ──────────
+  const dsVarRows = [];
+  dataStores.forEach(item => {
+    if (item.variables.length === 0) {
+      dsVarRows.push({ varName: '—', varType: '', readers: [], writers: [] });
+    } else {
+      item.variables.forEach(v => {
+        // Only include tasks that selected this specific variable
+        const readers = item.readers.filter(r => r.vars.includes(v.name)).map(r => r.task);
+        const writers = item.writers.filter(w => w.vars.includes(v.name));
+        dsVarRows.push({ varName: v.name, varType: v.type || 'uint', readers, writers });
+      });
+    }
+  });
+
+  const dsRows = dsVarRows.map((row, i) => `
     <tr class="border-b border-[#b1b1b1] ${i % 2 === 0 ? 'bg-white' : 'bg-[#f1f1f1]'}">
-      <td class="p-2 border-r border-[#b1b1b1] font-medium align-top">${item.name}</td>
+      <td class="p-2 border-r border-[#b1b1b1] font-mono align-top">${row.varName}</td>
+      <td class="p-2 border-r border-[#b1b1b1] text-gray-500 align-top">${row.varType}</td>
       <td class="p-2 border-r border-[#b1b1b1] align-top">
-        ${item.variables.length
-          ? item.variables.map(v => `<div><span class="font-mono">${v.name}</span> : <span class="text-gray-500">${v.type || 'uint'}</span></div>`).join('')
-          : '<span class="text-gray-400">—</span>'}
-      </td>
-      <td class="p-2 border-r border-[#b1b1b1] align-top">
-        ${item.readers.length
-          ? item.readers.map(r => `<div>${r}</div>`).join('')
-          : '<span class="text-gray-400">—</span>'}
+        ${row.readers.length
+          ? row.readers.map(r => `<div>${r}</div>`).join('')
+          : '<span class="text-gray-400">—</span>'
+        }
       </td>
       <td class="p-2 align-top">
-        ${item.writers.length
-          ? item.writers.map(w => {
-              const vars = w.vars.length ? ` <span class="text-gray-500 text-xs">(${w.vars.join(', ')})</span>` : '';
-              return `<div>${w.task}${vars}</div>`;
-            }).join('')
+        ${row.writers.length
+          ? row.writers.map(w => `<div>${w.task}</div>`).join('')
           : '<span class="text-gray-400">—</span>'}
       </td>
     </tr>
   `).join('');
 
-  const doSection = dataObjects.length > 0 ? `
+  const doSection = doGrouped.size > 0 ? `
     <h3 class="font-semibold text-sm px-1 mb-1 mt-2">Data Objects</h3>
     <table class="w-full border-collapse mb-4 border border-[#b1b1b1]">
       <thead class="bg-[#d8d9d9]">
@@ -68,15 +92,15 @@ export function renderVariablesWindow(data) {
     </table>
   ` : '';
 
-  const dsSection = dataStores.length > 0 ? `
+  const dsSection = dsVarRows.length > 0 ? `
     <h3 class="font-semibold text-sm px-1 mb-1 mt-2">Data Stores</h3>
     <table class="w-full border-collapse border border-[#b1b1b1]">
       <thead class="bg-[#d8d9d9]">
         <tr>
-          <th class="p-2 text-left border-r border-[#b1b1b1] w-1/5">Name</th>
-          <th class="p-2 text-left border-r border-[#b1b1b1] w-2/5">Variables</th>
-          <th class="p-2 text-left border-r border-[#b1b1b1] w-1/5">Read by</th>
-          <th class="p-2 text-left w-1/5">Written by</th>
+          <th class="p-2 text-left border-r border-[#b1b1b1] w-1/4">Variable</th>
+          <th class="p-2 text-left border-r border-[#b1b1b1] w-1/6">Type</th>
+          <th class="p-2 text-left border-r border-[#b1b1b1] w-1/4">Read by</th>
+          <th class="p-2 text-left w-1/4">Written by</th>
         </tr>
       </thead>
       <tbody>${dsRows}</tbody>

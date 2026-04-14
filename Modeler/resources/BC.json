@@ -71,6 +71,11 @@
             "name": "error",
             "isAttr": true,
             "type": "String"
+          },
+          {
+            "name": "bcpayable",
+            "isAttr": true,
+            "type": "Boolean"
           }
         ]
       },

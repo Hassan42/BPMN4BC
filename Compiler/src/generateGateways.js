@@ -74,7 +74,7 @@ function generateXORGateway(gateway, process, collaborationId) {
 
     const emptyConditionCount = conditions.filter(({ condition }) => condition === '0').length;
     if (emptyConditionCount > 1) {
-        throw new Error(`XOR Gateway '${gateway.id}' has more than one default (empty) condition.`);
+        throw new Error(`XOR Gateway '${gateway.name || gateway.id}' has multiple branches with no condition. Only one branch can be left without a condition (the default path).`);
     }
 
     const defaultIndex = conditions.findIndex(({ condition }) => condition === '0');

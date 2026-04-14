@@ -58,7 +58,8 @@ import {
 
     doWrites.forEach(conn => {
       const doEl = conn.target;
-      const doLabel = doEl.businessObject.name || doEl.businessObject.id;
+      const rawDoName = (doEl.businessObject.name || doEl.businessObject.id).replace(/\s+/g, '');
+      const doLabel = rawDoName.charAt(0).toLowerCase() + rawDoName.slice(1);
       const vars = getDataObjectVariables(doEl) || [];
       vars.forEach((variable, vi) => {
         const doItemId = `do-write-${doEl.id}-v${vi}`;

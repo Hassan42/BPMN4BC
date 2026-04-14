@@ -87,6 +87,32 @@ CustomRules.prototype.init = function () {
       return;
     }
 
+    // Walk up to find the root Participant (pool) of an element
+    function getPool(element) {
+      let el = element;
+      while (el) {
+        if (is(el.businessObject, 'bpmn:Participant')) return el;
+        el = el.parent;
+      }
+      return null;
+    }
+
+    // Block message flows (cross-pool connections) on BC IntermediateThrowEvents —
+    // only control flow (sequence flow within the same pool) is allowed
+    const sourceIsThrow = is(source.businessObject, 'bpmn:IntermediateThrowEvent') && source.businessObject.bc === 'true';
+    const targetIsThrow = is(target.businessObject, 'bpmn:IntermediateThrowEvent') && target.businessObject.bc === 'true';
+
+    if (sourceIsThrow || targetIsThrow) {
+      const sourcePool = getPool(source);
+      const targetPool = getPool(target);
+      if (sourcePool && targetPool && sourcePool !== targetPool) {
+        setTimeout(() => showErrorToast(
+          'Blockchain throw events can only use control flow. Message flows are not allowed.'
+        ), 0);
+        return false;
+      }
+    }
+
     const targetBo = target.businessObject;
     const sourceBo = source.businessObject;
 
@@ -148,6 +174,19 @@ CustomRules.prototype.init = function () {
       if (participantRole) {
         targetBo.bcsender = participantRole;
         sourceBo.bcid = targetBo.bcid;
+      }
+    }
+
+    // Auto-fill bcsender when a non-BC collapsed Participant (external pool) connects
+    // via message flow to a BC ReceiveTask
+    if (
+      is(sourceBo, 'bpmn:Participant') &&
+      sourceBo.bc !== 'true' &&
+      is(targetBo, 'bpmn:ReceiveTask') &&
+      bcTarget === 'true'
+    ) {
+      if (sourceBo.name && !targetBo.bcsender) {
+        targetBo.bcsender = sourceBo.name;
       }
     }
     

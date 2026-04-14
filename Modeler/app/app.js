@@ -19,6 +19,7 @@ import bcExtension from '../resources/BC';
 import $ from 'jquery';
 
 import { renderVariablesWindow } from './scripts/ui/variablesWindow.js';
+import { getEthChfRate, gasToCHF, formatCHF } from './scripts/pricing.js';
 
 
 
@@ -226,7 +227,11 @@ function collectDiagramData() {
         const name = el.target.businessObject && el.target.businessObject.name
           ? el.target.businessObject.name
           : el.target.id;
-        if (!dsEntry.readers.includes(name)) dsEntry.readers.push(name);
+        const selExt = el.businessObject.extensionElements && el.businessObject.extensionElements.values
+          ? el.businessObject.extensionElements.values.find(v => v.$type === 'bpmnbc:DataStoreVarSelections')
+          : null;
+        const vars = selExt ? (selExt.values || []).map(s => s.varname).filter(Boolean) : [];
+        dsEntry.readers.push({ task: name, vars });
       }
     }
 
@@ -384,6 +389,84 @@ $(function () {
     }
   });
 
+  // ── Deployment error modal ────────────────────────────────────────────────
+
+  /**
+   * Extract only the error blocks from a Solidity/Hardhat compiler output,
+   * skipping warnings, stack traces, and Hardhat boilerplate.
+   * Returns the filtered text, or the original if nothing matched.
+   */
+  function extractCompilerErrors(raw) {
+    // Match lines that open a Solidity error diagnostic (not warnings, not Hardhat boilerplate)
+    const errorStart = /^(TypeError|DeclarationError|SyntaxError|ParserError):/;
+    const stopLine   = /^(Warning:|Error HH\d|HardhatError:|Error executing|    at )/;
+
+    const lines = raw.split('\n');
+    const blocks = [];
+    let current = null;
+    let blanks  = 0;
+
+    for (const line of lines) {
+      if (errorStart.test(line)) {
+        // Start of a new error block
+        current = [line];
+        blanks  = 0;
+      } else if (current !== null) {
+        if (stopLine.test(line)) {
+          // Hit boilerplate — close current block
+          blocks.push(current.join('\n').trimEnd());
+          current = null;
+        } else if (line.trim() === '') {
+          blanks++;
+          if (blanks >= 2) {
+            // Two consecutive blank lines end the block
+            blocks.push(current.join('\n').trimEnd());
+            current = null;
+            blanks  = 0;
+          }
+        } else {
+          blanks = 0;
+          current.push(line);
+        }
+      }
+    }
+    if (current) blocks.push(current.join('\n').trimEnd());
+
+    return blocks.length > 0 ? blocks.join('\n\n') : null;
+  }
+
+  function showDeployError(title, rawError) {
+    document.getElementById('deploy-error-title').textContent = title;
+
+    // The server relay may double-encode the error as a JSON string — unwrap it
+    let errorText = rawError;
+    try {
+      const nested = JSON.parse(rawError);
+      errorText = nested.error || nested.message || rawError;
+    } catch (_) {}
+
+    const filtered = extractCompilerErrors(errorText);
+    const displayText = filtered ?? errorText;
+
+    const body = document.getElementById('deploy-error-body');
+    body.innerHTML = '';
+    const pre = document.createElement('pre');
+    pre.className = 'bg-gray-50 border border-gray-200 rounded text-xs text-gray-800 font-mono p-3 whitespace-pre-wrap break-words leading-relaxed';
+    pre.textContent = displayText;
+    body.appendChild(pre);
+
+    document.getElementById('deploy-error-modal').dataset.rawError = errorText;
+    document.getElementById('deploy-error-modal').classList.remove('hidden');
+  }
+
+  // Close handlers
+  ['deploy-error-close', 'deploy-error-dismiss'].forEach(btnId => {
+    document.getElementById(btnId).addEventListener('click', () => {
+      document.getElementById('deploy-error-modal').classList.add('hidden');
+    });
+  });
+
+
   // Deploy button opens name modal first
   $('#js-compile-deploy').click(function (event) {
     event.preventDefault();
@@ -429,7 +512,7 @@ $(function () {
 
       if (!compileResponse.ok) {
         console.error('Compilation error response:', compileData);
-        alert(`Compilation failed:\n${compileData.error || 'Unknown error'}`);
+        showDeployError('Compilation Failed', compileData.error || 'Unknown error');
         toggleLockButton(false);
         return;
       }
@@ -452,18 +535,43 @@ $(function () {
 
       if (!deployResponse.ok) {
         console.error('Deployment error response:', deployData);
-        alert(`Deployment failed:\n${deployData.error || 'Unknown error'}`);
+        showDeployError('Deployment Failed', deployData.error || 'Unknown error');
         toggleLockButton(false);
         return;
       }
 
-      // Open the new instance's workflow panel
+      // Show success modal with deployment cost
       const instanceId = deployData.instanceId;
-      window.open(`${baseUrl}/execute-panel.html?instanceId=${instanceId}`, '_blank');
+      const instance   = deployData.instance || {};
+      const totalGas   = (instance.contracts || [])
+        .reduce((sum, c) => sum + (Number(c.deployGas) || 0), 0);
+
+      let ethChfRate = null;
+      try { ethChfRate = await getEthChfRate(); } catch (_) {}
+
+      const chfCost  = ethChfRate && totalGas ? gasToCHF(totalGas, ethChfRate) : null;
+
+      document.getElementById('deploy-success-name').textContent = instance.name || `Instance #${instanceId}`;
+      document.getElementById('deploy-success-gas').textContent  =
+        totalGas > 0 ? totalGas.toLocaleString() + ' gas' : '—';
+      document.getElementById('deploy-success-chf').textContent  =
+        chfCost !== null ? formatCHF(chfCost) : '—';
+
+      const goBtn = document.getElementById('deploy-success-go');
+      goBtn.onclick = () => {
+        document.getElementById('deploy-success-modal').classList.add('hidden');
+        window.open(`${baseUrl}/execute-panel.html?instanceId=${instanceId}`, '_blank');
+      };
+
+      document.getElementById('deploy-success-continue').onclick = () => {
+        document.getElementById('deploy-success-modal').classList.add('hidden');
+      };
+
+      document.getElementById('deploy-success-modal').classList.remove('hidden');
       toggleLockButton(false);
     } catch (err) {
       console.error('Unexpected error:', err);
-      alert(`An unexpected error occurred:\n${err.message || 'Unknown error'}`);
+      showDeployError('Unexpected Error', err.message || 'Unknown error');
       toggleLockButton(false);
     }
   });

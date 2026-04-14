@@ -50,7 +50,8 @@ export default function InputParametersProps({ element, injector }) {
   const seenDoNames = new Set();
   doReads.forEach(conn => {
     const doEl = conn.source;
-    const doLabel = doEl.businessObject.name || doEl.businessObject.id;
+    const rawDoName = (doEl.businessObject.name || doEl.businessObject.id).replace(/\s+/g, '');
+    const doLabel = rawDoName.charAt(0).toLowerCase() + rawDoName.slice(1);
     if (seenDoNames.has(doLabel)) return;
     seenDoNames.add(doLabel);
     const vars = getDataObjectVariables(doEl) || [];

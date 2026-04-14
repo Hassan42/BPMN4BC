@@ -306,12 +306,13 @@ const isValueType = (name, type) => {
  * @param {string} code - The Solidity code to format.
  * @returns {Promise<string>} - The formatted Solidity code.
  */
-const formatSolidityCode = async (code) => {
-    return prettier.format(code, {
-        parser: "solidity-parse",
-        plugins: [solidityPlugin],
-    });
-}
+// const formatSolidityCode = async (code) => {
+//     return prettier.format(code, {
+//         parser: "solidity-parse",
+//         plugins: [solidityPlugin],
+//     });
+// }
+const formatSolidityCode = async (code) => code;
 
 /**
  * Determines the contract name for a given element based on the lane it is in.
@@ -429,6 +430,7 @@ const generateContractConfig = ({
             sender: task.bcsender,
             name: task.name || '',
             state: startReceiveTaskIds.includes(task.id.replace(/\s+/g, '')) ? 'Open' : 'Closed',
+            payable: task.bcpayable === true || task.bcpayable === 'true',
             externalParams
         };
     });

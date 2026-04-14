@@ -198,7 +198,7 @@ function generateEntryFunction(activity, process, roles, collaborationId) {
   const senderRole = activity.bcsender?.replace(/\s+/g, '') || '';
 
   if (!senderRole) {
-    throw new Error(`Initiator is not defined in activity "${activity.name || activity.id}".`);
+    throw new Error(`Sender is not defined in activity "${activity.name || activity.id}".`);
   }
 
   const proceedingElements = activity.outgoing?.flatMap(flow => getProceedingElementsFromFlow(flow, process)) || [];
@@ -496,8 +496,10 @@ function generateEntryFunction(activity, process, roles, collaborationId) {
   const dataStoreAssignments = generateDataStoreAssignments(activity, collaborationId);
   const doStructCreationsCode = doStructCreations.join('\n        ');
 
+  const payableModifier = (activity.bcpayable === true || activity.bcpayable === 'true') ? 'payable ' : '';
+
   return `
-    function ${activity.id.replace(/\s+/g, '')}(${externalParams}) public payable isAccessible("${activity.id.replace(/\s+/g, '')}") {
+    function ${activity.id.replace(/\s+/g, '')}(${externalParams}) public ${payableModifier}isAccessible("${activity.id.replace(/\s+/g, '')}") {
         ${doStructCreationsCode}
         ${dataStoreAssignments}
         ${proceedingLogic}
