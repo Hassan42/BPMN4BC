@@ -76,6 +76,11 @@
             "name": "bcpayable",
             "isAttr": true,
             "type": "Boolean"
+          },
+          {
+            "name": "bcmultiplicity",
+            "isAttr": true,
+            "type": "String"
           }
         ]
       },

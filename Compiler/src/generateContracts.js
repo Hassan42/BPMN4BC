@@ -1,4 +1,4 @@
-const { getParentLaneOrPool, generateContractConfig, findCollaboration, findProcessForParticipant, findLanesForProcess, findActivitiesForLane, findActivitiesForProcess, findGatewaysForProcess, findGatewaysForLane, formatSolidityCode, findEventsForProcess, findEventsForLane, extractRolesFromCollaboration, findReceiveTask } = require('./utils.js');
+const { getParentLaneOrPool, generateContractConfig, findCollaboration, findProcessForParticipant, findLanesForProcess, findActivitiesForLane, findActivitiesForProcess, findGatewaysForProcess, findGatewaysForLane, formatSolidityCode, findEventsForProcess, findEventsForLane, extractRolesFromCollaboration, extractParticipantMultiplicities, findReceiveTask } = require('./utils.js');
 const { generateFunctions, generateFunctionSignatures } = require('./generateFunctions.js');
 const { generateDataStoreStructs, generateDataObjectStructs } = require('./generateStorage.js');
 const { generateGateways } = require('./generateGateways.js');
@@ -27,12 +27,13 @@ async function generateContract(contractParams) {
     lane,
     collaborationId,
     instanceId,
+    participantMultiplicities,
     contractText
   } = contractParams;
 
   const { dataStoreStructs, dataStoreInitCode, dataStoreReadFunctions } = generateDataStoreStructs(process, lane);
   const dataObjectStructs = generateDataObjectStructs(process);
-  const functions = generateFunctions(activities, process, roles, collaborationId).join('\n');
+  const functions = generateFunctions(activities, process, roles, collaborationId, participantMultiplicities).join('\n');
   const gatewayFunctions = generateGateways(gateways, process, collaborationId);
   const solidityEvents = generateEvents(events);
   const emitFunctions = generateEmitFunctions(events);
@@ -64,14 +65,22 @@ async function generateContract(contractParams) {
 
       let participantsArray;
       if (typeof activity.bcsender === 'string' && activity.bcsender.startsWith('[') && activity.bcsender.endsWith(']')) {
-        participantsArray = JSON.parse(activity.bcsender); // Parse the stringified array
+        participantsArray = JSON.parse(activity.bcsender);
       } else {
         participantsArray = [activity.bcsender];
-      } 
+      }
 
-      const participantsString = participantsArray.map(participant => `"${participant}"`).join(', ');
+      // Expand multi-participant roles: "Customer" with N=3 → ["Customer_1","Customer_2","Customer_3"]
+      const expandedParticipants = participantsArray.flatMap(p => {
+        const key = (p || '').replace(/\s+/g, '');
+        const count = (participantMultiplicities || {})[key];
+        if (count > 1) {
+          return Array.from({ length: count }, (_, i) => `${key}_${i + 1}`);
+        }
+        return [p];
+      });
 
-  
+      const participantsString = expandedParticipants.map(p => `"${p}"`).join(', ');
       return `activitytoRole["${activity.id}"] = [${participantsString}];`;
     }
   ).join('\n');
@@ -79,6 +88,30 @@ async function generateContract(contractParams) {
   const stateMappings = receiveFunctionNames.map(name => {
     return startReceiveTaskIds.includes(name) ? `state["${name}"] = State.Open;` : `state["${name}"] = State.Closed;`;
   }).join('\n');
+
+  // Multi-participant: requiredParticipants init and state variable block
+  const multiParticipantInits = receiveTasks
+    .filter(task => {
+      const key = (task.bcsender || '').replace(/\s+/g, '');
+      return ((participantMultiplicities || {})[key] || 0) > 1;
+    })
+    .map(task => {
+      const key = (task.bcsender || '').replace(/\s+/g, '');
+      const count = participantMultiplicities[key];
+      return `requiredParticipants["${task.id.replace(/\s+/g, '')}"] = ${count};`;
+    })
+    .join('\n');
+
+  const hasMultiParticipant = receiveTasks.some(task => {
+    const key = (task.bcsender || '').replace(/\s+/g, '');
+    return ((participantMultiplicities || {})[key] || 0) > 1;
+  });
+
+  const multiParticipantVars = hasMultiParticipant ? `
+      mapping(string => mapping(address => bool)) public hasParticipated;
+      mapping(string => uint) public participationCount;
+      mapping(string => uint) public requiredParticipants;
+  ` : '';
 
   const instanceSuffix = instanceId != null ? '_' + instanceId : '';
 
@@ -108,6 +141,8 @@ async function generateContract(contractParams) {
       mapping(string => address) public addressOf;
 
       mapping(string => string[]) public activitytoRole;
+
+      ${multiParticipantVars}
 
       modifier isAccessible(string memory _activity) {
           require(state[_activity] == State.Open, "Activity is not open");
@@ -142,6 +177,7 @@ async function generateContract(contractParams) {
           ${stateMappings}
           ${activityToRoleMappings}
           ${dataStoreInitCode}
+          ${multiParticipantInits}
       }
 
       function setContracts(address[] memory addresses) public{
@@ -190,12 +226,22 @@ async function generateContract(contractParams) {
     const outputPath = path.resolve('./output/contracts', `${contractName}.sol`);
     fs.writeFileSync(outputPath, formattedSolidityCode, 'utf8');
     console.log(`Generated Solidity contract: ${contractName}`);
+    // Expand roles for multi-participant: Customer(N=3) → Customer_1, Customer_2, Customer_3
+    const expandedRoles = roles.flatMap(role => {
+      const key = (role.role || '').replace(/\s+/g, '');
+      const count = (participantMultiplicities || {})[key];
+      if (count > 1) {
+        return Array.from({ length: count }, (_, i) => ({ role: `${key}_${i + 1}` }));
+      }
+      return [role];
+    });
+
     //TODO: refactor contracts meta
     const contractConfig = generateContractConfig({
       contractName,
       networkId,
       activities,
-      roles,
+      roles: expandedRoles,
       lane,
       participant,
       process,
@@ -245,6 +291,7 @@ async function generateInterfaceFromCode(contractName, solidityCode, dataObjectS
 async function generateContracts(definitions, instanceId) {
   const collaboration = findCollaboration(definitions);
   const roles = extractRolesFromCollaboration(collaboration);
+  const participantMultiplicities = extractParticipantMultiplicities(collaboration);
   const contracts = [];
   // Filter blockchain pools/participants
   const participants = collaboration.participants.filter((participant) => participant.bc === "true");
@@ -276,6 +323,7 @@ async function generateContracts(definitions, instanceId) {
             participant,
             collaborationId: collaboration.id,
             instanceId,
+            participantMultiplicities,
             contractText: participant.name,
           };
           const contractConfig = await generateContract(contractParams);
@@ -301,6 +349,7 @@ async function generateContracts(definitions, instanceId) {
               lane,
               collaborationId: collaboration.id,
               instanceId,
+              participantMultiplicities,
               contractText: lane.name,
             };
             const contractConfig = await generateContract(contractParams);

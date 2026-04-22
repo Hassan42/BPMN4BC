@@ -54,7 +54,8 @@ export default function (element) {
         isEdited: isTextFieldEntryEdited
       }
     );
-  } else if (is(element, 'bpmn:Lane') || is(element, 'bpmn:Participant')) {
+  } else if (is(element, 'bpmn:Lane') || (is(element, 'bpmn:Participant') && element.businessObject.bc === 'true')) {
+    // BC pool / lane: show network ID and solidity script
     props.push(
       {
         id: 'bcId',
@@ -69,6 +70,14 @@ export default function (element) {
         isEdited: isTextFieldEntryEdited
       }
     );
+  } else if (is(element, 'bpmn:Participant') && element.businessObject.bc !== 'true' && element.businessObject.participantMultiplicity) {
+    // Non-BC participant with multiplicity enabled: show instance count
+    props.push({
+      id: 'multiplicityCount',
+      element,
+      component: MultiplicityCount,
+      isEdited: isTextFieldEntryEdited
+    });
   }
 return props;
 }
@@ -342,6 +351,33 @@ function Script(props) {
       >✎ Open Script Editor</button>
     </div>
   `;
+}
+
+function MultiplicityCount(props) {
+  const { element, id } = props;
+
+  const modeling = useService('modeling');
+  const translate = useService('translate');
+  const debounce = useService('debounceInput');
+
+  const getValue = () => element.businessObject.bcmultiplicity || '';
+
+  const setValue = value => {
+    const parsed = parseInt(value, 10);
+    // If empty or <= 1, remove the attribute entirely so the model is clean
+    const normalized = (value === '' || isNaN(parsed) || parsed <= 1) ? undefined : String(parsed);
+    modeling.updateProperties(element, { bcmultiplicity: normalized });
+  };
+
+  return html`<${TextFieldEntry}
+    id=${id}
+    element=${element}
+    label=${translate('Number of Instances')}
+    description=${translate('Number of participant instances per role.')}
+    getValue=${getValue}
+    setValue=${setValue}
+    debounce=${debounce}
+  />`;
 }
 
 function Returns(props) {

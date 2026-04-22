@@ -49,19 +49,34 @@ function renderSenderTabs(networkData, networkKey, instanceId, contentContainer,
   senderRow.innerHTML = '';
   contentContainer.innerHTML = '';
 
-  // Collect all tasks in this network, grouped by sender
+  // Collect all tasks and all roles across contracts in this network
   const allTaskEntries = [];
+  const allRoles = new Set();
   Object.keys(networkData).forEach(contractKey => {
     (networkData[contractKey].receiveTasks || []).forEach(task => {
       allTaskEntries.push({ networkKey, contractKey, task });
     });
+    (networkData[contractKey].contractRoles || []).forEach(r => allRoles.add(r.role));
   });
 
+  // Group by sender, expanding multi-participant senders into individual instance tabs.
+  // e.g. sender="Customer" with roles Customer_1, Customer_2 → two tabs, each with overrideSender set.
   const bySender = new Map();
   allTaskEntries.forEach(entry => {
-    const sender = entry.task.sender || 'Unknown';
-    if (!bySender.has(sender)) bySender.set(sender, []);
-    bySender.get(sender).push(entry);
+    const sender = (entry.task.sender || 'Unknown').replace(/\s+/g, '');
+    const instanceRoles = [...allRoles]
+      .filter(r => new RegExp(`^${sender}_\\d+$`).test(r))
+      .sort();
+
+    if (instanceRoles.length > 1) {
+      instanceRoles.forEach(role => {
+        if (!bySender.has(role)) bySender.set(role, []);
+        bySender.get(role).push({ ...entry, overrideSender: role });
+      });
+    } else {
+      if (!bySender.has(sender)) bySender.set(sender, []);
+      bySender.get(sender).push(entry);
+    }
   });
 
   if (bySender.size === 0) {

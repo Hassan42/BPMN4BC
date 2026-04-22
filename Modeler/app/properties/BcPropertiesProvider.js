@@ -101,6 +101,15 @@ export default function BcPropertiesProvider(propertiesPanel, injector, translat
         }
       }
 
+      // Non-BC participant with multiplicity enabled: show instance count field
+      if (isParticipant && businessObject.bc !== 'true' && businessObject.participantMultiplicity) {
+        groups.push({
+          id: 'ParticipantMultiplicity',
+          label: translate('Participant Properties'),
+          entries: BcProps(element),
+        });
+      }
+
       // Check if the element is a Lane and its parent is a blockchain environment
       if (isLane && (elementParent.bc === "true")) {
         groups.push(createBcGroup(element, translate));

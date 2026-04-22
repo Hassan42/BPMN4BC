@@ -194,7 +194,7 @@ function generateScriptFunction(activity, process, collaborationId) {
  * @param {string} collaborationId - The collaboration ID.
  * @returns {string} The logic for the entry function.
  */
-function generateEntryFunction(activity, process, roles, collaborationId) {
+function generateEntryFunction(activity, process, roles, collaborationId, participantMultiplicities = {}) {
   const contractName = getContractNameForElement(activity, process, collaborationId);
   const senderRole = activity.bcsender?.replace(/\s+/g, '') || '';
 
@@ -524,13 +524,35 @@ function generateEntryFunction(activity, process, roles, collaborationId) {
   const doStructCreationsCode = doStructCreations.join('\n        ');
 
   const payableModifier = (activity.bcpayable === true || activity.bcpayable === 'true') ? 'payable ' : '';
+  const taskId = activity.id.replace(/\s+/g, '');
+  const senderKey = (senderRole || '').replace(/\s+/g, '');
+  const multiplicityCount = (participantMultiplicities[senderKey] || 0);
+  const isMultiParticipant = multiplicityCount > 1;
+
+  if (isMultiParticipant) {
+    // Multi-participant: track each submission; only execute body when all N have submitted
+    return `
+    function ${taskId}(${externalParams}) public ${payableModifier}isAccessible("${taskId}") {
+        require(!hasParticipated["${taskId}"][msg.sender], "Participated already called this activity");
+        hasParticipated["${taskId}"][msg.sender] = true;
+        participationCount["${taskId}"]++;
+
+        if (participationCount["${taskId}"] >= requiredParticipants["${taskId}"]) {
+            ${doStructCreationsCode}
+            ${dataStoreAssignments}
+            ${proceedingLogic}
+            ${!hasNextReceiveTask && !hasLoop ? `state["${taskId}"] = State.Completed;` : ''}
+        }
+    }
+    `;
+  }
 
   return `
-    function ${activity.id.replace(/\s+/g, '')}(${externalParams}) public ${payableModifier}isAccessible("${activity.id.replace(/\s+/g, '')}") {
+    function ${taskId}(${externalParams}) public ${payableModifier}isAccessible("${taskId}") {
         ${doStructCreationsCode}
         ${dataStoreAssignments}
         ${proceedingLogic}
-        ${!hasNextReceiveTask && !hasLoop ? `state["${activity.id.replace(/\s+/g, '')}"] = State.Completed;` : ''}
+        ${!hasNextReceiveTask && !hasLoop ? `state["${taskId}"] = State.Completed;` : ''}
     }
   `;
 }
@@ -540,7 +562,7 @@ function generateEntryFunction(activity, process, roles, collaborationId) {
  * @param {Array} activities - The list of activities.
  * @returns {Array} The list of generated Solidity functions.
  */
-function generateFunctions(activities, process, roles, collaborationId) {
+function generateFunctions(activities, process, roles, collaborationId, participantMultiplicities = {}) {
   let functions = [];
 
   activities.forEach(activity => {
@@ -551,7 +573,7 @@ function generateFunctions(activities, process, roles, collaborationId) {
         functionLogic = generateScriptFunction(activity, process, collaborationId);
         break;
       case 'bpmn:ReceiveTask':
-        functionLogic = generateEntryFunction(activity, process, roles, collaborationId);
+        functionLogic = generateEntryFunction(activity, process, roles, collaborationId, participantMultiplicities);
         break;
       default:
         throw new Error(`Task type ${activity.$type} not supported`);

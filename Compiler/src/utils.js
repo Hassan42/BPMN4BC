@@ -361,12 +361,27 @@ const getContractNameForElement = (element, process, collaborationId) => {
 
 const extractRolesFromCollaboration = (collaboration) => {
     if (!collaboration || !collaboration.participants) return [];
-    const participants = collaboration.participants.filter((participant) => participant.bc === "true");
-
-
     return collaboration.participants.filter(participant => participant.bc !== "true").map(participant => {
         return { role: participant.name || participant.id, address: '' };
     });
+};
+
+/**
+ * Returns a map of { participantNameNoSpaces → instanceCount } for every
+ * non-BC participant that has bcmultiplicity set to a number greater than 1.
+ */
+const extractParticipantMultiplicities = (collaboration) => {
+    if (!collaboration || !collaboration.participants) return {};
+    const map = {};
+    collaboration.participants
+        .filter(p => p.bc !== 'true' && p.participantMultiplicity && p.bcmultiplicity)
+        .forEach(p => {
+            const count = parseInt(p.bcmultiplicity, 10);
+            if (count > 1) {
+                map[(p.name || p.id).replace(/\s+/g, '')] = count;
+            }
+        });
+    return map;
 };
 
 const generateContractConfig = ({
@@ -677,5 +692,6 @@ module.exports = {
     getTaskDataObjectReads,
     getTaskDataStoreReadVars,
     getTaskDataObjectWrites,
-    extractDataObjectVarSelections
+    extractDataObjectVarSelections,
+    extractParticipantMultiplicities
 };

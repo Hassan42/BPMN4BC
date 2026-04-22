@@ -18,12 +18,12 @@ export function renderSenderTasks(taskEntries, instanceId, container) {
     return;
   }
 
-  taskEntries.forEach(({ networkKey, contractKey, task }) => {
-    container.appendChild(createTaskCard(networkKey, contractKey, task, instanceId));
+  taskEntries.forEach(({ networkKey, contractKey, task, overrideSender }) => {
+    container.appendChild(createTaskCard(networkKey, contractKey, task, instanceId, overrideSender));
   });
 }
 
-function createTaskCard(network, contractName, task, instanceId) {
+function createTaskCard(network, contractName, task, instanceId, overrideSender) {
   const isOpen      = task.state === 'Open';
   const isCompleted = task.state === 'Completed';
   const isClosed    = task.state === 'Closed';
@@ -61,7 +61,7 @@ function createTaskCard(network, contractName, task, instanceId) {
   // Sender (read-only display — the tab already tells us who this is for)
   const senderInput = document.createElement('input');
   senderInput.type = 'text';
-  senderInput.value = task.sender || '';
+  senderInput.value = overrideSender || task.sender || '';
   senderInput.className = 'w-full p-2 border rounded text-sm mb-3';
   senderInput.disabled = isClosed;
 
