@@ -53,7 +53,7 @@ const findActivitiesForLane = (lane) => {
         'bpmn:ReceiveTask',
         'bpmn:ScriptTask',
     ];
-    return lane.flowNodeRef.filter(node => activityTypes.includes(node.$type));
+    return (lane.flowNodeRef || []).filter(node => activityTypes.includes(node.$type));
 }
 
 /**
@@ -69,7 +69,7 @@ const findGatewaysForLane = (lane) => {
         'bpmn:InclusiveGateway',
         'bpmn:EventBasedGateway'
     ];
-    return lane.flowNodeRef.filter(node => gatewayTypes.includes(node.$type));
+    return (lane.flowNodeRef || []).filter(node => gatewayTypes.includes(node.$type));
 }
 
 /**
@@ -115,7 +115,7 @@ const findEventsForLane = (lane) => {
         'bpmn:IntermediateCatchEvent',
         'bpmn:BoundaryEvent'
     ];
-    return lane.flowNodeRef.filter(node => eventTypes.includes(node.$type));
+    return (lane.flowNodeRef || []).filter(node => eventTypes.includes(node.$type));
 }
 
 /**
@@ -297,7 +297,7 @@ const isValueType = (name, type) => {
     if (!type) {
         throw new Error(`Variable ${name} type is undefined.`)
     }
-    const valueTypes = ['uint', 'address'];
+    const valueTypes = ['uint', 'address', 'bool'];
     return valueTypes.some(valueType => type.startsWith(valueType));
 }
 
@@ -323,7 +323,7 @@ const formatSolidityCode = async (code) => code;
 const getContractNameForElement = (element, process, collaborationId) => {
     for (const laneSet of process.laneSets || []) {
         for (const lane of laneSet.lanes || []) {
-            if (lane.flowNodeRef.some(node => node.id === element.id)) {
+            if ((lane.flowNodeRef || []).some(node => node.id === element.id)) {
                 return lane.id.replace(/\s+/g, '') + '_Contract' + '_' + collaborationId;
             }
         }

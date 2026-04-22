@@ -94,6 +94,7 @@ function VariableType({ idPrefix, element, variable }) {
     { value: 'uint', label: 'uint' },
     { value: 'string', label: 'string' },
     { value: 'address', label: 'address' },
+    { value: 'bool', label: 'bool' },
   ];
 
   return SelectEntry({

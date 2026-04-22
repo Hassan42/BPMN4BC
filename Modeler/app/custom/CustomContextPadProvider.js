@@ -20,7 +20,6 @@ export default function CustomContextPadProvider(injector, connect, translate) {
         if (hasBc(bo) || hasBc(parentBo)) {
 
             if (!isGateway && actions['replace']) {
-                
                 delete actions['replace'];
             }
 
@@ -30,6 +29,12 @@ export default function CustomContextPadProvider(injector, connect, translate) {
                 }
             });
 
+            // Remove all lane-related options from blockchain pools
+            forEach(actions, (action, key) => {
+                if (key.toLowerCase().includes('lane')) {
+                    delete actions[key];
+                }
+            });
 
         }
 

@@ -26,6 +26,7 @@ async function generateContract(contractParams) {
     participant,
     lane,
     collaborationId,
+    instanceId,
     contractText
   } = contractParams;
 
@@ -79,12 +80,14 @@ async function generateContract(contractParams) {
     return startReceiveTaskIds.includes(name) ? `state["${name}"] = State.Open;` : `state["${name}"] = State.Closed;`;
   }).join('\n');
 
+  const instanceSuffix = instanceId != null ? '_' + instanceId : '';
+
   const contractsMapping = lanes.map((lane, index) => {
-    return `contracts["${lane.id}_Contract_${collaborationId}"] = addresses[${index}];`;
+    return `contracts["${lane.id.replace(/\s+/g, '')}_Contract_${collaborationId}${instanceSuffix}"] = addresses[${index}];`;
   }).join('\n');
 
-  const contractsImports = lanes.map((lane, index) => {
-    return `import './I${lane.id}_Contract_${collaborationId}.sol';`;
+  const contractsImports = lanes.map((lane) => {
+    return `import './I${lane.id.replace(/\s+/g, '')}_Contract_${collaborationId}${instanceSuffix}.sol';`;
   }).join('\n');
 
   const solidityCode = `
@@ -256,11 +259,13 @@ async function generateContracts(definitions, instanceId) {
       }
       if (!process) {
         console.log(`No process found for the participant with id ${participant.id}.`);
+      } else if (!process.flowElements || process.flowElements.length === 0) {
+        throw new Error(`Blockchain pool "${participant.name || participant.id}" is empty. Please add at least one activity before compiling.`);
       } else {
         const lanes = findLanesForProcess(process);
         if (lanes.length === 0) {
           const contractParams = {
-            contractName: `${process.id.replace(/\s+/g, '')}_DefaultContract_${participant.id}_${collaboration.id}_${instanceId}`,
+            contractName: `${process.id.replace(/\s+/g, '')}_DefaultContract_${participant.id}_${collaboration.id}${instanceId != null ? '_' + instanceId : ''}`,
             networkId,
             activities: findActivitiesForProcess(process),
             gateways: findGatewaysForProcess(process),
@@ -269,25 +274,33 @@ async function generateContracts(definitions, instanceId) {
             process,
             roles,
             participant,
-            collaborationId:collaboration.id,
-            contractText : participant.name,
+            collaborationId: collaboration.id,
+            instanceId,
+            contractText: participant.name,
           };
           const contractConfig = await generateContract(contractParams);
           contracts.push(contractConfig);
         } else {
-          for (const lane of lanes) {
+          // Skip empty lanes so no contract/interface/import is generated for them
+          const nonEmptyLanes = lanes.filter(lane =>
+            findActivitiesForLane(lane).length > 0 ||
+            findGatewaysForLane(lane).length > 0 ||
+            findEventsForLane(lane).length > 0
+          );
+          for (const lane of nonEmptyLanes) {
             const contractParams = {
-              contractName: lane.id.replace(/\s+/g, '') + '_Contract' + '_' + collaboration.id + '_' + instanceId,
+              contractName: lane.id.replace(/\s+/g, '') + '_Contract_' + collaboration.id + (instanceId != null ? '_' + instanceId : ''),
               networkId,
               activities: findActivitiesForLane(lane),
               gateways: findGatewaysForLane(lane),
-              lanes,
+              lanes: nonEmptyLanes,
               events: findEventsForLane(lane),
               process,
               roles,
               participant,
               lane,
-              collaborationId:collaboration.id,
+              collaborationId: collaboration.id,
+              instanceId,
               contractText: lane.name,
             };
             const contractConfig = await generateContract(contractParams);

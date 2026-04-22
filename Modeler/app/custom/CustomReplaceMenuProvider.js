@@ -44,6 +44,17 @@ export default function CustomReplaceMenuProvider(
       return this._createEntries(element, filteredReplaceOptions);
     }
 
+    // Remove lane division options from BC participants
+    if (hasBc(bo)) {
+      const entries = baseGetPopupMenuEntries(element);
+      Object.keys(entries).forEach(key => {
+        if (key.toLowerCase().includes('lane')) {
+          delete entries[key];
+        }
+      });
+      return entries;
+    }
+
     //Safe fallback to base method
     return baseGetPopupMenuEntries(element);
   };

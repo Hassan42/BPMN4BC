@@ -160,6 +160,7 @@ function generateScriptFunction(activity, process, collaborationId) {
         // 3. Type default
         const defaultVal = (v.type || 'uint').startsWith('string') ? '""'
           : (v.type || 'uint').startsWith('address') ? 'address(0)'
+          : (v.type || 'uint') === 'bool' ? 'false'
           : '0';
         return `${v.name}: ${defaultVal}`;
       }).join(', ');

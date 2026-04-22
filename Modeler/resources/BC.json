@@ -318,7 +318,17 @@
         ]
       }
     ],
-    "emumerations": [],
+    "emumerations": [
+      {
+        "name": "SolidityType",
+        "literalValues": [
+          { "name": "uint" },
+          { "name": "string" },
+          { "name": "address" },
+          { "name": "bool" }
+        ]
+      }
+    ],
     "associations": []
   }
   
