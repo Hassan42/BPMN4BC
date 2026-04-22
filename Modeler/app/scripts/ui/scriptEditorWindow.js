@@ -1,5 +1,6 @@
 import hljs from 'highlight.js/lib/core';
 import { solidity } from 'highlightjs-solidity';
+import { validateSoliditySnippet } from '../solidityValidator.js';
 
 hljs.registerLanguage('solidity', solidity);
 
@@ -338,6 +339,15 @@ export function openScriptEditorWindow(getValue, setValue, taskName) {
       "></textarea>
     </div>
 
+    <!-- Syntax error bar (hidden until a validation error is found) -->
+    <div id="sol-error-bar" style="
+      display: none; flex-shrink: 0;
+      padding: 5px 14px;
+      background: #fff5f5; border-top: 1px solid #fca5a5;
+      color: #dc2626; font-size: 11px;
+      font-family: Consolas, 'Courier New', monospace;
+    "></div>
+
     <!-- Footer toolbar -->
     <div style="
       padding: 8px 12px; background: #d8d9d9;
@@ -370,10 +380,28 @@ export function openScriptEditorWindow(getValue, setValue, taskName) {
 
   document.body.appendChild(win);
 
-  const textarea = win.querySelector('#sol-textarea');
-  const pre = win.querySelector('#sol-pre');
-  const dropdown = win.querySelector('#sol-scripts-dropdown');
+  const textarea  = win.querySelector('#sol-textarea');
+  const pre       = win.querySelector('#sol-pre');
+  const dropdown  = win.querySelector('#sol-scripts-dropdown');
   const scriptsBtn = win.querySelector('#sol-scripts-btn');
+  const errorBar  = win.querySelector('#sol-error-bar');
+  const editorArea = win.querySelector('#sol-editor-area');
+
+  // ── Syntax validation helper ─────────────────────────────────────────────
+  function runValidation(code) {
+    const err = validateSoliditySnippet(code);
+    if (err) {
+      editorArea.style.outline = '2px solid #dc2626';
+      editorArea.style.outlineOffset = '-2px';
+      errorBar.style.display = 'block';
+      errorBar.textContent = err.line !== null
+        ? `⚠  Line ${err.line}: ${err.message}`
+        : `⚠  ${err.message}`;
+    } else {
+      editorArea.style.outline = '';
+      errorBar.style.display = 'none';
+    }
+  }
 
   // ── Populate custom scripts dropdown ────────────────────────────────────────
   dropdown.innerHTML = CUSTOM_SCRIPTS.map(s => `
@@ -405,12 +433,14 @@ export function openScriptEditorWindow(getValue, setValue, taskName) {
       openParamForm(win, script, (code) => {
         textarea.value = code;
         pre.innerHTML = highlight(code) + '\n';
+        runValidation(code);
         textarea.focus();
       });
     } else {
       const code = script.build({});
       textarea.value = code;
       pre.innerHTML = highlight(code) + '\n';
+      runValidation(code);
       textarea.focus();
     }
   });
@@ -421,8 +451,14 @@ export function openScriptEditorWindow(getValue, setValue, taskName) {
   pre.innerHTML = highlight(currentVal) + '\n';
   textarea.focus();
 
+  // Validate whatever is already in the field when the editor opens
+  runValidation(currentVal);
+
+  let validateTimer = null;
   textarea.addEventListener('input', () => {
     pre.innerHTML = highlight(textarea.value) + '\n';
+    clearTimeout(validateTimer);
+    validateTimer = setTimeout(() => runValidation(textarea.value), 500);
   });
 
   textarea.addEventListener('scroll', () => {

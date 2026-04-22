@@ -9,10 +9,11 @@ import BCSCRIPT from '../assets/BC-SCRIPT-icon.svg';
 import BCSTIMER from '../assets/BC-TIMER-ICON.svg';
 
 export default class CustomPalette {
-  constructor(bpmnFactory, create, elementFactory, modeling, palette, translate) {
+  constructor(bpmnFactory, create, elementFactory, elementRegistry, modeling, palette, translate) {
     this.bpmnFactory = bpmnFactory;
     this.create = create;
     this.elementFactory = elementFactory;
+    this.elementRegistry = elementRegistry;
     this.modeling = modeling;
     this.translate = translate;
 
@@ -24,6 +25,7 @@ export default class CustomPalette {
       bpmnFactory,
       create,
       elementFactory,
+      elementRegistry,
       modeling,
       translate
     } = this;
@@ -43,6 +45,16 @@ export default class CustomPalette {
         if (bcType === "Participant") {
           const processElement = bpmnFactory.create('bpmn:Process');
           shape.businessObject.processRef = processElement;
+
+          // Auto-assign network ID: count existing BC pools and use the next number
+          if (bcNode === 'true') {
+            const existingBcPools = elementRegistry.filter(
+              el => el.businessObject &&
+                    el.businessObject.$type === 'bpmn:Participant' &&
+                    el.businessObject.bc === 'true'
+            );
+            businessObject.bcid = `network-${existingBcPools.length + 1}`;
+          }
         }
 
         // If IntermediateCatchEvent, add MessageEventDefinition
@@ -165,6 +177,7 @@ CustomPalette.$inject = [
   'bpmnFactory',
   'create',
   'elementFactory',
+  'elementRegistry',
   'modeling',
   'palette',
   'translate'

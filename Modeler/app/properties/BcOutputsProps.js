@@ -24,6 +24,19 @@ import {
   import { html } from 'htm/preact';
   import { TextFieldEntry, isTextFieldEntryEdited, CheckboxEntry } from '@bpmn-io/properties-panel';
   import { useService } from 'bpmn-js-properties-panel';
+  import { validateSolidityExpression } from '../scripts/solidityValidator.js';
+
+  // Shared error display for value fields
+  function ValError({ err }) {
+    if (!err) return null;
+    const msg = err.line ? `Line ${err.line}: ${err.message}` : err.message;
+    return html`<div style="
+      margin-top:3px; padding:4px 6px;
+      background:#fff5f5; border:1px solid #fca5a5; border-radius:3px;
+      color:#dc2626; font-size:11px;
+      font-family:Consolas,'Courier New',monospace;
+    ">⚠ ${msg}</div>`;
+  }
   
   
   export default function OutputParametersProps({ element, injector }) {
@@ -250,14 +263,21 @@ import {
       commandStack.execute('properties-panel.multi-command-executor', commands);
     };
 
-    return html`<${TextFieldEntry}
-      id=${id}
-      element=${conn}
-      label=${translate('Value')}
-      getValue=${getValue}
-      setValue=${setValue}
-      debounce=${debounce}
-    />`;
+    const syntaxError = validateSolidityExpression(getValue());
+
+    return html`
+      <div>
+        <${TextFieldEntry}
+          id=${id}
+          element=${conn}
+          label=${translate('Value')}
+          getValue=${getValue}
+          setValue=${setValue}
+          debounce=${debounce}
+        />
+        <${ValError} err=${syntaxError} />
+      </div>
+    `;
   }
 
   function DsWriteValue({ id, element, selection }) {
@@ -276,14 +296,21 @@ import {
       });
     };
 
-    return html`<${TextFieldEntry}
-      id=${id}
-      element=${selection}
-      label=${translate('Value')}
-      getValue=${getValue}
-      setValue=${setValue}
-      debounce=${debounce}
-    />`;
+    const syntaxError = validateSolidityExpression(getValue());
+
+    return html`
+      <div>
+        <${TextFieldEntry}
+          id=${id}
+          element=${selection}
+          label=${translate('Value')}
+          getValue=${getValue}
+          setValue=${setValue}
+          debounce=${debounce}
+        />
+        <${ValError} err=${syntaxError} />
+      </div>
+    `;
   }
 
   function DsWriteExternal({ id, element, selection }) {

@@ -232,13 +232,15 @@ const executeTask = async (contractManager, contractName, contractInstance, task
                 } catch {
                     return null;
                 }
-            }).filter(Boolean).map(event => ({
-                name: event.name,
-                args: Object.fromEntries(
-                    Object.entries(event.args)
-                        .filter(([key]) => isNaN(key)) // remove numeric indices
-                )
-            }));
+            }).filter(Boolean).map(event => {
+                const inputs = (event.fragment && event.fragment.inputs) || [];
+                const args = {};
+                inputs.forEach((input, i) => {
+                    const raw = event.args[i];
+                    args[input.name] = typeof raw === 'bigint' ? raw.toString() : raw;
+                });
+                return { name: event.name, args };
+            });
 
             log({
                 timestamp,

@@ -3,6 +3,165 @@ import { executeTask } from '../api.js';
 import { toggleVisibility } from '../utils/helper.js';
 import { formatCHF } from '../pricing.js';
 
+/**
+ * Renders all tasks for a given sender into `container`.
+ * `taskEntries` = [{ networkKey, contractKey, task }, ...]
+ */
+export function renderSenderTasks(taskEntries, instanceId, container) {
+  container.innerHTML = '';
+
+  if (!taskEntries || taskEntries.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'text-gray-400 italic p-6 text-center';
+    empty.textContent = 'No tasks for this sender.';
+    container.appendChild(empty);
+    return;
+  }
+
+  taskEntries.forEach(({ networkKey, contractKey, task }) => {
+    container.appendChild(createTaskCard(networkKey, contractKey, task, instanceId));
+  });
+}
+
+function createTaskCard(network, contractName, task, instanceId) {
+  const isOpen      = task.state === 'Open';
+  const isCompleted = task.state === 'Completed';
+  const isClosed    = task.state === 'Closed';
+  const displayName = (task.name && task.name.trim()) ? task.name : task.id;
+
+  const card = document.createElement('div');
+  card.className = `p-4 my-3 rounded border ${
+    isOpen      ? 'border-green-400 bg-green-50' :
+    isCompleted ? 'border-gray-200 bg-gray-50 opacity-60' :
+                  'border-gray-200 bg-white'
+  }`;
+
+  // Header: task name + state badge
+  const header = document.createElement('div');
+  header.className = 'flex items-center justify-between mb-3';
+
+  const nameEl = document.createElement('span');
+  nameEl.className = 'font-semibold text-gray-800';
+  nameEl.textContent = displayName;
+
+  const badge = document.createElement('span');
+  badge.className = `text-xs px-2 py-0.5 rounded-full font-medium ${
+    isOpen      ? 'bg-green-100 text-green-700'  :
+    isCompleted ? 'bg-blue-100  text-blue-600'   :
+                  'bg-yellow-100 text-yellow-700'
+  }`;
+  badge.textContent = task.state;
+
+  header.appendChild(nameEl);
+  header.appendChild(badge);
+  card.appendChild(header);
+
+  if (isCompleted) return card;
+
+  // Sender (read-only display — the tab already tells us who this is for)
+  const senderInput = document.createElement('input');
+  senderInput.type = 'text';
+  senderInput.value = task.sender || '';
+  senderInput.className = 'w-full p-2 border rounded text-sm mb-3';
+  senderInput.disabled = isClosed;
+
+  const senderLabel = document.createElement('label');
+  senderLabel.className = 'block text-sm font-semibold text-gray-600 mb-1';
+  senderLabel.textContent = 'Sender';
+  card.appendChild(senderLabel);
+  card.appendChild(senderInput);
+
+  // ETH amount (payable tasks only)
+  const amountInput = document.createElement('input');
+  amountInput.type = 'number';
+  amountInput.step = '0.0001';
+  amountInput.min  = '0';
+  amountInput.value = '0';
+  amountInput.className = 'w-full p-2 border rounded text-sm mb-3';
+  amountInput.disabled = isClosed;
+
+  if (task.payable) {
+    const amountLabel = document.createElement('label');
+    amountLabel.className = 'block text-sm font-semibold text-gray-600 mb-1';
+    amountLabel.textContent = 'Amount (ETH)';
+    card.appendChild(amountLabel);
+    card.appendChild(amountInput);
+  }
+
+  // External params form
+  const form = document.createElement('form');
+  form.className = 'space-y-2';
+
+  if (Array.isArray(task.externalParams) && task.externalParams.length > 0) {
+    task.externalParams.forEach(param => {
+      const paramDiv = document.createElement('div');
+
+      const label = document.createElement('label');
+      label.className = 'block text-sm font-semibold text-gray-600 mb-1';
+      label.textContent = `${param.name} (${param.type})`;
+
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.name = param.name;
+      input.placeholder = `Enter ${param.type}`;
+      input.className = 'w-full p-2 border border-gray-300 rounded text-sm';
+      input.disabled = isClosed;
+
+      paramDiv.appendChild(label);
+      paramDiv.appendChild(input);
+      form.appendChild(paramDiv);
+    });
+  }
+
+  // Execute button
+  const executeBtn = document.createElement('button');
+  executeBtn.type = 'button';
+  executeBtn.disabled = !isOpen;
+  executeBtn.className = `w-full text-white px-4 py-2 rounded mt-3 font-medium transition-colors ${
+    isOpen ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
+  }`;
+  executeBtn.textContent = 'Execute';
+
+  executeBtn.onclick = async () => {
+    if (!isOpen) return;
+    const original = executeBtn.innerHTML;
+    executeBtn.disabled = true;
+    executeBtn.innerHTML = `<svg class="animate-spin h-5 w-5 mx-auto text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+    </svg>`;
+    try {
+      await executeTask(network, contractName, task, form, senderInput.value, parseFloat(amountInput.value) || 0, instanceId);
+    } catch (err) {
+      console.error('Task execution failed:', err);
+    } finally {
+      executeBtn.disabled = !isOpen;
+      executeBtn.innerHTML = original;
+    }
+  };
+
+  form.appendChild(executeBtn);
+  card.appendChild(form);
+  return card;
+}
+
+/**
+ * Appends a collapsible DataStore section for every contract in networkData
+ * that has dataStore variables. Called after task cards are rendered.
+ */
+export function renderDataStores(networkData, container) {
+  Object.entries(networkData).forEach(([contractKey, contract]) => {
+    if (!Array.isArray(contract.dataStore) || contract.dataStore.length === 0) return;
+    const label = (contract.contractText && contract.contractText.trim())
+      ? contract.contractText
+      : contractKey;
+    const wrapper = document.createElement('div');
+    wrapper.className = 'mt-4';
+    wrapper.appendChild(createCollapsibleSection(`Data – ${label}`, createDataStoreSection(contract.dataStore)));
+    container.appendChild(wrapper);
+  });
+}
+
 export function renderContract(data, networkKey, instanceId) {
   const container = document.getElementById('jsonContainer');
   container.innerHTML = `<h2 class='text-xl font-bold mb-2'>${networkKey}</h2>`;

@@ -1,27 +1,101 @@
-import { renderContract, renderRoleBalances } from './renderer.js';
+import { renderContract, renderRoleBalances, renderSenderTasks, renderDataStores } from './renderer.js';
 import { gasToCHF, formatCHF } from '../pricing.js';
 
 export function renderTabs(networks, instanceId, ethChfRate) {
   const tabsContainer = document.getElementById('tabsContainer');
+  const contentContainer = document.getElementById('jsonContainer');
   tabsContainer.innerHTML = '';
+  contentContainer.innerHTML = '';
+  tabsContainer.className = 'mb-0';
 
-  Object.keys(networks).forEach(networkKey => {
-    const tabButton = document.createElement('button');
-    tabButton.className = 'px-4 py-2 rounded bg-gray-300';
-    tabButton.innerText = networkKey;
+  const networkKeys = Object.keys(networks);
+  if (networkKeys.length === 0) return;
 
-    tabButton.onclick = () => {
-      renderContract(networks[networkKey], networkKey, instanceId);
-      renderRoleBalances({ [networkKey]: networks[networkKey] }, ethChfRate);
-    };
-    tabsContainer.appendChild(tabButton);
+  // ── Row 1: network tabs ──────────────────────────────────────────
+  const networkRow = document.createElement('div');
+  networkRow.className = 'flex space-x-1 border-b-2 border-blue-400';
+  tabsContainer.appendChild(networkRow);
+
+  // ── Row 2: sender tabs (re-populated when network changes) ───────
+  const senderRow = document.createElement('div');
+  senderRow.className = 'flex space-x-1 border-b border-gray-300 mt-3';
+  tabsContainer.appendChild(senderRow);
+
+  const networkButtons = [];
+
+  function selectNetwork(index) {
+    networkButtons.forEach((btn, i) => {
+      btn.className = i === index
+        ? 'px-5 py-2 rounded-t border-l border-r border-t border-blue-400 bg-white font-semibold text-blue-600 -mb-px z-10 relative'
+        : 'px-5 py-2 rounded-t bg-gray-100 text-gray-600 hover:bg-gray-200';
+    });
+    const networkKey = networkKeys[index];
+    renderSenderTabs(networks[networkKey], networkKey, instanceId, contentContainer, senderRow, ethChfRate);
+  }
+
+  networkKeys.forEach((networkKey, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'px-5 py-2 rounded-t bg-gray-100 text-gray-600 hover:bg-gray-200';
+    btn.textContent = networkKey;
+    btn.onclick = () => selectNetwork(i);
+    networkButtons.push(btn);
+    networkRow.appendChild(btn);
   });
 
-  renderRoleBalances(networks, ethChfRate);
+  selectNetwork(0);
+}
 
-  const firstNetwork = Object.keys(networks)[0];
-  renderContract(networks[firstNetwork], firstNetwork, instanceId);
-  renderRoleBalances({ [firstNetwork]: networks[firstNetwork] }, ethChfRate);
+function renderSenderTabs(networkData, networkKey, instanceId, contentContainer, senderRow, ethChfRate) {
+  senderRow.innerHTML = '';
+  contentContainer.innerHTML = '';
+
+  // Collect all tasks in this network, grouped by sender
+  const allTaskEntries = [];
+  Object.keys(networkData).forEach(contractKey => {
+    (networkData[contractKey].receiveTasks || []).forEach(task => {
+      allTaskEntries.push({ networkKey, contractKey, task });
+    });
+  });
+
+  const bySender = new Map();
+  allTaskEntries.forEach(entry => {
+    const sender = entry.task.sender || 'Unknown';
+    if (!bySender.has(sender)) bySender.set(sender, []);
+    bySender.get(sender).push(entry);
+  });
+
+  if (bySender.size === 0) {
+    contentContainer.innerHTML = '<p class="text-gray-400 italic p-6 text-center">No tasks in this network.</p>';
+    return;
+  }
+
+  const senderButtons = [];
+  const senderEntries = [...bySender.entries()];
+
+  function selectSender(index) {
+    senderButtons.forEach((btn, i) => {
+      btn.className = i === index
+        ? 'px-5 py-2 rounded-t border border-b-0 border-gray-300 bg-white font-semibold text-blue-600 -mb-px z-10 relative'
+        : 'px-5 py-2 rounded-t bg-gray-100 text-gray-600 hover:bg-gray-200 border border-transparent';
+    });
+    const [, entries] = senderEntries[index];
+    renderSenderTasks(entries, instanceId, contentContainer);
+    // DataStore sections for all contracts in this network
+    renderDataStores(networkData, contentContainer);
+    // Balances scoped to this network only
+    renderRoleBalances({ [networkKey]: networkData }, ethChfRate);
+  }
+
+  senderEntries.forEach(([senderName], i) => {
+    const btn = document.createElement('button');
+    btn.className = 'px-5 py-2 rounded-t bg-gray-100 text-gray-600 hover:bg-gray-200 border border-transparent';
+    btn.textContent = senderName;
+    btn.onclick = () => selectSender(i);
+    senderButtons.push(btn);
+    senderRow.appendChild(btn);
+  });
+
+  selectSender(0);
 }
 
 export function renderTransactionLog(logs, ethChfRate) {
@@ -55,7 +129,12 @@ export function renderTransactionLog(logs, ethChfRate) {
 
       tx.events.forEach(ev => {
         const li = document.createElement('li');
-        li.innerHTML = `<strong>${ev.name}</strong>: ${JSON.stringify(ev.args)}`;
+        const args = ev.args || {};
+        const argEntries = Object.entries(args);
+        const argsHtml = argEntries.length > 0
+          ? argEntries.map(([k, v]) => `<code class="bg-white px-1 rounded">${k}</code>: <code class="bg-white px-1 rounded">${v}</code>`).join(', ')
+          : '<em class="text-gray-400">no args</em>';
+        li.innerHTML = `<strong>${ev.name}</strong> — ${argsHtml}`;
         eventList.appendChild(li);
       });
 

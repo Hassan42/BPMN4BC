@@ -84,7 +84,7 @@ export default function InputParametersProps({ element, injector }) {
   });
 
   const bo = getBusinessObject(element);
-  const manualAddAllowed = !is(bo, 'bpmn:ReceiveTask') && !is(bo, 'bpmn:ScriptTask') && !is(bo, 'bpmn:ExclusiveGateway');
+  const manualAddAllowed = !is(bo, 'bpmn:ReceiveTask') && !is(bo, 'bpmn:ScriptTask') && !is(bo, 'bpmn:ExclusiveGateway') && !is(bo, 'bpmn:IntermediateThrowEvent');
 
   return {
     items,

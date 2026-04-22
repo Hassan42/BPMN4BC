@@ -20,6 +20,7 @@ import $ from 'jquery';
 
 import { renderVariablesWindow } from './scripts/ui/variablesWindow.js';
 import { getEthChfRate, gasToCHF, formatCHF } from './scripts/pricing.js';
+import { validateSoliditySnippet, validateSolidityExpression } from './scripts/solidityValidator.js';
 
 
 
@@ -389,6 +390,83 @@ $(function () {
     }
   });
 
+  // ── Pre-deployment Solidity syntax check ─────────────────────────────────
+
+  function validateAllScripts() {
+    const elementRegistry = bpmnModeler.get('elementRegistry');
+    const errors = [];
+
+    elementRegistry.getAll().forEach(el => {
+      const bo = el.businessObject;
+      if (!bo) return;
+
+      // ── Solidity script fields (ScriptTask / Lane / Participant) ─────────
+      const script = bo.solidityscript;
+      if (script && script.trim()) {
+        const err = validateSoliditySnippet(script);
+        if (err) {
+          errors.push({ element: bo.name || bo.id, message: err.message, line: err.line });
+        }
+      }
+
+      // ── DataOutput value fields (DataObject / DataStore writes) ──────────
+      if (bo.$type === 'bpmn:DataOutputAssociation') {
+        const taskName = el.source?.businessObject?.name || el.source?.id || '?';
+        const extVals = bo.extensionElements?.values || [];
+        extVals.forEach(ext => {
+          const isDoSel = ext.$type === 'bpmnbc:DataObjectVarSelections';
+          const isDsSel = ext.$type === 'bpmnbc:DataStoreVarSelections';
+          if (!isDoSel && !isDsSel) return;
+          (ext.values || []).forEach(sel => {
+            if (!sel.value || !sel.value.trim() || sel.external) return;
+            const err = validateSolidityExpression(sel.value);
+            if (err) {
+              errors.push({
+                element: `${taskName} → ${sel.varname || '?'}`,
+                message: err.message,
+                line: err.line
+              });
+            }
+          });
+        });
+      }
+    });
+
+    return errors;
+  }
+
+  function showSyntaxErrors(errors) {
+    document.getElementById('deploy-error-title').textContent = 'Solidity Syntax Errors';
+    const body = document.getElementById('deploy-error-body');
+    body.innerHTML = '';
+
+    const intro = document.createElement('p');
+    intro.style.cssText = 'font-size:13px; color:#555; margin-bottom:10px;';
+    intro.textContent = 'Fix the following syntax errors before deploying:';
+    body.appendChild(intro);
+
+    errors.forEach(e => {
+      const item = document.createElement('div');
+      item.style.cssText = `
+        display:flex; gap:8px; align-items:flex-start;
+        background:#fff5f5; border:1px solid #fca5a5; border-radius:5px;
+        padding:8px 10px; margin-bottom:6px;
+      `;
+      item.innerHTML = `
+        <span style="color:#dc2626; font-size:15px; line-height:1.4;">⚠</span>
+        <div>
+          <div style="font-size:13px; font-weight:600; color:#222;">${e.element}</div>
+          <div style="font-size:11px; font-family:Consolas,'Courier New',monospace; color:#dc2626; margin-top:2px;">
+            ${e.line ? `Line ${e.line}: ` : ''}${e.message}
+          </div>
+        </div>
+      `;
+      body.appendChild(item);
+    });
+
+    document.getElementById('deploy-error-modal').classList.remove('hidden');
+  }
+
   // ── Deployment error modal ────────────────────────────────────────────────
 
   /**
@@ -485,6 +563,15 @@ $(function () {
       $('#deploy-instance-name').focus();
       return;
     }
+
+    // Run client-side syntax check before hitting the server
+    const syntaxErrors = validateAllScripts();
+    if (syntaxErrors.length > 0) {
+      $('#deploy-modal').addClass('hidden');
+      showSyntaxErrors(syntaxErrors);
+      return;
+    }
+
     $('#deploy-modal').addClass('hidden');
     toggleLockButton(true, true);
 

@@ -36,6 +36,14 @@ module.exports = {
       ]
     })
   ],
+  resolve: {
+    fallback: {
+      fs: false,
+      path: false,
+      os: false,
+      crypto: false,
+    }
+  },
   mode: 'development',
   devtool: 'source-map',
   devServer: {

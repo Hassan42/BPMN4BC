@@ -1,41 +1,83 @@
+const { extractDataObjectVariables, extractDataStoreVariables, extractDataStoreVarSelections } = require('./utils.js');
+
 /**
- * Generates Solidity code for events.
- * @param {Array} events - The array of event objects.
- * @returns {string} The Solidity code for the events.
+ * Collects Solidity event parameters from a ThrowEvent's DataInputAssociations.
+ * DataObject inputs → all their variables become individual params.
+ * DataStore inputs  → all their variables become individual params.
+ *
+ * @param {Object} event - A bpmn:IntermediateThrowEvent
+ * @returns {Array<{ name, type, ref }>}  ref = "do.<instanceName>" or "ds"
+ */
+function getThrowEventParams(event) {
+  const params = [];
+  const seen = new Set();
+
+  (event.dataInputAssociations || []).forEach(conn => {
+    (conn.sourceRef || []).forEach(source => {
+      if (source.$type === 'bpmn:DataObjectReference') {
+        const rawName = source.name || source.id;
+        const structName = rawName.replace(/\s+/g, '');
+        const instanceName = structName.charAt(0).toLowerCase() + structName.slice(1);
+        extractDataObjectVariables(source).forEach(v => {
+          if (seen.has(v.name)) return;
+          seen.add(v.name);
+          params.push({ name: v.name, type: v.type || 'uint', ref: `${instanceName}.${v.name}` });
+        });
+      } else if (source.$type === 'bpmn:DataStoreReference') {
+        const dsVars = extractDataStoreVariables(source);
+        extractDataStoreVarSelections(conn).forEach(sel => {
+          if (!sel.varname || seen.has(sel.varname)) return;
+          seen.add(sel.varname);
+          const dsVar = dsVars.find(v => v.name === sel.varname);
+          params.push({ name: sel.varname, type: dsVar ? (dsVar.type || 'uint') : 'uint', ref: `dataStore.${sel.varname}` });
+        });
+      }
+    });
+  });
+
+  return params;
+}
+
+/**
+ * Generates Solidity event declarations for IntermediateThrowEvents.
+ * Event name  = element name (spaces stripped).
+ * Event params = variables from all DataInputAssociation sources.
+ *
+ * @param {Array} events
+ * @returns {string}
  */
 function generateEvents(events) {
   return events.map(event => {
-    switch (event.$type) {
-      case 'bpmn:IntermediateThrowEvent':
-        const eventName = event.bceventname?.replace(/\s+/g, '') || event.id.replace(/\s+/g, '');
-        return `event ${eventName}();\n`;
-      default:
-        return ``;
-    }
+    if (event.$type !== 'bpmn:IntermediateThrowEvent') return '';
+
+    const eventName = (event.name || event.id).replace(/\s+/g, '');
+    const params = getThrowEventParams(event);
+    const paramList = params.map(p => `${p.type} ${p.name}`).join(', ');
+
+    return `event ${eventName}(${paramList});`;
   }).join('\n');
 }
 
 /**
- * Generates Solidity code for public emit functions.
- * @param {Array} events - The array of event objects.
- * @returns {string} The Solidity code for the public emit functions.
+ * Generates public emit_* wrapper functions for IntermediateThrowEvents.
+ * The wrapper accepts the same params and emits the event.
+ *
+ * @param {Array} events
+ * @returns {string}
  */
 function generateEmitFunctions(events) {
   return events.map(event => {
-    switch (event.$type) {
-      case 'bpmn:IntermediateThrowEvent':
-        const eventName = event.bceventname?.replace(/\s+/g, '') || event.id.replace(/\s+/g, '');
-        return `function emit_${eventName}() public {\n` +
-               `    emit ${eventName}();\n` +
-               `}\n`;
-      default:
-        return ``;
-    }
+    if (event.$type !== 'bpmn:IntermediateThrowEvent') return '';
+
+    const eventName = (event.name || event.id).replace(/\s+/g, '');
+    const params = getThrowEventParams(event);
+    // Prefix all parameter names with _ to avoid collision when a param has the
+    // same name as the event itself (e.g. event "test" with param "test").
+    const paramList = params.map(p => `${p.type} _${p.name}`).join(', ');
+    const argList  = params.map(p => `_${p.name}`).join(', ');
+
+    return `function emit_${eventName}(${paramList}) public {\n    emit ${eventName}(${argList});\n}`;
   }).join('\n');
 }
 
-
-module.exports = {
-  generateEvents,
-  generateEmitFunctions
-};
+module.exports = { generateEvents, generateEmitFunctions };

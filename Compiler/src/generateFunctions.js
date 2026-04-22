@@ -454,11 +454,37 @@ function generateEntryFunction(activity, process, roles, collaborationId) {
         break;
       }
       case 'bpmn:IntermediateThrowEvent': {
-        const eventName = element.bceventname?.replace(/\s+/g, '') || element.id.replace(/\s+/g, '');
+        // Event name comes from element name; args from DataInputAssociations
+        const eventName = (element.name || element.id).replace(/\s+/g, '');
+
+        const argParts = [];
+        const seenArgs = new Set();
+        (element.dataInputAssociations || []).forEach(conn => {
+          (conn.sourceRef || []).forEach(source => {
+            if (source.$type === 'bpmn:DataObjectReference') {
+              const rawName = source.name || source.id;
+              const structName = capitalize(rawName.replace(/\s+/g, ''));
+              const instanceName = structName.charAt(0).toLowerCase() + structName.slice(1);
+              extractDataObjectVariables(source).forEach(v => {
+                if (seenArgs.has(v.name)) return;
+                seenArgs.add(v.name);
+                argParts.push(`${instanceName}.${v.name}`);
+              });
+            } else if (source.$type === 'bpmn:DataStoreReference') {
+              extractDataStoreVarSelections(conn).forEach(sel => {
+                if (!sel.varname || seenArgs.has(sel.varname)) return;
+                seenArgs.add(sel.varname);
+                argParts.push(`dataStore.${sel.varname}`);
+              });
+            }
+          });
+        });
+
+        const args = argParts.join(', ');
         if (elementContractName !== contractName) {
-          proceedingLogic += `I${elementContractName}(contracts["${elementContractName}"]).emit_${eventName}();\n`;
+          proceedingLogic += `I${elementContractName}(contracts["${elementContractName}"]).emit_${eventName}(${args});\n`;
         } else {
-          proceedingLogic += `emit_${eventName}();\n`;
+          proceedingLogic += `emit_${eventName}(${args});\n`;
         }
         break;
       }

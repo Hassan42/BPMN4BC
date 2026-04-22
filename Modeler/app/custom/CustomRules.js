@@ -14,13 +14,14 @@ const HIGH_PRIORITY = 2500;
  *
  * @param {EventBus} eventBus
  */
-export default function CustomRules(eventBus) {
+export default function CustomRules(eventBus, elementRegistry) {
+  this._elementRegistry = elementRegistry; // must be set before RuleProvider.call, which triggers init()
   RuleProvider.call(this, eventBus);
 }
 
 inherits(CustomRules, RuleProvider);
 
-CustomRules.$inject = ['eventBus'];
+CustomRules.$inject = ['eventBus', 'elementRegistry'];
 
 CustomRules.prototype.init = function () {
 
@@ -29,6 +30,19 @@ CustomRules.prototype.init = function () {
     const { shape, target } = context;
     const shapeBo = shape.businessObject;
     const targetBo = target.businessObject;
+
+    // Enforce maximum of 2 blockchain pools
+    if (is(shapeBo, 'bpmn:Participant') && shapeBo.bc === 'true') {
+      const existingBcPools = this._elementRegistry.filter(
+        el => el.businessObject &&
+              el.businessObject.$type === 'bpmn:Participant' &&
+              el.businessObject.bc === 'true'
+      );
+      if (existingBcPools.length >= 2) {
+        setTimeout(() => showErrorToast('Maximum of 2 blockchain pools allowed.'), 0);
+        return false;
+      }
+    }
 
     // Helper function to check if an element is allowed in the blockchain environment
     function isAllowedInBlockchain(shapeBo) {
@@ -97,14 +111,27 @@ CustomRules.prototype.init = function () {
       return null;
     }
 
+    // Block any connection between elements that live in two different BC pools
+    const sourcePool = getPool(source);
+    const targetPool = getPool(target);
+    if (
+      sourcePool && targetPool &&
+      sourcePool !== targetPool &&
+      sourcePool.businessObject.bc === 'true' &&
+      targetPool.businessObject.bc === 'true'
+    ) {
+      setTimeout(() => showErrorToast(
+        'Elements in different blockchain pools cannot be connected.'
+      ), 0);
+      return false;
+    }
+
     // Block message flows (cross-pool connections) on BC IntermediateThrowEvents —
     // only control flow (sequence flow within the same pool) is allowed
     const sourceIsThrow = is(source.businessObject, 'bpmn:IntermediateThrowEvent') && source.businessObject.bc === 'true';
     const targetIsThrow = is(target.businessObject, 'bpmn:IntermediateThrowEvent') && target.businessObject.bc === 'true';
 
     if (sourceIsThrow || targetIsThrow) {
-      const sourcePool = getPool(source);
-      const targetPool = getPool(target);
       if (sourcePool && targetPool && sourcePool !== targetPool) {
         setTimeout(() => showErrorToast(
           'Blockchain throw events can only use control flow. Message flows are not allowed.'
@@ -204,7 +231,10 @@ CustomRules.prototype.init = function () {
     const sourceIsXOR = is(sourceBo, 'bpmn:ExclusiveGateway');
     const targetIsData = is(targetBo, 'bpmn:DataObjectReference') || is(targetBo, 'bpmn:DataStoreReference');
 
-    if (sourceIsData && targetIsXOR) {
+    // BC IntermediateThrowEvents accept data reads (same as XOR gateway — read-only)
+    const targetIsBcThrow = is(targetBo, 'bpmn:IntermediateThrowEvent') && targetBo.bc === 'true';
+
+    if (sourceIsData && (targetIsXOR || targetIsBcThrow)) {
       // A task/gateway can only read from the same DataStore once
       if (is(sourceBo, 'bpmn:DataStoreReference')) {
         const alreadyReads = (target.incoming || []).some(
@@ -218,7 +248,8 @@ CustomRules.prototype.init = function () {
       }
       return { type: 'bpmn:DataInputAssociation' };
     }
-    if (sourceIsXOR && targetIsData) {
+    // Prevent outgoing data writes from XOR gateways or BC ThrowEvents
+    if ((sourceIsXOR || sourceIsThrow) && targetIsData) {
       return false;
     }
 

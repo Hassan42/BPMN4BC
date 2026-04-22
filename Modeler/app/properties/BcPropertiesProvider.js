@@ -134,6 +134,15 @@ export default function BcPropertiesProvider(propertiesPanel, injector, translat
         }
       }
 
+      if (is(businessObject, 'bpmn:IntermediateThrowEvent') && businessObject.bc === 'true') {
+        const hasDataInputs = (element.incoming || []).some(
+          conn => conn.businessObject?.$type === 'bpmn:DataInputAssociation'
+        );
+        if (hasDataInputs) {
+          groups.push(createBcInputGroup(element, injector, translate));
+        }
+      }
+
       if (is(businessObject, 'bpmn:DataInputAssociation') || is(businessObject, 'bpmn:DataOutputAssociation')) {
         const connSrc = element.source?.businessObject;
         const connTgt = element.target?.businessObject;

@@ -92,7 +92,7 @@ function colorElement(element) {
   const visual = gfx.querySelector('.djs-visual');
   if (!visual) return;
   visual.querySelectorAll('rect, circle, polygon, ellipse, path').forEach(el => {
-    el.style.stroke      = '#16a34a';
+    el.style.stroke      = '#82ca2f';
     el.style.strokeWidth = '3px';
   });
 }

@@ -132,8 +132,12 @@ if (instanceId) {
     }
   })();
 } else {
-  // Instances list — hide transaction log, show back-to-modeler button
+  // Instances list — hide transaction log, tabs and content panel
   if (transactionLogPanel) transactionLogPanel.classList.add('hidden');
+  const tabsContainer = document.getElementById('tabsContainer');
+  const jsonContainer = document.getElementById('jsonContainer');
+  if (tabsContainer) tabsContainer.classList.add('hidden');
+  if (jsonContainer) jsonContainer.classList.add('hidden');
   if (backToModelerSection) backToModelerSection.classList.remove('hidden');
   if (backToModelerBtn) {
     backToModelerBtn.addEventListener('click', () => {

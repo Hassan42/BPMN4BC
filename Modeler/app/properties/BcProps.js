@@ -4,6 +4,7 @@ import { TextFieldEntry, isTextFieldEntryEdited, SelectEntry, isSelectEntryEdite
 import { useService } from 'bpmn-js-properties-panel';
 import { is } from 'bpmn-js/lib/util/ModelUtil';
 import { openScriptEditorWindow } from '../scripts/ui/scriptEditorWindow';
+import { validateSoliditySnippet } from '../scripts/solidityValidator.js';
 export default function (element) {
 
   // Initialize props array with the bcId object
@@ -24,7 +25,7 @@ export default function (element) {
         component: Payable
       }
     );
-  } else if ((is(element, 'bpmn:IntermediateThrowEvent') || is(element, 'bpmn:IntermediateCatchEvent')) && element.businessObject.bc == "true") {
+  } else if (is(element, 'bpmn:IntermediateCatchEvent') && element.businessObject.bc == "true") {
     props.push(
       {
         id: 'event',
@@ -33,6 +34,8 @@ export default function (element) {
         isEdited: isTextFieldEntryEdited
       }
     );
+  } else if (is(element, 'bpmn:IntermediateThrowEvent') && element.businessObject.bc == "true") {
+    // Event name is taken from the element name — no extra property needed
   } else if (is(element, 'bpmn:ScriptTask') && element.businessObject.bc == "true") {
   props.push(
     {
@@ -302,10 +305,17 @@ function Script(props) {
   const getValue = () => element.businessObject.solidityscript || '';
   const setValue = value => modeling.updateProperties(element, { solidityscript: value });
 
+  // Derived directly from the business object — no state needed
+  const syntaxError = validateSoliditySnippet(element.businessObject.solidityscript || '');
+
   const openEditor = (e) => {
     e.preventDefault();
     openScriptEditorWindow(getValue, setValue, element.businessObject.name || element.id);
   };
+
+  const errorMsg = syntaxError
+    ? (syntaxError.line ? `Line ${syntaxError.line}: ${syntaxError.message}` : syntaxError.message)
+    : null;
 
   return html`
     <div>
@@ -317,6 +327,14 @@ function Script(props) {
         setValue=${setValue}
         debounce=${debounce}
       />
+      ${errorMsg ? html`
+        <div style="
+          margin-top: 3px; padding: 4px 6px;
+          background: #fff5f5; border: 1px solid #fca5a5; border-radius: 3px;
+          color: #dc2626; font-size: 11px;
+          font-family: Consolas, 'Courier New', monospace;
+        ">⚠ ${errorMsg}</div>
+      ` : null}
       <button
         type="button"
         onClick=${openEditor}
