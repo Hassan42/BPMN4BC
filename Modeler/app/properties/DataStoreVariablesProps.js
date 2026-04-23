@@ -23,7 +23,11 @@ export default function DataStoreVariablesProps({ element, injector }) {
     const id = element.id + '-dsvar-' + index;
     return {
       id,
-      label: variable.name ? `${variable.name} : ${variable.type || 'uint'}` : `Variable_${index + 1}`,
+      label: variable.name
+        ? (variable.type === 'mapping'
+          ? `${variable.name} : mapping(${variable.keyType || 'uint'} => ${variable.valueType || 'uint'})`
+          : `${variable.name} : ${variable.type || 'uint'}`)
+        : `Variable_${index + 1}`,
       entries: DataStoreVariableProp({ idPrefix: id, element, variable }),
       autoFocusEntry: id + '-name',
       remove: removeFactory({ commandStack, element, variable, elementRegistry })

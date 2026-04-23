@@ -400,12 +400,15 @@ const generateContractConfig = ({
 
     const receiveTasks = activities.filter(activity => activity.$type === 'bpmn:ReceiveTask');
 
-    // Build dataStore array: variables from the lane's (or process's) DataStore
+    // Build dataStore array: non-mapping variables from the lane's (or process's) DataStore
+    // (mapping variables are top-level public state vars — excluded from the struct array)
     const dataStoreRefs = lane
         ? findDataStoreReferencesForLane(lane)
         : findDataStoreReferencesForProcess(process);
     const dataStore = dataStoreRefs.length > 0
-        ? extractDataStoreVariables(dataStoreRefs[0]).map(v => ({ name: v.name, type: v.type || 'uint' }))
+        ? extractDataStoreVariables(dataStoreRefs[0])
+            .filter(v => (v.type || 'uint') !== 'mapping')
+            .map(v => ({ name: v.name, type: v.type || 'uint' }))
         : [];
 
     // Filter roles based on those used in ReceiveTasks and format as an array of objects
@@ -423,19 +426,39 @@ const generateContractConfig = ({
             if (target.$type === 'bpmn:DataStoreReference') {
                 const dsVars = extractDataStoreVariables(target);
                 extractDataStoreVarSelections(conn).forEach(sel => {
-                    if (String(sel.external).trim() !== 'true' || !sel.varname) return;
+                    if (!sel.varname) return;
                     const dsVar = dsVars.find(v => v.name === sel.varname);
-                    externalParams.push({
-                        name: sel.varname,
-                        type: dsVar ? (dsVar.type || 'uint') : 'uint'
-                    });
+                    const varType = dsVar ? (dsVar.type || 'uint') : 'uint';
+
+                    if (varType === 'mapping') {
+                        // Mapping: key and/or value can be external params independently
+                        if (sel.externalKey) {
+                            externalParams.push({
+                                name: `${sel.varname}Key`,
+                                type: dsVar ? (dsVar.keyType || 'uint') : 'uint'
+                            });
+                        }
+                        if (sel.externalValue) {
+                            externalParams.push({
+                                name: `${sel.varname}Value`,
+                                type: dsVar ? (dsVar.valueType || 'uint') : 'uint'
+                            });
+                        }
+                    } else {
+                        // Regular var: external=true makes the whole value a param
+                        if (String(sel.external).trim() !== 'true') return;
+                        externalParams.push({ name: sel.varname, type: varType });
+                    }
                 });
             } else if (target.$type === 'bpmn:DataObjectReference') {
-                // External DataObject write variables (external: true on DataObjectVariable)
-                extractDataObjectVariables(target).forEach(v => {
-                    if (String(v.external).trim() === 'true' && v.name) {
-                        externalParams.push({ name: v.name, type: v.type || 'uint' });
-                    }
+                // External DataObject write variables — read from DataObjectVarSelection on the
+                // connection (same source as generateEntryFunction), NOT from DataObjectVariable.
+                const doVars = extractDataObjectVariables(target);
+                extractDataObjectVarSelections(conn).forEach(sel => {
+                    if (String(sel.external).trim() !== 'true' || !sel.varname) return;
+                    const doVar = doVars.find(v => v.name === sel.varname);
+                    if (!doVar) return;
+                    externalParams.push({ name: sel.varname, type: doVar.type || 'uint' });
                 });
             }
         });
@@ -641,6 +664,8 @@ const getTaskDataStoreReadVars = (task) => {
             extractDataStoreVarSelections(assoc).forEach(sel => {
                 if (!sel.varname) return;
                 const dsVar = dsVars.find(v => v.name === sel.varname);
+                // Mapping variables are always public — skip them (no function param needed)
+                if (dsVar && (dsVar.type || 'uint') === 'mapping') return;
                 result.push({ varname: sel.varname, type: dsVar ? (dsVar.type || 'uint') : 'uint' });
             });
         });

@@ -44,20 +44,33 @@ export function renderVariablesWindow(data) {
     </tr>
   `).join('');
 
-  // ── DataStores: one row per variable, filtered readers/writers ──────────
-  const dsVarRows = [];
+  // ── DataStores: aggregate across all DataStore shapes (siblings share variables) ──
+  // Multiple DataStoreReference shapes in the same lane are kept in sync and hold
+  // identical variable definitions. Aggregate them so each variable appears only once,
+  // merging readers and writers from every shape.
+  const dsVarMap = new Map(); // varName → { varName, varType, readers: Set<string>, writers: Set<string> }
+
   dataStores.forEach(item => {
-    if (item.variables.length === 0) {
-      dsVarRows.push({ varName: '—', varType: '', readers: [], writers: [] });
-    } else {
-      item.variables.forEach(v => {
-        // Only include tasks that selected this specific variable
-        const readers = item.readers.filter(r => r.vars.includes(v.name)).map(r => r.task);
-        const writers = item.writers.filter(w => w.vars.includes(v.name));
-        dsVarRows.push({ varName: v.name, varType: v.type || 'uint', readers, writers });
-      });
-    }
+    item.variables.forEach(v => {
+      if (!dsVarMap.has(v.name)) {
+        dsVarMap.set(v.name, { varName: v.name, varType: v.type || 'uint', readers: new Set(), writers: new Set() });
+      }
+      const entry = dsVarMap.get(v.name);
+      item.readers.filter(r => r.vars.includes(v.name)).forEach(r => entry.readers.add(r.task));
+      item.writers.filter(w => w.vars.includes(v.name)).forEach(w => entry.writers.add(w.task));
+    });
   });
+
+  const dsVarRows = dsVarMap.size > 0
+    ? [...dsVarMap.values()].map(e => ({
+        varName: e.varName,
+        varType: e.varType,
+        readers: [...e.readers],
+        writers: [...e.writers].map(t => ({ task: t }))
+      }))
+    : dataStores.length > 0
+      ? [{ varName: '—', varType: '', readers: [], writers: [] }]
+      : [];
 
   const dsRows = dsVarRows.map((row, i) => `
     <tr class="border-b border-[#b1b1b1] ${i % 2 === 0 ? 'bg-white' : 'bg-[#f1f1f1]'}">

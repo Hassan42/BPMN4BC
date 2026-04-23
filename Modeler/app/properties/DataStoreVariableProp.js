@@ -5,12 +5,21 @@ import { getDataStoreVariables, getDataStoreVarSelectionsExtension } from '../ut
 import { showErrorToast } from '../util/toast';
 
 export default function DataStoreVariableProp({ idPrefix, element, variable }) {
+  const isMapping = (variable.type || 'uint') === 'mapping';
+
   const entries = [
     { id: idPrefix + '-name', component: VariableName, idPrefix, element, variable },
     { id: idPrefix + '-type', component: VariableType, idPrefix, element, variable }
   ];
 
-  entries.push({ id: idPrefix + '-value', component: VariableInitialValue, idPrefix, element, variable });
+  if (isMapping) {
+    entries.push(
+      { id: idPrefix + '-keytype', component: MappingKeyType, idPrefix, element, variable },
+      { id: idPrefix + '-valuetype', component: MappingValueType, idPrefix, element, variable }
+    );
+  } else {
+    entries.push({ id: idPrefix + '-value', component: VariableInitialValue, idPrefix, element, variable });
+  }
 
   return entries;
 }
@@ -84,10 +93,74 @@ function VariableType({ idPrefix, element, variable }) {
     const vars = getDataStoreVariables(element) || [];
     if (vars.some(v => v !== variable && v.name === variable.name && (v.type || 'uint') === newType)) return;
 
+    // Clear key/value types and initial value when switching away from/to mapping
+    const extraProps = newType === 'mapping'
+      ? { type: newType, value: undefined, keyType: variable.keyType || 'uint', valueType: variable.valueType || 'uint' }
+      : { type: newType, keyType: undefined, valueType: undefined };
+
     commandStack.execute('element.updateModdleProperties', {
       element,
       moddleElement: variable,
-      properties: { type: newType }
+      properties: extraProps
+    });
+  };
+  const getOptions = () => [
+    { value: 'uint', label: 'uint' },
+    { value: 'string', label: 'string' },
+    { value: 'address', label: 'address' },
+    { value: 'bool', label: 'bool' },
+    { value: 'mapping', label: 'mapping' },
+  ];
+
+  return SelectEntry({
+    element: variable,
+    id: idPrefix + '-type',
+    label: translate('Type'),
+    getValue,
+    setValue,
+    getOptions
+  });
+}
+
+function MappingKeyType({ idPrefix, element, variable }) {
+  const commandStack = useService('commandStack');
+  const translate = useService('translate');
+
+  const getValue = () => variable.keyType || 'uint';
+  const setValue = value => {
+    commandStack.execute('element.updateModdleProperties', {
+      element,
+      moddleElement: variable,
+      properties: { keyType: value }
+    });
+  };
+  const getOptions = () => [
+    { value: 'uint', label: 'uint' },
+    { value: 'address', label: 'address' },
+    { value: 'bool', label: 'bool' },
+    { value: 'string', label: 'string' },
+  ];
+
+  return SelectEntry({
+    element: variable,
+    id: idPrefix + '-keytype',
+    label: translate('Key Type'),
+    getValue,
+    setValue,
+    getOptions
+  });
+}
+
+function MappingValueType({ idPrefix, element, variable }) {
+  const commandStack = useService('commandStack');
+  const translate = useService('translate');
+
+  const getValue = () => variable.valueType || 'uint';
+  const setValue = value => {
+    commandStack.execute('element.updateModdleProperties', {
+      element,
+      moddleElement: variable,
+      properties: { valueType: value }
     });
   };
   const getOptions = () => [
@@ -99,8 +172,8 @@ function VariableType({ idPrefix, element, variable }) {
 
   return SelectEntry({
     element: variable,
-    id: idPrefix + '-type',
-    label: translate('Type'),
+    id: idPrefix + '-valuetype',
+    label: translate('Value Type'),
     getValue,
     setValue,
     getOptions

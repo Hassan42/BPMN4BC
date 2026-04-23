@@ -159,6 +159,16 @@
             "name": "value",
             "isAttr": true,
             "type": "String"
+          },
+          {
+            "name": "keyType",
+            "isAttr": true,
+            "type": "String"
+          },
+          {
+            "name": "valueType",
+            "isAttr": true,
+            "type": "String"
           }
         ]
       },
@@ -218,7 +228,22 @@
             "type": "String"
           },
           {
+            "name": "key",
+            "isAttr": true,
+            "type": "String"
+          },
+          {
             "name": "external",
+            "isAttr": true,
+            "type": "Boolean"
+          },
+          {
+            "name": "externalKey",
+            "isAttr": true,
+            "type": "Boolean"
+          },
+          {
+            "name": "externalValue",
             "isAttr": true,
             "type": "Boolean"
           }

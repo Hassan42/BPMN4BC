@@ -56,22 +56,44 @@ function generateDataStoreAssignments(activity, collaborationId) {
   activity.dataOutputAssociations.forEach(conn => {
     const target = conn.targetRef;
     if (!target || target.$type !== 'bpmn:DataStoreReference') return;
-    // All DataStores in a lane share one struct named "DataStore" / "dataStore"
-    const instanceName = 'dataStore';
+    const dsVars = extractDataStoreVariables(target);
     const selections = extractDataStoreVarSelections(conn);
     selections.forEach(sel => {
       if (!sel.varname) return;
-      const dsVars = extractDataStoreVariables(target);
       const dsVar = dsVars.find(v => v.name === sel.varname);
       const varType = dsVar ? (dsVar.type || 'uint') : 'uint';
-      if (String(sel.external).trim() === 'true') {
-        lines.push(`${instanceName}.${sel.varname} = ${sel.varname};`);
-      } else if (sel.value) {
-        const raw = generateExpression(sel.value, collaborationId);
-        const formatted = (varType === 'string' && !sel.value.includes('${') && !raw.startsWith('"'))
-          ? `"${raw}"`
-          : raw;
-        lines.push(`${instanceName}.${sel.varname} = ${formatted};`);
+
+      if (varType === 'mapping') {
+        // Key: either an external function param or an inline expression
+        const keyExpr = sel.externalKey
+          ? `${sel.varname}Key`
+          : (sel.key ? generateExpression(sel.key, collaborationId) : null);
+
+        // Value: either an external function param or an inline expression
+        const valueType = dsVar ? (dsVar.valueType || 'uint') : 'uint';
+        let valueExpr = null;
+        if (sel.externalValue) {
+          valueExpr = `${sel.varname}Value`;
+        } else if (sel.value) {
+          const rawValue = generateExpression(sel.value, collaborationId);
+          valueExpr = (valueType === 'string' && !sel.value.includes('${') && !rawValue.startsWith('"'))
+            ? `"${rawValue}"` : rawValue;
+        }
+
+        if (!keyExpr || !valueExpr) return;
+        lines.push(`${sel.varname}[${keyExpr}] = ${valueExpr};`);
+      } else {
+        // Regular DataStore struct var: dataStore.varName = value;
+        const instanceName = 'dataStore';
+        if (String(sel.external).trim() === 'true') {
+          lines.push(`${instanceName}.${sel.varname} = ${sel.varname};`);
+        } else if (sel.value) {
+          const raw = generateExpression(sel.value, collaborationId);
+          const formatted = (varType === 'string' && !sel.value.includes('${') && !raw.startsWith('"'))
+            ? `"${raw}"`
+            : raw;
+          lines.push(`${instanceName}.${sel.varname} = ${formatted};`);
+        }
       }
     });
   });
@@ -211,11 +233,28 @@ function generateEntryFunction(activity, process, roles, collaborationId, partic
     if (!target || target.$type !== 'bpmn:DataStoreReference') return;
     const dsVars = extractDataStoreVariables(target);
     extractDataStoreVarSelections(conn).forEach(sel => {
-      if (String(sel.external).trim() !== 'true' || !sel.varname) return;
+      if (!sel.varname) return;
       const dsVar = dsVars.find(v => v.name === sel.varname);
       const varType = dsVar ? (dsVar.type || 'uint') : 'uint';
-      const memoryKeyword = isValueType(sel.varname, varType) ? '' : 'memory ';
-      dsExternalParamsList.push(`${varType} ${memoryKeyword}${sel.varname}`);
+
+      if (varType === 'mapping') {
+        // Mapping: key and/or value can independently be external function params
+        if (sel.externalKey) {
+          const keyType = dsVar ? (dsVar.keyType || 'uint') : 'uint';
+          const keyMem = isValueType(`${sel.varname}Key`, keyType) ? '' : 'memory ';
+          dsExternalParamsList.push(`${keyType} ${keyMem}${sel.varname}Key`);
+        }
+        if (sel.externalValue) {
+          const valueType = dsVar ? (dsVar.valueType || 'uint') : 'uint';
+          const valMem = isValueType(`${sel.varname}Value`, valueType) ? '' : 'memory ';
+          dsExternalParamsList.push(`${valueType} ${valMem}${sel.varname}Value`);
+        }
+      } else {
+        // Regular var: external=true makes the whole value a function param
+        if (String(sel.external).trim() !== 'true') return;
+        const memoryKeyword = isValueType(sel.varname, varType) ? '' : 'memory ';
+        dsExternalParamsList.push(`${varType} ${memoryKeyword}${sel.varname}`);
+      }
     });
   });
 

@@ -100,30 +100,71 @@ import {
       const dsVars = getDataStoreVariables(conn.target) || [];
       selections.forEach((sel, idx) => {
         if (!sel.varname) return;
+        const dsVar = dsVars.find(v => v.name === sel.varname);
+        const varType = (dsVar || {}).type || 'uint';
+        const isMapping = varType === 'mapping';
         const dsItemId = `ds-write-${conn.id}-${idx}`;
-        const varType = (dsVars.find(v => v.name === sel.varname) || {}).type || 'uint';
-        const entries = [
-          {
+
+        const label = isMapping
+          ? `${sel.varname} : mapping(${dsVar?.keyType || 'uint'} => ${dsVar?.valueType || 'uint'}) [DS]`
+          : `${sel.varname} : ${varType} [DS]`;
+
+        const entries = [];
+        if (isMapping) {
+          // External Key checkbox — always visible
+          entries.push({
+            id: `${dsItemId}-extkey`,
+            element: conn,
+            selection: sel,
+            component: DsMappingExternalKey,
+          });
+          // Key text field — hidden when externalKey is checked
+          if (!sel.externalKey) {
+            entries.push({
+              id: `${dsItemId}-key`,
+              element: conn,
+              selection: sel,
+              component: DsMappingKey,
+              isEdited: isTextFieldEntryEdited,
+            });
+          }
+          // External Value checkbox — always visible
+          entries.push({
+            id: `${dsItemId}-extval`,
+            element: conn,
+            selection: sel,
+            component: DsMappingExternalValue,
+          });
+          // Value text field — hidden when externalValue is checked
+          if (!sel.externalValue) {
+            entries.push({
+              id: `${dsItemId}-value`,
+              element: conn,
+              selection: sel,
+              component: DsWriteValue,
+              isEdited: isTextFieldEntryEdited,
+            });
+          }
+        } else {
+          // Regular DS var: Value expression + optional External param (ReceiveTask only)
+          entries.push({
             id: `${dsItemId}-value`,
             element: conn,
             selection: sel,
             component: DsWriteValue,
             isEdited: isTextFieldEntryEdited,
-          }
-        ];
-        if (isReceiveTask) {
-          entries.push({
-            id: `${dsItemId}-external`,
-            element: conn,
-            selection: sel,
-            component: DsWriteExternal,
           });
+          if (isReceiveTask) {
+            entries.push({
+              id: `${dsItemId}-external`,
+              element: conn,
+              selection: sel,
+              component: DsWriteExternal,
+            });
+          }
         }
-        items.push({
-          id: dsItemId,
-          label: `${sel.varname} : ${varType} [DS]`,
-          entries,
-        });
+
+        items.push({ id: dsItemId, label, entries });
       });
     });
 
@@ -278,6 +319,77 @@ import {
         <${ValError} err=${syntaxError} />
       </div>
     `;
+  }
+
+  function DsMappingKey({ id, element, selection }) {
+    const commandStack = useService('commandStack');
+    const translate = useService('translate');
+    const debounce = useService('debounceInput');
+
+    const getValue = () => selection.key || '';
+    const setValue = value => {
+      commandStack.execute('element.updateModdleProperties', {
+        element,
+        moddleElement: selection,
+        properties: { key: value }
+      });
+    };
+
+    const syntaxError = validateSolidityExpression(getValue());
+
+    return html`
+      <div>
+        <${TextFieldEntry}
+          id=${id}
+          element=${selection}
+          label=${translate('Key')}
+          getValue=${getValue}
+          setValue=${setValue}
+          debounce=${debounce}
+        />
+        <${ValError} err=${syntaxError} />
+      </div>
+    `;
+  }
+
+  function DsMappingExternalKey({ id, element, selection }) {
+    const commandStack = useService('commandStack');
+    const translate = useService('translate');
+
+    const getValue = () => selection.externalKey || false;
+    const setValue = value => commandStack.execute('element.updateModdleProperties', {
+      element,
+      moddleElement: selection,
+      properties: { externalKey: value, key: value ? undefined : selection.key }
+    });
+
+    return html`<${CheckboxEntry}
+      id=${id}
+      element=${selection}
+      getValue=${getValue}
+      setValue=${setValue}
+      label=${translate('External Key')}
+    />`;
+  }
+
+  function DsMappingExternalValue({ id, element, selection }) {
+    const commandStack = useService('commandStack');
+    const translate = useService('translate');
+
+    const getValue = () => selection.externalValue || false;
+    const setValue = value => commandStack.execute('element.updateModdleProperties', {
+      element,
+      moddleElement: selection,
+      properties: { externalValue: value, value: value ? undefined : selection.value }
+    });
+
+    return html`<${CheckboxEntry}
+      id=${id}
+      element=${selection}
+      getValue=${getValue}
+      setValue=${setValue}
+      label=${translate('External Value')}
+    />`;
   }
 
   function DsWriteValue({ id, element, selection }) {

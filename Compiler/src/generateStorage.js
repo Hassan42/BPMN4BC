@@ -17,35 +17,55 @@ function generateDataStoreStructs(process, lane) {
 
     // All DataStores in a lane share the same variables — use the first one only
     const ds = allDataStores[0];
-    const vars = extractDataStoreVariables(ds);
-    if (vars.length === 0) return { dataStoreStructs: '', dataStoreInitCode: '', dataStoreReadFunctions: '' };
+    const allVars = extractDataStoreVariables(ds);
+    if (allVars.length === 0) return { dataStoreStructs: '', dataStoreInitCode: '', dataStoreReadFunctions: '' };
+
+    // Split into regular vars (go into struct) and mapping vars (top-level state variables)
+    const regularVars = allVars.filter(v => (v.type || 'uint') !== 'mapping');
+    const mappingVars = allVars.filter(v => (v.type || 'uint') === 'mapping');
 
     // Fixed struct name: "DataStore" / "dataStore" — one per lane contract
     const structName = 'DataStore';
     const instanceName = 'dataStore';
 
-    const fields = vars.map(v => `${v.type || 'uint'} ${v.name};`).join('\n        ');
-    const dataStoreStructs = `
+    let dataStoreStructs = '';
+    let dataStoreReadFunctions = '';
+    const initLines = [];
+
+    // Generate struct only if there are regular (non-mapping) variables
+    if (regularVars.length > 0) {
+        const fields = regularVars.map(v => `${v.type || 'uint'} ${v.name};`).join('\n        ');
+        dataStoreStructs += `
     struct ${structName} {
         ${fields}
     }
     ${structName} public ${instanceName};
     `;
 
-    const initLines = [];
-    vars.forEach(v => {
-        if (v.value) {
-            const formattedValue = (v.type || 'uint') === 'string' ? `"${v.value}"` : v.value;
-            initLines.push(`${instanceName}.${v.name} = ${formattedValue};`);
-        }
-    });
+        regularVars.forEach(v => {
+            if (v.value) {
+                const formattedValue = (v.type || 'uint') === 'string' ? `"${v.value}"` : v.value;
+                initLines.push(`${instanceName}.${v.name} = ${formattedValue};`);
+            }
+        });
 
-    // Generate public getter functions for each DataStore variable
-    const dataStoreReadFunctions = vars.map(({ type, name }) => `
+        // Generate public getter functions for each regular DataStore variable
+        dataStoreReadFunctions = regularVars.map(({ type, name }) => `
     function get${capitalize(name)}() public view returns (${type}${isValueType(name, type) ? '' : ' memory'}) {
         return ${instanceName}.${name};
     }
     `).join('');
+    }
+
+    // Generate top-level mapping state variables (Solidity auto-generates public getters)
+    if (mappingVars.length > 0) {
+        const mappingDecls = mappingVars.map(v => {
+            const keyType = v.keyType || 'uint';
+            const valueType = v.valueType || 'uint';
+            return `    mapping(${keyType} => ${valueType}) public ${v.name};`;
+        }).join('\n');
+        dataStoreStructs += '\n' + mappingDecls + '\n';
+    }
 
     return {
         dataStoreStructs,

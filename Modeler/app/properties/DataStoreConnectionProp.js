@@ -28,9 +28,19 @@ export default function DataStoreConnectionProps({ element, injector }) {
 
   const items = selections.map((sel, index) => {
     const id = element.id + '-dssel-' + index;
+    const selectedVar = storeVariables.find(v => v.name === sel.varname);
+    const isMapping = selectedVar?.type === 'mapping';
+
+    // Label shows the type (including mapping signature)
+    const label = sel.varname
+      ? (isMapping
+        ? `${sel.varname} : mapping(${selectedVar?.keyType || 'uint'} => ${selectedVar?.valueType || 'uint'})`
+        : `${sel.varname} : ${selectedVar?.type || 'uint'}`)
+      : '(select variable)';
+
     return {
       id,
-      label: sel.varname || '(select variable)',
+      label,
       entries: [
         {
           id: id + '-varname',
@@ -41,6 +51,7 @@ export default function DataStoreConnectionProps({ element, injector }) {
           isRead
         }
       ],
+      autoFocusEntry: id + '-varname',
       remove: removeFactory({ commandStack, element, sel })
     };
   });
@@ -123,17 +134,23 @@ function VarSelectEntry({ id, element, selection, storeVariables, isRead }) {
 
   const getValue = () => selection.varname || '';
   const setValue = value => {
+    // Clear key and value when the variable changes
     commandStack.execute('element.updateModdleProperties', {
       element,
       moddleElement: selection,
-      properties: { varname: value }
+      properties: { varname: value, key: undefined, value: undefined }
     });
   };
 
   const getOptions = () => {
+    // Show all variables including mappings for both read and write
     const opts = storeVariables.map(v => ({
       value: v.name || '',
-      label: v.name ? `${v.name} : ${v.type || 'uint'}` : '(unnamed)'
+      label: v.name
+        ? (v.type === 'mapping'
+          ? `${v.name} : mapping(${v.keyType || 'uint'} => ${v.valueType || 'uint'})`
+          : `${v.name} : ${v.type || 'uint'}`)
+        : '(unnamed)'
     }));
     return [{ value: '', label: translate('-- select variable --') }, ...opts];
   };
