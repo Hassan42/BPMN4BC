@@ -61,8 +61,21 @@ function VariableName({ idPrefix, element, variable }) {
     const commands = [
       { cmd: 'element.updateModdleProperties', context: { element, moddleElement: variable, properties: { name: newName } } }
     ];
-    elementRegistry.getAll().forEach(connEl => {
-      if (connEl.source !== element && connEl.target !== element) return;
+
+    // DataStoreSync keeps all DataStore shapes in the same lane in sync — they all
+    // share the same variable names. Collect every DataStoreReference in the diagram
+    // that currently has a variable called oldName (which covers the edited shape and
+    // all its lane siblings), then update VarSelections on any connection attached to
+    // any of those shapes. (allElements already declared above for the clash check)
+    const dsRefsWithVar = allElements.filter(el => {
+      if (!is(el.businessObject, 'bpmn:DataStoreReference')) return false;
+      const vars = getDataStoreVariables(el) || [];
+      return vars.some(v => v.name === oldName);
+    });
+
+    allElements.forEach(connEl => {
+      const touchesDs = dsRefsWithVar.some(ds => connEl.source === ds || connEl.target === ds);
+      if (!touchesDs) return;
       const selExt = getDataStoreVarSelectionsExtension(connEl);
       if (!selExt) return;
       selExt.get('values').forEach(sel => {
@@ -71,6 +84,7 @@ function VariableName({ idPrefix, element, variable }) {
         }
       });
     });
+
     commandStack.execute('properties-panel.multi-command-executor', commands);
   };
 

@@ -7,9 +7,10 @@ import DataObjectSync from './DataObjectSync';
 import DataStoreSync from './DataStoreSync';
 import GatewayDataSync from './GatewayDataSync';
 import DataNameClashGuard from './DataNameClashGuard';
+import ParticipantSync from './ParticipantSync';
 
 export default {
-  __init__: [ 'customPalette', 'customRenderer', 'customRules', 'contextPadProvider', 'replaceMenuProvider', 'dataObjectSync', 'dataStoreSync', 'gatewayDataSync', 'dataNameClashGuard' ],
+  __init__: [ 'customPalette', 'customRenderer', 'customRules', 'contextPadProvider', 'replaceMenuProvider', 'dataObjectSync', 'dataStoreSync', 'gatewayDataSync', 'dataNameClashGuard', 'participantSync' ],
   customPalette: [ 'type', CustomPalette ],
   customRenderer: [ 'type', CustomRenderer ],
   customRules: [ 'type', CustomRules ],
@@ -18,5 +19,6 @@ export default {
   dataObjectSync: [ 'type', DataObjectSync ],
   dataStoreSync: [ 'type', DataStoreSync ],
   gatewayDataSync: [ 'type', GatewayDataSync ],
-  dataNameClashGuard: [ 'type', DataNameClashGuard ]
+  dataNameClashGuard: [ 'type', DataNameClashGuard ],
+  participantSync: [ 'type', ParticipantSync ]
 };
