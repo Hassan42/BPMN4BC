@@ -382,24 +382,28 @@ export function renderRoleBalances(networks, ethChfRate) {
       sectionContent.appendChild(contractBalanceDiv);
     });
 
-    // Collect unique roles
+    // Collect unique roles — sum escrow across contracts for the same address
     const uniqueRoles = new Map();
     Object.values(contracts).forEach(contract => {
       if (Array.isArray(contract.contractRoles)) {
         contract.contractRoles.forEach(role => {
+          const escrowEth = parseFloat(role.escrow) || 0;
           if (!uniqueRoles.has(role.address)) {
             uniqueRoles.set(role.address, {
               role: role.role,
               address: role.address,
-              balance: role.balance
+              balance: role.balance,
+              escrow: escrowEth
             });
+          } else {
+            uniqueRoles.get(role.address).escrow += escrowEth;
           }
         });
       }
     });
 
     // Render roles
-    uniqueRoles.forEach(({ role, address, balance }) => {
+    uniqueRoles.forEach(({ role, address, balance, escrow }) => {
       const roleCard = document.createElement('div');
       roleCard.className = 'p-3 bg-gray-100 border rounded shadow-sm mb-2';
 
@@ -416,6 +420,15 @@ export function renderRoleBalances(networks, ethChfRate) {
 
       roleCard.appendChild(roleName);
       roleCard.appendChild(roleBalance);
+
+      // Escrow balance row (always shown so users can see 0.0000 escrow too)
+      const escrowBalance = document.createElement('div');
+      escrowBalance.className = 'text-blue-700 font-semibold';
+      const escrowChf = ethChfRate ? escrow * ethChfRate : null;
+      const escrowChfLabel = escrowChf !== null ? `  ≈  ${escrow === 0 ? 'CHF 0.00' : formatCHF(escrowChf)}` : '';
+      escrowBalance.innerText = `Escrow: ${escrow.toFixed(4)} ETH${escrowChfLabel}`;
+      roleCard.appendChild(escrowBalance);
+
       sectionContent.appendChild(roleCard);
     });
 

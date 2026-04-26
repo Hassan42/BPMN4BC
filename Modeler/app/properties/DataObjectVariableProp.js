@@ -5,6 +5,7 @@ import { showErrorToast } from '../util/toast';
 import {
   getDataObjectVariables,
   getDataObjectVariablesExtension,
+  getDataObjectVarSelectionsExtension,
   getSameNameDataObjects
 } from '../util';
 
@@ -33,7 +34,10 @@ function VariableName({ idPrefix, element, variable, index, elementRegistry }) {
       showErrorToast('A variable with this name and type already exists.');
       return;
     }
+    const oldName = variable.name;
     const siblings = getSameNameDataObjects(element, elementRegistry);
+
+    // 1. Rename the variable on this DataObject and all same-name siblings
     const commands = siblings.map(sibling => {
       const ext = getDataObjectVariablesExtension(sibling);
       if (!ext) return null;
@@ -41,6 +45,24 @@ function VariableName({ idPrefix, element, variable, index, elementRegistry }) {
       if (!siblingVar) return null;
       return { cmd: 'element.updateModdleProperties', context: { element: sibling, moddleElement: siblingVar, properties: { name: newName } } };
     }).filter(Boolean);
+
+    // 2. Update DataObjectVarSelection.varname on every DataOutputAssociation that
+    //    targets any sibling DataObject and references the old variable name.
+    //    This keeps the compiled function-parameter names in sync.
+    elementRegistry.getAll().forEach(connEl => {
+      if (!siblings.some(s => connEl.target === s)) return;
+      const selExt = getDataObjectVarSelectionsExtension(connEl);
+      if (!selExt) return;
+      selExt.get('values').forEach(sel => {
+        if (sel.varname === oldName) {
+          commands.push({
+            cmd: 'element.updateModdleProperties',
+            context: { element: connEl, moddleElement: sel, properties: { varname: newName } }
+          });
+        }
+      });
+    });
+
     commandStack.execute('properties-panel.multi-command-executor', commands);
   };
 

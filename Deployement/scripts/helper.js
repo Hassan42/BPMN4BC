@@ -106,7 +106,7 @@ const queryContract = async (contractManager, contractName, contractInstance) =>
         }
     }
 
-    // Update role balances
+    // Update role balances and escrow
     const roles = contractManager.getRolesByContractName(contractName);
 
     for (const role of roles) {
@@ -116,6 +116,15 @@ const queryContract = async (contractManager, contractName, contractInstance) =>
             contractManager.updateRoleBalance(contractName, role.role, balanceEth);
         } catch (err) {
             console.error(`Error fetching balance for role ${role.role}:`, err);
+        }
+
+        try {
+            const escrowWei = await contractInstance.escrowOf(role.address);
+            const escrowEth = ethers.formatEther(escrowWei);
+            contractManager.updateRoleEscrow(contractName, role.role, escrowEth);
+        } catch (err) {
+            // escrowOf may not exist on older contracts — silently ignore
+            console.warn(`Could not fetch escrow for role ${role.role}: ${err.message}`);
         }
     }
     try {

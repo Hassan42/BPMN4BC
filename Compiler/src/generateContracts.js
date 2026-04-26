@@ -142,6 +142,8 @@ async function generateContract(contractParams) {
 
       mapping(string => string[]) public activitytoRole;
 
+      mapping(address => uint) public escrowOf;
+
       ${multiParticipantVars}
 
       modifier isAccessible(string memory _activity) {

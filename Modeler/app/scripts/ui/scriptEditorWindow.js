@@ -42,6 +42,51 @@ const CUSTOM_SCRIPTS = [
     ],
     build: ({ amount }) =>
       `(bool success, ) = payable(address(0)).call{value: ${amount}}("");\nrequire(success, "ETH burn failed");`
+  },
+  {
+    id: 'add-to-escrow',
+    label: 'Add to Escrow',
+    description: 'Register ETH in escrow for a participant address',
+    params: [
+      {
+        id: 'participant',
+        label: 'Participant (address)',
+        placeholder: 'e.g. addressOf["Buyer"]  or  msg.sender'
+      },
+      {
+        id: 'amount',
+        label: 'Amount (wei)',
+        placeholder: 'e.g. msg.value  or  1 ether',
+        helper: 'eth-wei-converter'
+      }
+    ],
+    build: ({ participant, amount }) =>
+      `require(msg.value >= ${amount}, "Insufficient ETH sent for escrow");\nescrowOf[${participant}] += ${amount};`
+  },
+  {
+    id: 'release-escrow',
+    label: 'Release Escrow',
+    description: 'Release escrowed ETH from one address to a recipient',
+    params: [
+      {
+        id: 'from',
+        label: 'From (address)',
+        placeholder: 'e.g. addressOf["Buyer"]  or  msg.sender'
+      },
+      {
+        id: 'to',
+        label: 'To (address)',
+        placeholder: 'e.g. addressOf["Seller"]  or  0xAbCd…'
+      },
+      {
+        id: 'amount',
+        label: 'Amount (wei)',
+        placeholder: 'e.g. escrowOf[from]  or  1 ether',
+        helper: 'eth-wei-converter'
+      }
+    ],
+    build: ({ from, to, amount }) =>
+      `require(escrowOf[${from}] >= ${amount}, "Insufficient escrow balance");\nescrowOf[${from}] -= ${amount};\n(bool success, ) = payable(${to}).call{value: ${amount}}("");\nrequire(success, "escrow release failed");`
   }
 ];
 // ─────────────────────────────────────────────────────────────────────────────

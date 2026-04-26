@@ -274,6 +274,17 @@ const createContractManager = (instanceId) => {
         writeContracts(contracts);
     };
 
+    const updateRoleEscrow = (contractName, roleName, escrow) => {
+        const contracts = readContracts();
+        const contract = contracts.find(c => c.contractName === contractName);
+        if (!contract) throw new Error(`Contract "${contractName}" not found.`);
+        if (!Array.isArray(contract.contractRoles)) throw new Error(`No roles in "${contractName}".`);
+        const role = contract.contractRoles.find(r => r.role === roleName);
+        if (!role) throw new Error(`Role "${roleName}" not found in "${contractName}".`);
+        role.escrow = escrow;
+        writeContracts(contracts);
+    };
+
     const updateContractBalance = (contractName, balance) => {
         const contracts = readContracts();
         const contract = contracts.find(c => c.contractName === contractName);
@@ -324,6 +335,7 @@ const createContractManager = (instanceId) => {
         getNetworkByContractName,
         getRolesByContractName,
         updateRoleBalance,
+        updateRoleEscrow,
         updateContractBalance,
         getTransactions,
         appendTransaction
