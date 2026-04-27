@@ -77,8 +77,9 @@ function renderInstanceList(instances, ethChfRate) {
   });
 }
 
-const urlParams = new URLSearchParams(window.location.search);
+const urlParams  = new URLSearchParams(window.location.search);
 const instanceId = parseInt(urlParams.get('instanceId'));
+const modelId    = urlParams.get('modelId');
 
 const transactionLogPanel = document.getElementById('transactionLogPanel');
 
@@ -115,7 +116,11 @@ if (instanceId) {
   }
   if (backToInstancesBtn) {
     backToInstancesBtn.addEventListener('click', () => {
-      window.location.href = `${getBaseUrl()}/execute-panel.html`;
+      if (modelId) {
+        window.location.href = `${getBaseUrl()}/model-detail.html?modelId=${modelId}`;
+      } else {
+        window.location.href = `${getBaseUrl()}/models.html`;
+      }
     });
   }
 
@@ -132,28 +137,6 @@ if (instanceId) {
     }
   })();
 } else {
-  // Instances list — hide transaction log, tabs and content panel
-  if (transactionLogPanel) transactionLogPanel.classList.add('hidden');
-  const tabsContainer = document.getElementById('tabsContainer');
-  const jsonContainer = document.getElementById('jsonContainer');
-  if (tabsContainer) tabsContainer.classList.add('hidden');
-  if (jsonContainer) jsonContainer.classList.add('hidden');
-  if (backToModelerSection) backToModelerSection.classList.remove('hidden');
-  if (backToModelerBtn) {
-    backToModelerBtn.addEventListener('click', () => {
-      window.location.href = `${getBaseUrl()}/`;
-    });
-  }
-
-  (async () => {
-    try {
-      loadingSpinner.classList.remove('hidden');
-      const [instances, ethChfRate] = await Promise.all([fetchInstances(), getEthChfRate()]);
-      renderInstanceList(instances, ethChfRate);
-    } catch (error) {
-      console.error('Error fetching instances:', error);
-    } finally {
-      loadingSpinner.classList.add('hidden');
-    }
-  })();
+  // No instanceId — redirect to models list
+  window.location.href = `${getBaseUrl()}/models.html`;
 }

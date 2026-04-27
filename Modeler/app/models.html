@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>My Models – BPMN4BC</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="./models.js" defer></script>
+</head>
+
+<body class="bg-gray-100 min-h-screen">
+
+  <div class="max-w-6xl mx-auto p-6">
+
+    <!-- Header -->
+    <div class="flex items-center justify-between mb-6">
+      <h1 class="text-2xl font-bold text-gray-800">My Models</h1>
+      <a id="back-to-modeler-link" href="#" class="px-4 py-2 text-sm rounded border border-gray-300 bg-white hover:bg-blue-50">
+        ← Back to Modeler
+      </a>
+    </div>
+
+    <!-- Loading spinner -->
+    <div id="loading-spinner" class="flex justify-center items-center py-16 hidden">
+      <svg class="animate-spin h-8 w-8 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none"
+        viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+      </svg>
+    </div>
+
+    <!-- Empty state -->
+    <div id="empty-state" class="hidden text-center py-16 text-gray-500">
+      <p class="text-lg font-medium mb-2">No models saved yet.</p>
+      <p class="text-sm">Go back to the modeler and click <strong>Save Model</strong> to save your first process.</p>
+    </div>
+
+    <!-- Models grid -->
+    <div id="models-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+
+  </div>
+
+  <!-- Delete confirm modal -->
+  <div id="delete-modal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 hidden">
+    <div class="bg-white p-6 rounded-lg shadow-lg w-80">
+      <h2 class="text-lg font-bold mb-2 text-red-600">Delete Model</h2>
+      <p id="delete-modal-text" class="text-sm text-gray-600 mb-4"></p>
+      <div class="flex justify-end gap-2">
+        <button id="delete-modal-cancel"
+          class="px-4 py-2 text-sm rounded border border-gray-300 hover:bg-gray-100">Cancel</button>
+        <button id="delete-modal-confirm"
+          class="px-4 py-2 text-sm rounded bg-red-500 text-white hover:bg-red-600">Delete</button>
+      </div>
+    </div>
+  </div>
+
+</body>
+
+</html>

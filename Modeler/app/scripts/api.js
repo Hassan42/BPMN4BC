@@ -18,6 +18,45 @@ function getBaseUrl() {
   return origin;
 }
 
+export async function validateModel(xml) {
+  const response = await fetch(`${getBaseUrl()}/api/validate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ xml })
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || data.message || 'Validation failed');
+  return data;
+}
+
+export async function saveModel({ name, bpmn, svg }) {
+  const response = await fetch(`${getBaseUrl()}/api/models`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, bpmn, svg })
+  });
+  if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+  return await response.json();
+}
+
+export async function fetchModels() {
+  const response = await fetch(`${getBaseUrl()}/api/models`);
+  if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+  return await response.json();
+}
+
+export async function fetchModel(id) {
+  const response = await fetch(`${getBaseUrl()}/api/models/${id}`);
+  if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+  return await response.json();
+}
+
+export async function deleteModel(id) {
+  const response = await fetch(`${getBaseUrl()}/api/models/${id}`, { method: 'DELETE' });
+  if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+  return await response.json();
+}
+
 export async function fetchInstances() {
   const response = await fetch(`${getBaseUrl()}/api/instances`);
   if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);

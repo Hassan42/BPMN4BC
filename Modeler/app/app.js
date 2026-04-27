@@ -280,10 +280,10 @@ function toggleLockButton(isDisabled, isLoading = false) {
   // Show loading animation
   if (isLoading) {
     compileDeployButton.html(`
-      <span class="spinner-border animate-spin inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full"></span> Deploying...
+      <span class="spinner-border animate-spin inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full"></span> Saving...
     `);
   } else {
-    compileDeployButton.html(`Deploy Process`);
+    compileDeployButton.html(`Save Model`);
   }
 }
 
@@ -294,17 +294,43 @@ eventBus.on('element.changed', (event) => {
 });
 
 
-// Try to load from localStorage, fallback to default BPMN file
-const savedXML = localStorage.getItem('autosave_bpmn');
-if (savedXML) {
-  bpmnModeler.importXML(savedXML).catch((err) => {
-    console.error('Error loading saved XML from localStorage:', err);
-  });
-} else {
-  bpmnModeler.importXML(diagramXML).catch((err) => {
-    console.error('Error loading default diagram XML:', err);
-  });
-}
+// Load diagram: ?modelId= (edit from library) → localStorage autosave → default blank diagram
+(async () => {
+  const urlParams  = new URLSearchParams(window.location.search);
+  const editModelId = urlParams.get('modelId');
+
+  if (editModelId) {
+    // Strip the param from the URL immediately so autosave works normally afterwards
+    const cleanUrl = window.location.pathname;
+    window.history.replaceState({}, '', cleanUrl);
+
+    try {
+      const baseUrl = `${window.location.origin}${window.location.pathname.replace(/\/$/, '')}`;
+      const res  = await fetch(`${baseUrl}/api/models/${editModelId}`);
+      if (!res.ok) throw new Error(`Model not found (${res.status})`);
+      const model = await res.json();
+      await bpmnModeler.importXML(model.bpmn);
+    } catch (err) {
+      console.error('Error loading model for editing:', err);
+      // Fall back to autosave or default
+      const savedXML = localStorage.getItem('autosave_bpmn');
+      await bpmnModeler.importXML(savedXML || diagramXML).catch(() => {});
+    }
+    return;
+  }
+
+  // No modelId — use autosave or default blank diagram
+  const savedXML = localStorage.getItem('autosave_bpmn');
+  if (savedXML) {
+    bpmnModeler.importXML(savedXML).catch((err) => {
+      console.error('Error loading saved XML from localStorage:', err);
+    });
+  } else {
+    bpmnModeler.importXML(diagramXML).catch((err) => {
+      console.error('Error loading default diagram XML:', err);
+    });
+  }
+})()
 
 $(function () {
 
@@ -442,7 +468,7 @@ $(function () {
 
     const intro = document.createElement('p');
     intro.style.cssText = 'font-size:13px; color:#555; margin-bottom:10px;';
-    intro.textContent = 'Fix the following syntax errors before deploying:';
+    intro.textContent = 'Fix the following syntax errors before saving:';
     body.appendChild(intro);
 
     errors.forEach(e => {
@@ -453,7 +479,6 @@ $(function () {
         padding:8px 10px; margin-bottom:6px;
       `;
       item.innerHTML = `
-        <span style="color:#dc2626; font-size:15px; line-height:1.4;">⚠</span>
         <div>
           <div style="font-size:13px; font-weight:600; color:#222;">${e.element}</div>
           <div style="font-size:11px; font-family:Consolas,'Courier New',monospace; color:#dc2626; margin-top:2px;">
@@ -528,6 +553,13 @@ $(function () {
 
     const body = document.getElementById('deploy-error-body');
     body.innerHTML = '';
+
+    const intro = document.createElement('p');
+    intro.style.cssText = 'font-size:13px; color:#555; margin-bottom:10px;';
+    intro.textContent = 'Fix the following errors before saving:';
+    body.appendChild(intro);
+
+
     const pre = document.createElement('pre');
     pre.className = 'bg-gray-50 border border-gray-200 rounded text-xs text-gray-800 font-mono p-3 whitespace-pre-wrap break-words leading-relaxed';
     pre.textContent = displayText;
@@ -558,8 +590,8 @@ $(function () {
   });
 
   $('#deploy-modal-confirm').click(async function () {
-    const instanceName = $('#deploy-instance-name').val().trim();
-    if (!instanceName) {
+    const modelName = $('#deploy-instance-name').val().trim();
+    if (!modelName) {
       $('#deploy-instance-name').focus();
       return;
     }
@@ -579,88 +611,62 @@ $(function () {
       // Get BPMN XML
       const { xml } = await bpmnModeler.saveXML({ format: true });
 
-      const baseUrl = `${window.location.origin}${window.location.pathname.replace(/\/$/, '')}`;
-      const compileUrl = `${baseUrl}/api/compile`;
-      const deployUrl = `${baseUrl}/api/deploy`;
+      const baseUrl     = `${window.location.origin}${window.location.pathname.replace(/\/$/, '')}`;
+      const validateUrl = `${baseUrl}/api/validate`;
+      const modelsUrl   = `${baseUrl}/api/models`;
 
-      // Step 1: Compile
-      console.log('Compiling BPMN diagram...');
-      const compileResponse = await fetch(compileUrl, {
+      // Step 1: Validate (BPMN compiler + Hardhat compile — no deployment)
+      console.log('Validating BPMN diagram...');
+      const validateResponse = await fetch(validateUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ xml })
       });
-      let compileData;
-      try {
-        compileData = await compileResponse.json();
-      } catch (jsonError) {
-        compileData = { error: 'Invalid response from server' };
-      }
+      let validateData;
+      try { validateData = await validateResponse.json(); }
+      catch (_) { validateData = { error: 'Invalid response from server' }; }
 
-      if (!compileResponse.ok) {
-        console.error('Compilation error response:', compileData);
-        showDeployError('Compilation Failed', compileData.error || 'Unknown error');
+      if (!validateResponse.ok) {
+        showDeployError('Validation Failed', validateData.error || validateData.message || 'Unknown error');
         toggleLockButton(false);
         return;
       }
 
-      console.log('Compilation successful! Proceeding to deployment...');
+      console.log('Validation successful! Saving model...');
 
-      // Step 2: Deploy (include instance name)
-      const deployResponse = await fetch(deployUrl, {
+      // Step 2: Export SVG for preview
+      let svg = '';
+      try { ({ svg } = await bpmnModeler.saveSVG()); } catch (_) {}
+
+      // Step 3: Save model
+      const saveResponse = await fetch(modelsUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ xml, name: instanceName })
+        body: JSON.stringify({ name: modelName, bpmn: xml, svg })
       });
+      let saveData;
+      try { saveData = await saveResponse.json(); }
+      catch (_) { saveData = { error: 'Invalid response from server' }; }
 
-      let deployData;
-      try {
-        deployData = await deployResponse.json();
-      } catch (jsonError) {
-        deployData = { error: 'Invalid response from server' };
-      }
-
-      if (!deployResponse.ok) {
-        console.error('Deployment error response:', deployData);
-        showDeployError('Deployment Failed', deployData.error || 'Unknown error');
+      if (!saveResponse.ok) {
+        showDeployError('Save Failed', saveData.error || saveData.message || 'Unknown error');
         toggleLockButton(false);
         return;
       }
 
-      // Show success modal with deployment cost
-      const instanceId = deployData.instanceId;
-      const instance   = deployData.instance || {};
-      const totalGas   = (instance.contracts || [])
-        .reduce((sum, c) => sum + (Number(c.deployGas) || 0), 0);
-
-      let ethChfRate = null;
-      try { ethChfRate = await getEthChfRate(); } catch (_) {}
-
-      const chfCost  = ethChfRate && totalGas ? gasToCHF(totalGas, ethChfRate) : null;
-
-      document.getElementById('deploy-success-name').textContent = instance.name || `Instance #${instanceId}`;
-      document.getElementById('deploy-success-gas').textContent  =
-        totalGas > 0 ? totalGas.toLocaleString() + ' gas' : '—';
-      document.getElementById('deploy-success-chf').textContent  =
-        chfCost !== null ? formatCHF(chfCost) : '—';
-
-      const goBtn = document.getElementById('deploy-success-go');
-      goBtn.onclick = () => {
-        document.getElementById('deploy-success-modal').classList.add('hidden');
-        window.open(`${baseUrl}/execute-panel.html?instanceId=${instanceId}`, '_blank');
-      };
-
-      document.getElementById('deploy-success-continue').onclick = () => {
-        document.getElementById('deploy-success-modal').classList.add('hidden');
-      };
-
-      document.getElementById('deploy-success-modal').classList.remove('hidden');
-      toggleLockButton(false);
+      // Navigate to models list
+      window.location.href = `${baseUrl}/models.html`;
     } catch (err) {
       console.error('Unexpected error:', err);
       showDeployError('Unexpected Error', err.message || 'Unknown error');
       toggleLockButton(false);
     }
+  });
+
+  $('#js-my-models').click(function (e) {
+    e.preventDefault();
+    const baseUrl = `${window.location.origin}${window.location.pathname.replace(/\/$/, '')}`;
+    window.location.href = `${baseUrl}/models.html`;
   });
 
   $('#js-execute-panel').click(function (e) {

@@ -10,7 +10,7 @@ const app = express();
 const port = 8000;
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
 
 app.post('/compile', async (req, res) => {
   const { xml, instanceId } = req.body;

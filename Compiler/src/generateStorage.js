@@ -9,9 +9,9 @@ const { extractOutputParameters, capitalize, isValueType, findDataStoreReference
  * @returns {{ dataStoreStructs: string, dataStoreInitCode: string, dataStoreReadFunctions: string }}
  */
 function generateDataStoreStructs(process, lane) {
-    const allDataStores = lane
-        ? findDataStoreReferencesForLane(lane)
-        : findDataStoreReferencesForProcess(process);
+    // DataStoreReferences are process-level elements — lane.flowNodeRef never contains them.
+    // Always search the process; DataStoreSync ensures all lanes share the same variables.
+    const allDataStores = findDataStoreReferencesForProcess(process);
 
     if (allDataStores.length === 0) return { dataStoreStructs: '', dataStoreInitCode: '', dataStoreReadFunctions: '' };
 

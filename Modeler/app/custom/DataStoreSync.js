@@ -70,7 +70,9 @@ export default function DataStoreSync(eventBus, commandStack, elementRegistry, b
 
     const newVars = sourceVars.map(v => {
       const props = { name: v.name, type: v.type || 'uint' };
-      if (v.value !== undefined && v.value !== '') props.value = v.value;
+      if (v.value     !== undefined && v.value     !== '') props.value     = v.value;
+      if (v.keyType   !== undefined && v.keyType   !== '') props.keyType   = v.keyType;
+      if (v.valueType !== undefined && v.valueType !== '') props.valueType = v.valueType;
       return createElement('bpmnbc:DataStoreVariable', props, null, bpmnFactory);
     });
 

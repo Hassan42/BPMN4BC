@@ -11,8 +11,9 @@ function getBaseUrl() {
   return origin;
 }
 
-const urlParams = new URLSearchParams(window.location.search);
+const urlParams  = new URLSearchParams(window.location.search);
 const instanceId = parseInt(urlParams.get('instanceId'));
+const modelId    = urlParams.get('modelId');
 
 const viewer = new NavigatedViewer({
   container: '#canvas',
@@ -80,11 +81,18 @@ function getTransactionElements(startElement) {
   return result;
 }
 
+// State → hex color mapping (mirrors execution panel badge colors)
+const STATE_COLORS = {
+  Open:      '#22c55e',  // green-500
+  Completed: '#3b82f6',  // blue-500
+  Closed:    '#eab308',  // yellow-500
+};
+
 /**
- * Apply a green fill / stroke to a single diagram element's SVG graphics.
+ * Apply a colored stroke to a single diagram element's SVG graphics.
  * Uses data-element-id DOM lookup — more reliable than canvas.getGraphics.
  */
-function colorElement(element) {
+function colorElement(element, color) {
   const gfx = document.querySelector(`[data-element-id="${CSS.escape(element.id)}"]`);
   if (!gfx) return;
 
@@ -92,7 +100,7 @@ function colorElement(element) {
   const visual = gfx.querySelector('.djs-visual');
   if (!visual) return;
   visual.querySelectorAll('rect, circle, polygon, ellipse, path').forEach(el => {
-    el.style.stroke      = '#82ca2f';
+    el.style.stroke      = color;
     el.style.strokeWidth = '3px';
   });
 }
@@ -115,29 +123,49 @@ function clearHighlights() {
 }
 
 /**
- * Read state data and highlight all completed transaction boundaries.
+ * Read state data and highlight tasks by state:
+ *   Open      → green  (task shape only — it's the active step)
+ *   Completed → blue   (task + full transaction boundary)
+ *   Closed    → yellow (task shape only)
  */
 function applyStateHighlights(stateResult) {
   const elementRegistry = viewer.get('elementRegistry');
 
   clearHighlights();
 
-  // Collect IDs of all completed ReceiveTasks across all networks/contracts
-  const completedIds = new Set();
+  // Bucket task IDs by state
+  const byState = { Open: new Set(), Completed: new Set(), Closed: new Set() };
   Object.values(stateResult || {}).forEach(network => {
     Object.values(network || {}).forEach(contract => {
       (contract.receiveTasks || []).forEach(task => {
-        if (task.state === 'Completed') completedIds.add(task.id);
+        if (byState[task.state]) byState[task.state].add(task.id);
       });
     });
   });
 
-  completedIds.forEach(taskId => {
+  // Completed — highlight the entire transaction boundary in blue
+  byState.Completed.forEach(taskId => {
     const element = elementRegistry.get(taskId);
     if (!element) return;
     const toColor = getTransactionElements(element).filter(shouldColor);
-    toColor.forEach(el => colorElement(el));
+    toColor.forEach(el => colorElement(el, STATE_COLORS.Completed));
     highlightedElements.push(...toColor);
+  });
+
+  // Open — highlight just the task shape in green
+  byState.Open.forEach(taskId => {
+    const element = elementRegistry.get(taskId);
+    if (!element || !shouldColor(element)) return;
+    colorElement(element, STATE_COLORS.Open);
+    highlightedElements.push(element);
+  });
+
+  // Closed — highlight just the task shape in yellow
+  byState.Closed.forEach(taskId => {
+    const element = elementRegistry.get(taskId);
+    if (!element || !shouldColor(element)) return;
+    colorElement(element, STATE_COLORS.Closed);
+    highlightedElements.push(element);
   });
 }
 
@@ -153,8 +181,31 @@ stateChannel.addEventListener('message', (event) => {
 // ── Load diagram ───────────────────────────────────────────────────────────
 
 async function loadDiagram() {
+  // ── Model preview mode (no state highlighting) ─────────────────────────────
+  if (modelId) {
+    try {
+      const modelRes = await fetch(`${getBaseUrl()}/api/models/${modelId}`);
+      if (!modelRes.ok) throw new Error(`Model not found (${modelRes.status})`);
+      const model = await modelRes.json();
+
+      const labelEl = document.getElementById('instance-label');
+      if (labelEl) labelEl.textContent = model.name || `Model #${modelId}`;
+      document.title = `${model.name || `Model #${modelId}`} – BPMN Viewer`;
+
+      await viewer.importXML(model.bpmn);
+      viewer.get('canvas').zoom('fit-viewport');
+    } catch (err) {
+      console.error('Failed to load model diagram:', err);
+      const labelEl = document.getElementById('instance-label');
+      if (labelEl) labelEl.textContent = `Error: ${err.message}`;
+    }
+    return;
+  }
+
+  // ── Instance mode (with state highlighting) ────────────────────────────────
   if (!instanceId) {
-    document.getElementById('instance-label').textContent = 'No instance specified.';
+    const labelEl = document.getElementById('instance-label');
+    if (labelEl) labelEl.textContent = 'No instance or model specified.';
     return;
   }
 
@@ -195,11 +246,13 @@ document.getElementById('js-download-diagram').addEventListener('click', async (
   e.preventDefault();
   try {
     const { xml } = await viewer.saveXML({ format: true });
-    const blob = new Blob([xml], { type: 'application/bpmn20-xml;charset=UTF-8' });
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a');
-    a.href     = url;
-    a.download = `instance-${instanceId}.bpmn`;
+    const blob     = new Blob([xml], { type: 'application/bpmn20-xml;charset=UTF-8' });
+    const url      = URL.createObjectURL(blob);
+    const a        = document.createElement('a');
+    a.href         = url;
+    a.download     = modelId
+      ? `model-${modelId}.bpmn`
+      : `instance-${instanceId}.bpmn`;
     a.click();
     URL.revokeObjectURL(url);
   } catch (err) {

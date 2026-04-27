@@ -31,9 +31,9 @@ function createTaskCard(network, contractName, task, instanceId, overrideSender)
 
   const card = document.createElement('div');
   card.className = `p-4 my-3 rounded border ${
-    isOpen      ? 'border-green-400 bg-green-50' :
-    isCompleted ? 'border-gray-200 bg-gray-50 opacity-60' :
-                  'border-gray-200 bg-white'
+    isOpen      ? 'border-green-400  bg-green-50'              :
+    isCompleted ? 'border-blue-300   bg-blue-50   opacity-70'  :
+                  'border-yellow-300 bg-yellow-50 opacity-80'
   }`;
 
   // Header: task name + state badge
@@ -99,6 +99,12 @@ function createTaskCard(network, contractName, task, instanceId, overrideSender)
       const label = document.createElement('label');
       label.className = 'block text-sm font-semibold text-gray-600 mb-1';
       label.textContent = `${param.name} (${param.type})`;
+      if (param.mappingSignature) {
+        const hint = document.createElement('span');
+        hint.className = 'block text-xs text-gray-400 font-normal mt-0.5';
+        hint.textContent = param.mappingSignature;
+        label.appendChild(hint);
+      }
 
       const input = document.createElement('input');
       input.type = 'text';
@@ -203,12 +209,17 @@ function createReceiveTaskSection(network, contractName, tasks, instanceId) {
   const sectionDiv = document.createElement('div');
 
   tasks.forEach(task => {
-    const isCompleted = task.state === "Completed";
-    const displayName = task.name && task.name.trim() !== '' ? task.name : task.id;  // Use name or fallback to id
+    const isOpen      = task.state === 'Open';
+    const isCompleted = task.state === 'Completed';
+    const isClosed    = task.state === 'Closed';
+    const displayName = task.name && task.name.trim() !== '' ? task.name : task.id;
 
     const taskDiv = document.createElement('div');
-    taskDiv.className = `p-4 my-2 rounded border ${isCompleted ? 'bg-green-200 border-green-400' : 'bg-gray-100 border-gray-300'
-      }`;
+    taskDiv.className = `p-4 my-2 rounded border ${
+      isOpen      ? 'bg-green-50  border-green-400'  :
+      isCompleted ? 'bg-blue-50   border-blue-300'   :
+                    'bg-yellow-50 border-yellow-300'
+    }`;
 
     const taskHeader = document.createElement('button');
     taskHeader.className = 'w-full text-left font-semibold bg-gray-300 p-2 rounded';
@@ -220,8 +231,11 @@ function createReceiveTaskSection(network, contractName, tasks, instanceId) {
 
     // Show Task State
     const stateDiv = document.createElement('div');
-    stateDiv.className = `font-semibold ${isCompleted ? 'text-green-700' : 'text-gray-700'
-      } mb-2`;
+    stateDiv.className = `font-semibold ${
+      isOpen      ? 'text-green-700'  :
+      isCompleted ? 'text-blue-600'   :
+                    'text-yellow-600'
+    } mb-2`;
     stateDiv.innerText = `State: ${task.state}`;
     taskContent.appendChild(stateDiv);
 

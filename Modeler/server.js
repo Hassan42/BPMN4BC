@@ -22,7 +22,7 @@ app.use((req, res, next) => {
 
 // Middleware
 app.use(cors()); // Allow cross-origin requests (optional)
-app.use(express.json()); // Parse JSON request bodies
+app.use(express.json({ limit: '50mb' })); // Parse JSON request bodies
 app.use(express.static(path.join(__dirname, 'public')));
 
 // **Helper function to handle API requests safely**
@@ -106,7 +106,7 @@ app.post('/api/executeTask', async (req, res) => {
 // **Relay POST request to deploy BPMN diagram as a new instance**
 app.post('/api/deploy', async (req, res) => {
   try {
-    const { xml, name } = req.body;
+    const { xml, name, modelId } = req.body;
 
     if (!xml) {
       return res.status(400).json({ error: 'Missing XML in request body' });
@@ -129,7 +129,7 @@ app.post('/api/deploy', async (req, res) => {
     const data = await safeFetch(`${DEP_API_BASE_URL}/deploy_instance`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ xml, name })
+      body: JSON.stringify({ xml, name, modelId: modelId || null })
     });
 
     res.json(data);
@@ -137,6 +137,62 @@ app.post('/api/deploy', async (req, res) => {
   } catch (error) {
     console.error('Deployment error:', error);
     res.status(500).json({ error: `${error.message}` });
+  }
+});
+
+// **Relay POST request to validate BPMN (compile + Hardhat compile, no deploy)**
+app.post('/api/validate', async (req, res) => {
+  try {
+    const response = await fetch(`${DEP_API_BASE_URL}/validate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req.body)
+    });
+    const data = await response.json();
+    res.status(response.status).json(data);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// **Model CRUD relay routes**
+app.post('/api/models', async (req, res) => {
+  try {
+    const data = await safeFetch(`${DEP_API_BASE_URL}/models`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req.body)
+    });
+    res.json(data);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/models', async (req, res) => {
+  try {
+    const data = await safeFetch(`${DEP_API_BASE_URL}/models`);
+    res.json(data);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/models/:id', async (req, res) => {
+  try {
+    const data = await safeFetch(`${DEP_API_BASE_URL}/models/${req.params.id}`);
+    res.json(data);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/api/models/:id', async (req, res) => {
+  try {
+    const data = await safeFetch(`${DEP_API_BASE_URL}/models/${req.params.id}`, { method: 'DELETE' });
+    res.json(data);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 });
 // **Relay POST request to compile BPMN diagram**

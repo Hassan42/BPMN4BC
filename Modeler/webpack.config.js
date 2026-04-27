@@ -5,7 +5,9 @@ module.exports = {
   entry: {
     app: './app/app.js',
     'execution-panel': './app/scripts/execution-panel.js',
-    'diagram-viewer': './app/scripts/diagram-viewer.js'
+    'diagram-viewer': './app/scripts/diagram-viewer.js',
+    'models': './app/scripts/models.js',
+    'model-detail': './app/scripts/model-detail.js'
   },
   output: {
     path: path.resolve(__dirname, 'public'),

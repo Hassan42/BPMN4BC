@@ -21,8 +21,7 @@ const COM_API_BASE_URL = process.env.COM_API_BASE_URL || 'http://localhost:8000'
 
 const docker = new Docker(); // Initialize Docker client
 
-app.use(express.json());
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
 
 // Start Ganache containers
 app.post('/start', async (req, res) => {
@@ -266,6 +265,14 @@ app.post('/executeAll', async (req, res) => {
 // ── Instance helpers ────────────────────────────────────────────────────────
 
 const instancesPath = path.join(__dirname, 'instances.json');
+const modelsPath    = path.join(__dirname, 'models.json');
+
+const readModels = () => {
+  if (!fs.existsSync(modelsPath)) fs.writeFileSync(modelsPath, '[]', 'utf8');
+  return JSON.parse(fs.readFileSync(modelsPath, 'utf8'));
+};
+const writeModels   = (models) => fs.writeFileSync(modelsPath, JSON.stringify(models, null, 2), 'utf8');
+const nextModelId   = (models) => models.length === 0 ? 1 : Math.max(...models.map(m => m.id)) + 1;
 
 const readInstances = () => {
   if (!fs.existsSync(instancesPath)) {
@@ -285,8 +292,83 @@ const nextInstanceId = (instances) => {
 
 // ── POST /deploy_instance ────────────────────────────────────────────────────
 
+// ── Model CRUD ────────────────────────────────────────────────────────────────
+
+app.post('/models', (req, res) => {
+  const { name, bpmn, svg } = req.body;
+  if (!name || !bpmn) return res.status(400).json({ message: 'name and bpmn are required.' });
+  const models = readModels();
+  const model  = { id: nextModelId(models), name, createdAt: new Date().toISOString(), bpmn, svg: svg || '' };
+  models.push(model);
+  writeModels(models);
+  res.status(200).json({ modelId: model.id, model });
+});
+
+app.get('/models', (req, res) => {
+  // Return list without bpmn to keep payload small; svg kept for previews
+  const models = readModels().map(({ bpmn, ...rest }) => rest);
+  res.status(200).json(models);
+});
+
+app.get('/models/:id', (req, res) => {
+  const model = readModels().find(m => m.id === parseInt(req.params.id));
+  if (!model) return res.status(404).json({ message: 'Model not found.' });
+  res.status(200).json(model);
+});
+
+app.delete('/models/:id', (req, res) => {
+  const models = readModels();
+  const idx    = models.findIndex(m => m.id === parseInt(req.params.id));
+  if (idx === -1) return res.status(404).json({ message: 'Model not found.' });
+  models.splice(idx, 1);
+  writeModels(models);
+  res.status(200).json({ message: `Model ${req.params.id} deleted.` });
+});
+
+// ── Validate (compile BPMN → Solidity + Hardhat compile, no deploy) ──────────
+
+app.post('/validate', async (req, res) => {
+  const { xml } = req.body;
+  if (!xml) return res.status(400).json({ message: 'Missing xml.' });
+  const tempFiles = [];
+  try {
+    // Stage 1: BPMN → Solidity
+    const compileRes = await axios.post(`${COM_API_BASE_URL}/compile`, { xml, instanceId: 0 });
+    const contracts  = compileRes.data;
+
+    // Stage 2: write temp .sol files
+    await fs.ensureDir(contractsDir);
+    contracts.forEach(c => {
+      const p  = path.join(contractsDir, `${c.contractName}.sol`);
+      const pi = path.join(contractsDir, `I${c.contractName}.sol`);
+      fs.writeFileSync(p,  c.contractCode,      'utf8');
+      fs.writeFileSync(pi, c.contractInterface, 'utf8');
+      tempFiles.push(p, pi);
+    });
+
+    // Stage 3: Hardhat compile only
+    const networks = [...new Set(contracts.map(c => c.networkId))];
+    for (const network of networks) {
+      await executeHardhatTask('compile', network);
+    }
+
+    res.status(200).json({ message: 'Validation successful.' });
+  } catch (err) {
+    // Compiler sends plain-text via res.send(), so err.response.data is already the string
+    const responseData = err.response?.data;
+    const errorMsg = (typeof responseData === 'string' && responseData)
+      ? responseData
+      : (responseData?.error || responseData?.message || err.message || String(err));
+    res.status(400).json({ message: 'Validation failed.', error: errorMsg });
+  } finally {
+    tempFiles.forEach(f => { try { fs.removeSync(f); } catch (_) {} });
+  }
+});
+
+// ── Deploy instance ───────────────────────────────────────────────────────────
+
 app.post('/deploy_instance', async (req, res) => {
-  const { xml, name } = req.body;
+  const { xml, name, modelId } = req.body;
 
   if (!xml) {
     return res.status(400).json({ message: 'Missing xml in request body.' });
@@ -316,6 +398,7 @@ app.post('/deploy_instance', async (req, res) => {
     // contractsManager reads from here during deploy/setup tasks
     const instance = {
       id: instanceId,
+      modelId: modelId || null,
       name: name || `Instance #${instanceId}`,
       createdAt: new Date().toISOString(),
       bpmn: xml,

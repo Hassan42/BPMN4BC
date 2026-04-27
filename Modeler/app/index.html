@@ -41,15 +41,21 @@
     <li>
       <a id="js-compile-deploy" href="#"
         class="px-4 py-2 text-sm rounded border border-gray-300 bg-white hover:bg-blue-50 cursor-pointer">
-        Deploy Process
+        Save Model
       </a>
     </li>
     <li>
+      <a id="js-my-models" href="#"
+        class="px-4 py-2 text-sm rounded border border-gray-300 bg-white hover:bg-blue-50 cursor-pointer">
+        My Models
+      </a>
+    </li>
+    <!-- <li>
       <a id="js-execute-panel" href="#"
         class="px-4 py-2 text-sm rounded border border-gray-300 bg-white hover:bg-blue-50 cursor-pointer">
         Workflow Panel
       </a>
-    </li>
+    </li> -->
     <li>
       <a id="js-open-floating-window" href="#"
         class="px-4 py-2 text-sm rounded border border-gray-300 bg-white hover:bg-blue-50 cursor-pointer">
@@ -71,18 +77,18 @@
     Reloading the page will erase the process diagram. Download the diagram to save your work.
   </div> -->
 
-  <!-- Deploy Name Modal -->
+  <!-- Save Model Modal -->
   <div id="deploy-modal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 hidden">
     <div class="bg-white p-6 rounded-lg shadow-lg w-80">
-      <h2 class="text-lg font-bold mb-3">Deploy Process</h2>
-      <label class="block text-sm text-gray-600 mb-1">Instance Name</label>
-      <input id="deploy-instance-name" type="text" placeholder="e.g. Assignment 1"
+      <h2 class="text-lg font-bold mb-3">Save Model</h2>
+      <label class="block text-sm text-gray-600 mb-1">Model Name</label>
+      <input id="deploy-instance-name" type="text" placeholder="e.g. Loan Process"
         class="w-full border border-gray-300 rounded px-3 py-2 text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-blue-400" />
       <div class="flex justify-end gap-2">
         <button id="deploy-modal-cancel"
           class="px-4 py-2 text-sm rounded border border-gray-300 hover:bg-gray-100">Cancel</button>
         <button id="deploy-modal-confirm"
-          class="px-4 py-2 text-sm rounded bg-blue-500 text-white hover:bg-blue-600">Deploy</button>
+          class="px-4 py-2 text-sm rounded bg-blue-500 text-white hover:bg-blue-600">Save</button>
       </div>
     </div>
   </div>

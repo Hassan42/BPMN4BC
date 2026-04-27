@@ -400,11 +400,9 @@ const generateContractConfig = ({
 
     const receiveTasks = activities.filter(activity => activity.$type === 'bpmn:ReceiveTask');
 
-    // Build dataStore array: non-mapping variables from the lane's (or process's) DataStore
-    // (mapping variables are top-level public state vars — excluded from the struct array)
-    const dataStoreRefs = lane
-        ? findDataStoreReferencesForLane(lane)
-        : findDataStoreReferencesForProcess(process);
+    // DataStoreReferences are process-level elements — lane.flowNodeRef never contains them.
+    // Always search the process; DataStoreSync ensures all lanes share the same variables.
+    const dataStoreRefs = findDataStoreReferencesForProcess(process);
     const dataStore = dataStoreRefs.length > 0
         ? extractDataStoreVariables(dataStoreRefs[0])
             .filter(v => (v.type || 'uint') !== 'mapping')
@@ -432,16 +430,21 @@ const generateContractConfig = ({
 
                     if (varType === 'mapping') {
                         // Mapping: key and/or value can be external params independently
+                        const kType = dsVar ? (dsVar.keyType   || 'uint') : 'uint';
+                        const vType = dsVar ? (dsVar.valueType || 'uint') : 'uint';
+                        const mappingSignature = `${sel.varname}: mapping(${kType} => ${vType})`;
                         if (sel.externalKey) {
                             externalParams.push({
                                 name: `${sel.varname}Key`,
-                                type: dsVar ? (dsVar.keyType || 'uint') : 'uint'
+                                type: kType,
+                                mappingSignature
                             });
                         }
                         if (sel.externalValue) {
                             externalParams.push({
                                 name: `${sel.varname}Value`,
-                                type: dsVar ? (dsVar.valueType || 'uint') : 'uint'
+                                type: vType,
+                                mappingSignature
                             });
                         }
                     } else {
