@@ -63,6 +63,27 @@ const eventBus = bpmnModeler.get('eventBus');
 const lanes = [];
 const ParametersArray = [];
 
+// ── Error highlight state ─────────────────────────────────────────────────
+const _errorHighlightedIds = new Set();
+
+function clearErrorHighlights() {
+  const canvas = bpmnModeler.get('canvas');
+  _errorHighlightedIds.forEach(id => {
+    try { canvas.removeMarker(id, 'bpmn-error-highlight'); } catch (_) {}
+  });
+  _errorHighlightedIds.clear();
+}
+
+function highlightErrorElements(elementIds) {
+  const canvas = bpmnModeler.get('canvas');
+  elementIds.forEach(id => {
+    try {
+      canvas.addMarker(id, 'bpmn-error-highlight');
+      _errorHighlightedIds.add(id);
+    } catch (_) {}
+  });
+}
+
 // Function to process all Participants and Lanes
 function processAllElements() {
   const definitions = bpmnModeler.getDefinitions();
@@ -394,6 +415,7 @@ $(function () {
   }, 500);
 
   bpmnModeler.on('commandStack.changed', exportArtifacts);
+  bpmnModeler.on('commandStack.changed', clearErrorHighlights);
 
   // Handle file upload
   $('#js-upload-diagram').change(async function (e) {
@@ -499,9 +521,13 @@ $(function () {
    * skipping warnings, stack traces, and Hardhat boilerplate.
    * Returns the filtered text, or the original if nothing matched.
    */
+  /**
+   * Parse structured error blocks from raw Solidity/Hardhat output.
+   * Returns an array of { type, message, file, line, block } objects.
+   */
   function extractCompilerErrors(raw) {
-    // Match lines that open a Solidity error diagnostic (not warnings, not Hardhat boilerplate)
-    const errorStart = /^(TypeError|DeclarationError|SyntaxError|ParserError):/;
+    const errorStart = /^(TypeError|DeclarationError|SyntaxError|ParserError):\s*(.*)/;
+    const locationRe = /-->\s*(?:contracts\/)?([^:]+\.sol):(\d+)/;
     const stopLine   = /^(Warning:|Error HH\d|HardhatError:|Error executing|    at )/;
 
     const lines = raw.split('\n');
@@ -510,35 +536,88 @@ $(function () {
     let blanks  = 0;
 
     for (const line of lines) {
-      if (errorStart.test(line)) {
-        // Start of a new error block
-        current = [line];
+      const m = errorStart.exec(line);
+      if (m) {
+        current = { type: m[1], message: m[2].trim(), file: null, line: null, rawLines: [line] };
         blanks  = 0;
       } else if (current !== null) {
         if (stopLine.test(line)) {
-          // Hit boilerplate — close current block
-          blocks.push(current.join('\n').trimEnd());
+          blocks.push(current);
           current = null;
         } else if (line.trim() === '') {
           blanks++;
-          if (blanks >= 2) {
-            // Two consecutive blank lines end the block
-            blocks.push(current.join('\n').trimEnd());
-            current = null;
-            blanks  = 0;
-          }
+          if (blanks >= 2) { blocks.push(current); current = null; blanks = 0; }
         } else {
           blanks = 0;
-          current.push(line);
+          const loc = locationRe.exec(line);
+          if (loc) { current.file = loc[1]; current.line = parseInt(loc[2], 10); }
+          current.rawLines.push(line);
         }
       }
     }
-    if (current) blocks.push(current.join('\n').trimEnd());
+    if (current) blocks.push(current);
 
-    return blocks.length > 0 ? blocks.join('\n\n') : null;
+    // Fallback: BPMN compiler errors are plain strings — no Solidity patterns match them.
+    // Wrap the whole message as a single card so it renders consistently.
+    if (blocks.length === 0 && raw.trim()) {
+      blocks.push({ type: 'Error', message: raw.trim(), file: null, line: null, rawLines: [] });
+    }
+
+    return blocks;
   }
 
-  function showDeployError(title, rawError) {
+  /**
+   * Given compiled contract sources (array of { contractName, contractCode })
+   * and an error block { file, line }, scan backward in the matching contract's
+   * source from the error line to find the nearest // @bpmn: marker.
+   * Returns { elementId, elementName } or null.
+   */
+  function findBpmnElement(contracts, errorFile, errorLine) {
+    if (!contracts || !errorFile || !errorLine) return null;
+    // Match contract by file name (file is like "ContractName.sol")
+    const baseName = errorFile.replace(/\.sol$/i, '');
+    const contract = contracts.find(c => c.contractName === baseName);
+    if (!contract || !contract.contractCode) return null;
+
+    const sourceLines = contract.contractCode.split('\n');
+    const bpmnMarker = /\/\/\s*@bpmn:\s*(\S+)\s+"([^"]*)"/;
+
+    // Scan backward from the error line (1-indexed → 0-indexed)
+    for (let i = Math.min(errorLine - 1, sourceLines.length - 1); i >= 0; i--) {
+      const m = bpmnMarker.exec(sourceLines[i]);
+      if (m) return { elementId: m[1], elementName: m[2] };
+    }
+    return null;
+  }
+
+  /**
+   * Fallback for Stage-1 (BPMN compiler) errors: scan the error message text
+   * for a quoted name (e.g. 'foo') and find the matching element in the registry.
+   */
+  function findBpmnElementByName(errorMessage) {
+    if (!errorMessage) return null;
+    // Match the first single- or double-quoted string of ≥2 chars
+    const m = /['"]([^'"]{2,})['"]/.exec(errorMessage);
+    if (!m) return null;
+    const token = m[1];
+    const elementRegistry = bpmnModeler.get('elementRegistry');
+
+    // 1. Try matching by element name (when the error contains a user-set label)
+    const byName = elementRegistry.getAll().find(el => {
+      const n = el.businessObject?.name;
+      return n && n === token;
+    });
+    if (byName) return { elementId: byName.id, elementName: token };
+
+    // 2. Fall back to ID match (when the error contains the raw BPMN id,
+    //    e.g. gateway.name || gateway.id fell back to the id because no name was set)
+    const byId = elementRegistry.get(token);
+    if (byId) return { elementId: byId.id, elementName: byId.businessObject?.name || token };
+
+    return null;
+  }
+
+  function showDeployError(title, rawError, contracts) {
     document.getElementById('deploy-error-title').textContent = title;
 
     // The server relay may double-encode the error as a JSON string — unwrap it
@@ -548,8 +627,7 @@ $(function () {
       errorText = nested.error || nested.message || rawError;
     } catch (_) {}
 
-    const filtered = extractCompilerErrors(errorText);
-    const displayText = filtered ?? errorText;
+    const errorBlocks = extractCompilerErrors(errorText);
 
     const body = document.getElementById('deploy-error-body');
     body.innerHTML = '';
@@ -559,11 +637,61 @@ $(function () {
     intro.textContent = 'Fix the following errors before saving:';
     body.appendChild(intro);
 
+    // Collect element IDs to highlight after rendering all cards
+    const idsToHighlight = [];
 
-    const pre = document.createElement('pre');
-    pre.className = 'bg-gray-50 border border-gray-200 rounded text-xs text-gray-800 font-mono p-3 whitespace-pre-wrap break-words leading-relaxed';
-    pre.textContent = displayText;
-    body.appendChild(pre);
+    errorBlocks.forEach(err => {
+      // Marker-based lookup (Solidity errors) → name-based fallback (BPMN compiler errors)
+      const bpmn = findBpmnElement(contracts, err.file, err.line)
+                || findBpmnElementByName(err.message);
+
+      if (bpmn?.elementId) idsToHighlight.push(bpmn.elementId);
+
+      const card = document.createElement('div');
+      card.style.cssText = `
+        background:#fff5f5; border:1px solid #fca5a5; border-radius:5px;
+        padding:10px 12px; margin-bottom:8px;
+      `;
+
+      // BPMN element badge (if found)
+      if (bpmn) {
+        const badge = document.createElement('div');
+        badge.style.cssText = 'font-size:14px; font-weight:700; color:#dc2626; margin-bottom:5px;';
+        badge.textContent = `BPMN Element: ${bpmn.elementName || bpmn.elementId}`;
+        card.appendChild(badge);
+      }
+
+      // Error type + message
+      const headline = document.createElement('div');
+      headline.style.cssText = 'font-size:13px; font-weight:600; color:#991b1b;';
+      headline.textContent = `${err.type}: ${err.message}`;
+      card.appendChild(headline);
+
+      // Location (Solidity errors only)
+      if (err.file && err.line) {
+        const loc = document.createElement('div');
+        loc.style.cssText = 'font-size:11px; color:#555; margin-top:2px;';
+        loc.textContent = `${err.file}:${err.line}`;
+        card.appendChild(loc);
+      }
+
+      // Code snippet — only when there are raw lines to show
+      if (err.rawLines.length > 0) {
+        const pre = document.createElement('pre');
+        pre.style.cssText = `
+          margin-top:6px; font-size:11px; font-family:Consolas,'Courier New',monospace;
+          color:#374151; background:#fef2f2; border:1px solid #fecaca;
+          border-radius:3px; padding:6px 8px; white-space:pre-wrap; word-break:break-all;
+        `;
+        pre.textContent = err.rawLines.join('\n');
+        card.appendChild(pre);
+      }
+
+      body.appendChild(card);
+    });
+
+    // Red-border every faulty element in the diagram
+    highlightErrorElements(idsToHighlight);
 
     document.getElementById('deploy-error-modal').dataset.rawError = errorText;
     document.getElementById('deploy-error-modal').classList.remove('hidden');
@@ -627,7 +755,7 @@ $(function () {
       catch (_) { validateData = { error: 'Invalid response from server' }; }
 
       if (!validateResponse.ok) {
-        showDeployError('Validation Failed', validateData.error || validateData.message || 'Unknown error');
+        showDeployError('Validation Failed', validateData.error || validateData.message || 'Unknown error', validateData.contracts || []);
         toggleLockButton(false);
         return;
       }
@@ -649,7 +777,7 @@ $(function () {
       catch (_) { saveData = { error: 'Invalid response from server' }; }
 
       if (!saveResponse.ok) {
-        showDeployError('Save Failed', saveData.error || saveData.message || 'Unknown error');
+        showDeployError('Save Failed', saveData.error || saveData.message || 'Unknown error', []);
         toggleLockButton(false);
         return;
       }
@@ -658,7 +786,7 @@ $(function () {
       window.location.href = `${baseUrl}/models.html`;
     } catch (err) {
       console.error('Unexpected error:', err);
-      showDeployError('Unexpected Error', err.message || 'Unknown error');
+      showDeployError('Unexpected Error', err.message || 'Unknown error', []);
       toggleLockButton(false);
     }
   });

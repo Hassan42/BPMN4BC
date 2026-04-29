@@ -27,6 +27,7 @@ function generateAndGateway(gateway) {
     const functionName = `checkGateway_${gateway.id}`;
 
     return `
+    // @bpmn: ${gateway.id} "${(gateway.name || gateway.id).replace(/"/g, '')}"
     uint256 private ${functionName}Count = 0;
 
     function ${functionName}() public returns (bool) {
@@ -107,6 +108,7 @@ function generateXORGateway(gateway, process, collaborationId) {
     }).join(' || ')});`;
 
     return `
+        // @bpmn: ${gateway.id} "${(gateway.name || gateway.id).replace(/"/g, '')}"
         function ${functionName}(${parameterList}) public payable returns (uint256) {
             ${requireState}
             return ${solidityConditions};

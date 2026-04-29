@@ -234,3 +234,9 @@ html, body, #container {
   cursor: default !important;
 }
 
+/* ── Error highlight: red border on faulty BPMN elements ──────────────── */
+.bpmn-error-highlight .djs-visual > :nth-child(1) {
+  stroke: #dc2626 !important;
+  stroke-width: 3px !important;
+}
+

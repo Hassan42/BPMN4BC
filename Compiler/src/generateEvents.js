@@ -54,7 +54,7 @@ function generateEvents(events) {
     const params = getThrowEventParams(event);
     const paramList = params.map(p => `${p.type} ${p.name}`).join(', ');
 
-    return `event ${eventName}(${paramList});`;
+    return `// @bpmn: ${event.id} "${(event.name || event.id).replace(/"/g, '')}"\nevent ${eventName}(${paramList});`;
   }).join('\n');
 }
 
@@ -76,7 +76,7 @@ function generateEmitFunctions(events) {
     const paramList = params.map(p => `${p.type} _${p.name}`).join(', ');
     const argList  = params.map(p => `_${p.name}`).join(', ');
 
-    return `function emit_${eventName}(${paramList}) public {\n    emit ${eventName}(${argList});\n}`;
+    return `// @bpmn: ${event.id} "${(event.name || event.id).replace(/"/g, '')}"\nfunction emit_${eventName}(${paramList}) public {\n    emit ${eventName}(${argList});\n}`;
   }).join('\n');
 }
 

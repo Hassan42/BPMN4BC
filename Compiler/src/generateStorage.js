@@ -50,11 +50,19 @@ function generateDataStoreStructs(process, lane) {
         });
 
         // Generate public getter functions for each regular DataStore variable
-        dataStoreReadFunctions = regularVars.map(({ type, name }) => `
-    function get${capitalize(name)}() public view returns (${type}${isValueType(name, type) ? '' : ' memory'}) {
+        dataStoreReadFunctions = regularVars.map(({ type, name }) => {
+            let memSuffix;
+            try {
+                memSuffix = isValueType(name, type) ? '' : ' memory';
+            } catch (_) {
+                throw new Error(`DataStore "${ds.name || ds.id}": variable "${name}" has no type defined. Please set a type for this variable in the DataStore properties.`);
+            }
+            return `
+    function get${capitalize(name)}() public view returns (${type || 'uint'}${memSuffix}) {
         return ${instanceName}.${name};
     }
-    `).join('');
+    `;
+        }).join('');
     }
 
     // Generate top-level mapping state variables (Solidity auto-generates public getters)

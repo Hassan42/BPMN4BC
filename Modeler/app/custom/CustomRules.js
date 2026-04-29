@@ -164,6 +164,60 @@ CustomRules.prototype.init = function () {
       }
     }
 
+    // BC Script Tasks cannot be part of any message flow (cross-pool connection)
+    const sourceIsScriptTask = is(source.businessObject, 'bpmn:ScriptTask') && source.businessObject.bc === 'true';
+    const targetIsScriptTask = is(target.businessObject, 'bpmn:ScriptTask') && target.businessObject.bc === 'true';
+
+    if (sourceIsScriptTask || targetIsScriptTask) {
+      if (!sourcePool || !targetPool || sourcePool !== targetPool) {
+        setTimeout(() => showErrorToast(
+          'Blockchain Script Tasks cannot be connected via message flow.'
+        ), 0);
+        return false;
+      }
+    }
+
+    // BC End Events cannot be connected via message flow (cross-pool)
+    const sourceIsEndEvent = is(source.businessObject, 'bpmn:EndEvent') && source.businessObject.bc === 'true';
+    const targetIsEndEvent = is(target.businessObject, 'bpmn:EndEvent') && target.businessObject.bc === 'true';
+
+    if (sourceIsEndEvent || targetIsEndEvent) {
+      if (!sourcePool || !targetPool || sourcePool !== targetPool) {
+        setTimeout(() => showErrorToast(
+          'Blockchain end events cannot be connected outside their pool.'
+        ), 0);
+        return false;
+      }
+    }
+
+    // BC ReceiveTask rules:
+    // 1. ReceiveTask → Participant/SendTask: always blocked (wrong direction)
+    // 2. Participant/SendTask → ReceiveTask: allowed only if the ReceiveTask has no existing participant connection
+    const isNonBcParticipantOrSendTask = (el) =>
+      (is(el.businessObject, 'bpmn:Participant') && el.businessObject.bc !== 'true') ||
+      is(el.businessObject, 'bpmn:SendTask');
+
+    if (is(source.businessObject, 'bpmn:ReceiveTask') && source.businessObject.bc === 'true') {
+      if (isNonBcParticipantOrSendTask(target)) {
+        setTimeout(() => showErrorToast('Receive Transaction Task is already assigned to a participant.'), 0);
+        return false;
+      }
+    }
+
+    if (is(target.businessObject, 'bpmn:ReceiveTask') && target.businessObject.bc === 'true') {
+      if (isNonBcParticipantOrSendTask(source)) {
+        const allConns = [...(target.incoming || []), ...(target.outgoing || [])];
+        const alreadyHasParticipant = allConns.some(conn => {
+          const other = conn.source === target ? conn.target : conn.source;
+          return isNonBcParticipantOrSendTask(other);
+        });
+        if (alreadyHasParticipant) {
+          setTimeout(() => showErrorToast('A Receive Task can only be connected to one participant.'), 0);
+          return false;
+        }
+      }
+    }
+
     const targetBo = target.businessObject;
     const sourceBo = source.businessObject;
 

@@ -25,6 +25,32 @@ app.use(cors()); // Allow cross-origin requests (optional)
 app.use(express.json({ limit: '50mb' })); // Parse JSON request bodies
 app.use(express.static(path.join(__dirname, 'public')));
 
+// **Attempt logger — appends all attempts to a single attempts.json file**
+const attemptsFile = path.join(__dirname, 'resources', 'attempts', 'attempts.json');
+
+function saveAttempt({ bpmn, errors }) {
+  try {
+    const dir = path.dirname(attemptsFile);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+
+    let attempts = [];
+    if (fs.existsSync(attemptsFile)) {
+      try { attempts = JSON.parse(fs.readFileSync(attemptsFile, 'utf8')); } catch (_) {}
+    }
+
+    attempts.push({
+      timestamp: new Date().toISOString(),
+      bpmn,
+      errors: errors || null
+    });
+
+    fs.writeFileSync(attemptsFile, JSON.stringify(attempts, null, 2), 'utf8');
+    console.log('Attempt logged → attempts.json');
+  } catch (err) {
+    console.error('Failed to save attempt log:', err.message);
+  }
+}
+
 // **Helper function to handle API requests safely**
 async function safeFetch(url, options = {}) {
   try {
@@ -105,27 +131,12 @@ app.post('/api/executeTask', async (req, res) => {
 
 // **Relay POST request to deploy BPMN diagram as a new instance**
 app.post('/api/deploy', async (req, res) => {
+  const { xml, name, modelId } = req.body;
+
+  if (!xml) return res.status(400).json({ error: 'Missing XML in request body' });
+
+  console.log('Deploying BPMN diagram as new instance...');
   try {
-    const { xml, name, modelId } = req.body;
-
-    if (!xml) {
-      return res.status(400).json({ error: 'Missing XML in request body' });
-    }
-
-    // Ensure attempts folder exists
-    const attemptsDir = path.join(__dirname, 'resources', 'attempts');
-    if (!fs.existsSync(attemptsDir)) {
-      fs.mkdirSync(attemptsDir, { recursive: true });
-    }
-
-    // Create timestamped filename
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const filePath = path.join(attemptsDir, `attempt-${timestamp}.bpmn`);
-
-    fs.writeFileSync(filePath, xml, 'utf8');
-    console.log(`Saved deployment attempt to: ${filePath}`);
-    console.log('Deploying BPMN diagram as new instance...');
-
     const data = await safeFetch(`${DEP_API_BASE_URL}/deploy_instance`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -133,7 +144,6 @@ app.post('/api/deploy', async (req, res) => {
     });
 
     res.json(data);
-
   } catch (error) {
     console.error('Deployment error:', error);
     res.status(500).json({ error: `${error.message}` });
@@ -142,6 +152,7 @@ app.post('/api/deploy', async (req, res) => {
 
 // **Relay POST request to validate BPMN (compile + Hardhat compile, no deploy)**
 app.post('/api/validate', async (req, res) => {
+  const { xml } = req.body;
   try {
     const response = await fetch(`${DEP_API_BASE_URL}/validate`, {
       method: 'POST',
@@ -149,8 +160,12 @@ app.post('/api/validate', async (req, res) => {
       body: JSON.stringify(req.body)
     });
     const data = await response.json();
+
+    saveAttempt({ bpmn: xml, errors: response.ok ? null : (data.error || data.message || null) });
+
     res.status(response.status).json(data);
   } catch (error) {
+    saveAttempt({ bpmn: xml, errors: error.message });
     res.status(500).json({ error: error.message });
   }
 });

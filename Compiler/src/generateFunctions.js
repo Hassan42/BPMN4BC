@@ -195,7 +195,9 @@ function generateScriptFunction(activity, process, collaborationId) {
   const scriptWithoutReturn = solidityScript.replace(/return\s+.*?;/g, '').trim();
   const dataStoreAssignments = generateDataStoreAssignments(activity, collaborationId);
 
+  const bpmnName = (activity.name || activity.id).replace(/"/g, '');
   return `
+    // @bpmn: ${activity.id} "${bpmnName}"
     function ${activity.id.replace(/\s+/g, '')}(${inputTypes}) public payable ${returnClause} {
         ${requireState}
         ${scriptWithoutReturn}
@@ -568,17 +570,20 @@ function generateEntryFunction(activity, process, roles, collaborationId, partic
   const multiplicityCount = (participantMultiplicities[senderKey] || 0);
   const isMultiParticipant = multiplicityCount > 1;
 
+  const bpmnMarker = `// @bpmn: ${activity.id} "${(activity.name || activity.id).replace(/"/g, '')}"`;
+
   if (isMultiParticipant) {
     // Multi-participant: track each submission; only execute body when all N have submitted
     return `
+    ${bpmnMarker}
     function ${taskId}(${externalParams}) public ${payableModifier}isAccessible("${taskId}") {
         require(!hasParticipated["${taskId}"][msg.sender], "Participated already called this activity");
         hasParticipated["${taskId}"][msg.sender] = true;
         participationCount["${taskId}"]++;
-
+        ${dataStoreAssignments}
         if (participationCount["${taskId}"] >= requiredParticipants["${taskId}"]) {
             ${doStructCreationsCode}
-            ${dataStoreAssignments}
+
             ${proceedingLogic}
             ${!hasNextReceiveTask && !hasLoop ? `state["${taskId}"] = State.Completed;` : ''}
         }
@@ -587,6 +592,7 @@ function generateEntryFunction(activity, process, roles, collaborationId, partic
   }
 
   return `
+    ${bpmnMarker}
     function ${taskId}(${externalParams}) public ${payableModifier}isAccessible("${taskId}") {
         ${doStructCreationsCode}
         ${dataStoreAssignments}
@@ -615,7 +621,7 @@ function generateFunctions(activities, process, roles, collaborationId, particip
         functionLogic = generateEntryFunction(activity, process, roles, collaborationId, participantMultiplicities);
         break;
       default:
-        throw new Error(`Task type ${activity.$type} not supported`);
+        throw new Error(`Activity "${activity.name || activity.id}" has an unsupported type: ${activity.$type}`);
     }
 
     functions.push(functionLogic);

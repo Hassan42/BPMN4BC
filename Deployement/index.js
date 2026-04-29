@@ -292,7 +292,8 @@ app.post('/executeAll', async (req, res) => {
 // ── Instance helpers ────────────────────────────────────────────────────────
 
 const instancesPath = path.join(__dirname, 'instances.json');
-const modelsPath    = path.join(__dirname, 'models.json');
+const modelsPath    = path.join(__dirname, 'data', 'models.json');
+fs.ensureDirSync(path.join(__dirname, 'data'));
 
 const readModels = () => {
   if (!fs.existsSync(modelsPath)) fs.writeFileSync(modelsPath, '[]', 'utf8');
@@ -358,10 +359,11 @@ app.post('/validate', async (req, res) => {
   const { xml } = req.body;
   if (!xml) return res.status(400).json({ message: 'Missing xml.' });
   const tempFiles = [];
+  let contracts = [];
   try {
     // Stage 1: BPMN → Solidity
     const compileRes = await axios.post(`${COM_API_BASE_URL}/compile`, { xml, instanceId: 0 });
-    const contracts  = compileRes.data;
+    contracts = compileRes.data;
 
     // Stage 2: write temp .sol files
     await fs.ensureDir(contractsDir);
@@ -386,7 +388,9 @@ app.post('/validate', async (req, res) => {
     const errorMsg = (typeof responseData === 'string' && responseData)
       ? responseData
       : (responseData?.error || responseData?.message || err.message || String(err));
-    res.status(400).json({ message: 'Validation failed.', error: errorMsg });
+    // Include compiled contract sources so the frontend can map errors back to BPMN elements
+    // via the // @bpmn: markers embedded in the generated Solidity.
+    res.status(400).json({ message: 'Validation failed.', error: errorMsg, contracts });
   } finally {
     tempFiles.forEach(f => { try { fs.removeSync(f); } catch (_) {} });
   }
