@@ -1,5 +1,5 @@
 import { createCollapsibleSection } from './collapsible.js';
-import { executeTask } from '../api.js';
+import { executeTask, queryMapping } from '../api.js';
 import { toggleVisibility } from '../utils/helper.js';
 import { formatCHF } from '../pricing.js';
 
@@ -153,17 +153,25 @@ function createTaskCard(network, contractName, task, instanceId, overrideSender)
 
 /**
  * Appends a collapsible DataStore section for every contract in networkData
- * that has dataStore variables. Called after task cards are rendered.
+ * that has dataStore variables or mapping variables. Called after task cards are rendered.
  */
-export function renderDataStores(networkData, container) {
+export function renderDataStores(networkData, networkKey, instanceId, container) {
   Object.entries(networkData).forEach(([contractKey, contract]) => {
-    if (!Array.isArray(contract.dataStore) || contract.dataStore.length === 0) return;
+    const hasDataStore = Array.isArray(contract.dataStore) && contract.dataStore.length > 0;
+    const hasMappings  = Array.isArray(contract.mappingVars) && contract.mappingVars.length > 0;
+    if (!hasDataStore && !hasMappings) return;
+
     const label = (contract.contractText && contract.contractText.trim())
       ? contract.contractText
       : contractKey;
     const wrapper = document.createElement('div');
     wrapper.className = 'mt-4';
-    wrapper.appendChild(createCollapsibleSection(`Data – ${label}`, createDataStoreSection(contract.dataStore)));
+    wrapper.appendChild(
+      createCollapsibleSection(
+        `Data – ${label}`,
+        createDataStoreSection(contract.dataStore || [], contract.mappingVars || [], contractKey, networkKey, instanceId)
+      )
+    );
     container.appendChild(wrapper);
   });
 }
@@ -194,8 +202,11 @@ export function renderContract(data, networkKey, instanceId) {
     if (Array.isArray(contract.receiveTasks) && contract.receiveTasks.length > 0) {
       contractContent.appendChild(createCollapsibleSection('Tasks', createReceiveTaskSection(networkKey, contractKey, contract.receiveTasks, instanceId)));
     }
-    if (Array.isArray(contract.dataStore) && contract.dataStore.length > 0) {
-      contractContent.appendChild(createCollapsibleSection('Data', createDataStoreSection(contract.dataStore)));
+    if ((Array.isArray(contract.dataStore) && contract.dataStore.length > 0) ||
+        (Array.isArray(contract.mappingVars) && contract.mappingVars.length > 0)) {
+      contractContent.appendChild(createCollapsibleSection('Data', createDataStoreSection(
+        contract.dataStore || [], contract.mappingVars || [], contractKey, networkKey, instanceId
+      )));
     }
 
     contractDiv.appendChild(contractHeader);
@@ -342,10 +353,11 @@ function createReceiveTaskSection(network, contractName, tasks, instanceId) {
 }
 
 
-function createDataStoreSection(dataArray) {
+function createDataStoreSection(dataArray, mappingVars, contractName, networkKey, instanceId) {
   const sectionDiv = document.createElement('div');
   sectionDiv.className = 'grid grid-cols-2 gap-4';
 
+  // ── Regular (non-mapping) DataStore variables ──────────────────
   dataArray.forEach(item => {
     const itemDiv = document.createElement('div');
     itemDiv.className = 'p-3 bg-gray-100 border rounded shadow-sm';
@@ -356,12 +368,90 @@ function createDataStoreSection(dataArray) {
 
     const value = document.createElement('div');
     value.className = 'text-gray-600';
-    value.innerText = `Value: ${item.value}`;
+    value.innerText = `Value: ${item.value !== undefined ? item.value : '—'}`;
 
     itemDiv.appendChild(name);
     itemDiv.appendChild(value);
     sectionDiv.appendChild(itemDiv);
   });
+
+  // ── Mapping variables (interactive key lookup) ─────────────────
+  if (Array.isArray(mappingVars)) {
+    mappingVars.forEach(mv => {
+      const keyType   = mv.keyType   || 'uint';
+      const valueType = mv.valueType || 'uint';
+      const signature = `mapping(${keyType} => ${valueType})`;
+
+      const card = document.createElement('div');
+      card.className = 'p-3 bg-gray-100 border rounded shadow-sm col-span-2';
+
+      // Name + type signature
+      const nameRow = document.createElement('div');
+      nameRow.className = 'flex items-baseline gap-2 mb-2';
+
+      const nameEl = document.createElement('span');
+      nameEl.className = 'font-bold text-gray-700';
+      nameEl.textContent = mv.name;
+
+      const sigEl = document.createElement('span');
+      sigEl.className = 'text-xs text-gray-500 font-mono';
+      sigEl.textContent = signature;
+
+      nameRow.appendChild(nameEl);
+      nameRow.appendChild(sigEl);
+      card.appendChild(nameRow);
+
+      // Key input + Lookup button row
+      const inputRow = document.createElement('div');
+      inputRow.className = 'flex gap-2 items-center';
+
+      const keyInput = document.createElement('input');
+      keyInput.type = 'text';
+      keyInput.placeholder = `Key (${keyType})`;
+      keyInput.className = 'flex-1 p-2 border border-gray-300 rounded text-sm bg-white';
+
+      const lookupBtn = document.createElement('button');
+      lookupBtn.type = 'button';
+      lookupBtn.textContent = 'Lookup';
+      lookupBtn.className = 'px-3 py-2 bg-white hover:bg-gray-200 text-gray-700 text-sm rounded border border-gray-300 font-medium transition-colors';
+
+      // Result display
+      const resultEl = document.createElement('div');
+      resultEl.className = 'mt-2 text-sm hidden';
+
+      lookupBtn.onclick = async () => {
+        const key = keyInput.value.trim();
+        if (!key) return;
+        lookupBtn.disabled = true;
+        lookupBtn.textContent = '…';
+        resultEl.className = 'mt-2 text-sm';
+        resultEl.textContent = 'Looking up…';
+        try {
+          const { value } = await queryMapping({
+            instanceId,
+            contractName,
+            networkId: networkKey,
+            varName: mv.name,
+            key
+          });
+          resultEl.className = 'mt-2 text-sm text-gray-700 font-mono bg-white border border-gray-300 rounded px-2 py-1';
+          resultEl.textContent = `${mv.name}[${key}] = ${value}`;
+        } catch (err) {
+          resultEl.className = 'mt-2 text-sm text-red-600';
+          resultEl.textContent = `Error: ${err.message}`;
+        } finally {
+          lookupBtn.disabled = false;
+          lookupBtn.textContent = 'Lookup';
+        }
+      };
+
+      inputRow.appendChild(keyInput);
+      inputRow.appendChild(lookupBtn);
+      card.appendChild(inputRow);
+      card.appendChild(resultEl);
+      sectionDiv.appendChild(card);
+    });
+  }
 
   return sectionDiv;
 }
@@ -423,7 +513,11 @@ export function renderRoleBalances(networks, ethChfRate) {
 
       const roleName = document.createElement('div');
       roleName.className = 'font-semibold text-gray-700';
-      roleName.innerText = `${role} (${address.slice(0, 6)}…)`;
+      roleName.innerText = role;
+
+      const roleAddress = document.createElement('div');
+      roleAddress.className = 'text-xs text-gray-500 font-mono break-all mb-1';
+      roleAddress.innerText = address;
 
       const roleBalance = document.createElement('div');
       roleBalance.className = 'text-blue-700 font-semibold';
@@ -433,6 +527,7 @@ export function renderRoleBalances(networks, ethChfRate) {
       roleBalance.innerText = `Balance: ${roleEth.toFixed(4)} ETH${roleChfLabel}`;
 
       roleCard.appendChild(roleName);
+      roleCard.appendChild(roleAddress);
       roleCard.appendChild(roleBalance);
 
       // Escrow balance row (always shown so users can see 0.0000 escrow too)

@@ -3,15 +3,7 @@ import { renderTabs, renderTransactionLog } from './ui/tabs.js';
 import { GAS_PRICE_GWEI, getEthChfRate, gasToCHF, formatCHF } from './pricing.js';
 
 const loadingSpinner = document.getElementById('loading-spinner');
-const toggleBtn = document.getElementById('toggleLogBtn');
-const logContent = document.getElementById('logContent');
 const instancesSection = document.getElementById('instancesSection');
-
-if (toggleBtn && logContent) {
-  toggleBtn.addEventListener('click', () => {
-    logContent.classList.toggle('hidden');
-  });
-}
 
 function getBaseUrl() {
   const origin = window.location.origin;
@@ -127,7 +119,11 @@ if (instanceId) {
   (async () => {
     try {
       loadingSpinner.classList.remove('hidden');
-      const [data, ethChfRate] = await Promise.all([fetchData(instanceId), getEthChfRate()]);
+      const [data, ethChfRate] = await Promise.all([
+        fetchData(instanceId),
+        getEthChfRate()
+      ]);
+
       renderTabs(data.result, instanceId, ethChfRate);
       renderTransactionLog(data.transactions, ethChfRate);
     } catch (error) {

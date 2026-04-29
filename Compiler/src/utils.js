@@ -403,11 +403,13 @@ const generateContractConfig = ({
     // DataStoreReferences are process-level elements — lane.flowNodeRef never contains them.
     // Always search the process; DataStoreSync ensures all lanes share the same variables.
     const dataStoreRefs = findDataStoreReferencesForProcess(process);
-    const dataStore = dataStoreRefs.length > 0
-        ? extractDataStoreVariables(dataStoreRefs[0])
-            .filter(v => (v.type || 'uint') !== 'mapping')
-            .map(v => ({ name: v.name, type: v.type || 'uint' }))
-        : [];
+    const allDsVars = dataStoreRefs.length > 0 ? extractDataStoreVariables(dataStoreRefs[0]) : [];
+    const dataStore = allDsVars
+        .filter(v => (v.type || 'uint') !== 'mapping')
+        .map(v => ({ name: v.name, type: v.type || 'uint' }));
+    const mappingVars = allDsVars
+        .filter(v => (v.type || 'uint') === 'mapping')
+        .map(v => ({ name: v.name, keyType: v.keyType || 'uint', valueType: v.valueType || 'uint' }));
 
     // Filter roles based on those used in ReceiveTasks and format as an array of objects
     const contractRoles = roles
@@ -484,6 +486,7 @@ const generateContractConfig = ({
         contractCode: formattedSolidityCode,
         contractInterface: formattedSolidityInterface,
         dataStore: dataStore,
+        mappingVars: mappingVars,
         contractText
     };
 }

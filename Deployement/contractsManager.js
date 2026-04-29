@@ -217,8 +217,8 @@ const createContractManager = (instanceId) => {
         const contracts = readContracts();
         const networkContracts = contracts.filter(c => c.networkId === network);
         return networkContracts.reduce((acc, contract) => {
-            const { contractName, contractRoles, contractText, balance, receiveTasks, dataStore } = contract;
-            acc[contractName] = { contractText, receiveTasks, dataStore, contractRoles, balance };
+            const { contractName, contractRoles, contractText, balance, receiveTasks, dataStore, mappingVars } = contract;
+            acc[contractName] = { contractText, receiveTasks, dataStore, mappingVars: mappingVars || [], contractRoles, balance };
             return acc;
         }, {});
     };

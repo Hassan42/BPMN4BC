@@ -69,6 +69,9 @@ CustomRules.prototype.init = function () {
       if (isAllowedInBlockchain(shapeBo)) {
         return true;
       } else {
+        setTimeout(() => showErrorToast(
+          'Off-chain elements cannot be placed inside a blockchain pool.'
+        ), 0);
         return false;
       }
     }
@@ -109,6 +112,27 @@ CustomRules.prototype.init = function () {
         el = el.parent;
       }
       return null;
+    }
+
+    // Block DataObject / DataStore connections that cross outside the BC pool
+    const sourceIsDataEl = is(source.businessObject, 'bpmn:DataObjectReference') || is(source.businessObject, 'bpmn:DataStoreReference');
+    const targetIsDataEl = is(target.businessObject, 'bpmn:DataObjectReference') || is(target.businessObject, 'bpmn:DataStoreReference');
+
+    if (sourceIsDataEl || targetIsDataEl) {
+      const dataEl  = sourceIsDataEl ? source : target;
+      const otherEl = sourceIsDataEl ? target : source;
+      const dataPool  = getPool(dataEl);
+      const otherPool = getPool(otherEl);
+
+      // Only enforce when the data element lives inside a BC pool
+      if (dataPool && dataPool.businessObject.bc === 'true') {
+        if (!otherPool || otherPool !== dataPool) {
+          setTimeout(() => showErrorToast(
+            'DataObjects and DataStores inside a blockchain pool cannot be connected to elements outside it.'
+          ), 0);
+          return false;
+        }
+      }
     }
 
     // Block any connection between elements that live in two different BC pools
@@ -234,20 +258,20 @@ CustomRules.prototype.init = function () {
     // BC IntermediateThrowEvents accept data reads (same as XOR gateway — read-only)
     const targetIsBcThrow = is(targetBo, 'bpmn:IntermediateThrowEvent') && targetBo.bc === 'true';
 
-    if (sourceIsData && (targetIsXOR || targetIsBcThrow)) {
-      // A task/gateway can only read from the same DataStore once
-      if (is(sourceBo, 'bpmn:DataStoreReference')) {
-        const alreadyReads = (target.incoming || []).some(
-          conn => is(conn.source.businessObject, 'bpmn:DataStoreReference') &&
-                  conn.source.id === source.id
-        );
-        if (alreadyReads) {
-          setTimeout(() => showErrorToast('A task can only read from the same DataStore once.'), 0);
-          return false;
-        }
+    // DataStore → XOR / ThrowEvent: early return with DataInputAssociation (no boundary check needed for stores)
+    if (is(sourceBo, 'bpmn:DataStoreReference') && (targetIsXOR || targetIsBcThrow)) {
+      const alreadyReads = (target.incoming || []).some(
+        conn => is(conn.source.businessObject, 'bpmn:DataStoreReference') &&
+                conn.source.id === source.id
+      );
+      if (alreadyReads) {
+        setTimeout(() => showErrorToast('A task can only read from the same DataStore once.'), 0);
+        return false;
       }
       return { type: 'bpmn:DataInputAssociation' };
     }
+    // DataObject → XOR / ThrowEvent: do NOT early-return — fall through to the
+    // sourceIsDataObj boundary check below so the transaction boundary rule is enforced.
     // Prevent outgoing data writes from XOR gateways or BC ThrowEvents
     if ((sourceIsXOR || sourceIsThrow) && targetIsData) {
       return false;
@@ -334,8 +358,10 @@ CustomRules.prototype.init = function () {
         }
       }
 
-      // Returns the SET of all boundary ReceiveTasks reachable walking backwards.
-      // A ScriptTask after an XOR join will resolve to multiple ReceiveTasks.
+      // Returns the SET of all boundary ReceiveTasks reachable walking backwards
+      // along SEQUENCE FLOW edges only. Data associations (DataInputAssociation /
+      // DataOutputAssociation) are intentionally ignored — they are data flow, not
+      // control flow, and must not bleed the traversal into foreign transactions.
       function getBoundaryReceiveTasks(element) {
         const result = new Set();
         const visited = new Set();
@@ -351,8 +377,10 @@ CustomRules.prototype.init = function () {
             continue; // stop traversal at a ReceiveTask — it IS the boundary
           }
           for (const conn of (current.incoming || [])) {
+            // Only follow control flow — skip data associations entirely
+            if (conn.businessObject?.$type !== 'bpmn:SequenceFlow') continue;
             const src = conn.source;
-            if (!src || is(src.businessObject, 'bpmn:DataObjectReference')) continue;
+            if (!src) continue;
             if (!visited.has(src.id)) queue.push(src);
           }
         }

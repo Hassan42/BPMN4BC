@@ -195,6 +195,20 @@ app.delete('/api/models/:id', async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+// **Relay POST request to query a mapping variable by key**
+app.post('/api/queryMapping', async (req, res) => {
+  try {
+    const data = await safeFetch(`${DEP_API_BASE_URL}/queryMapping`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req.body)
+    });
+    res.json(data);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // **Relay POST request to compile BPMN diagram**
 app.post('/api/compile', async (req, res) => {
   try {

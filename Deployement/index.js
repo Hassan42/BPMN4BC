@@ -174,6 +174,33 @@ app.get('/query', async (req, res) => {
 });
 
 
+// Query a single mapping variable by key
+app.post('/queryMapping', async (req, res) => {
+  const { instanceId, contractName, networkId, varName, key } = req.body;
+  if (!instanceId || !contractName || !networkId || !varName || key === undefined) {
+    return res.status(400).json({ message: 'Missing required fields.' });
+  }
+
+  try {
+    const stdout = await executeHardhatTask('query-mapping', networkId, {
+      instanceId, contractName, varName, key
+    });
+
+    // The task prints a line: QUERY_RESULT:{"value":"..."}
+    const match = stdout.match(/QUERY_RESULT:(\{.*\})/);
+    if (!match) {
+      console.error('query-mapping stdout:', stdout);
+      return res.status(500).json({ message: 'Unexpected output from query task.' });
+    }
+
+    const { value } = JSON.parse(match[1]);
+    res.status(200).json({ value });
+  } catch (err) {
+    console.error('Error querying mapping:', err);
+    res.status(500).json({ message: String(err) });
+  }
+});
+
 //Execute task in contract
 app.post('/executeTask', async (req, res) => {
   try {

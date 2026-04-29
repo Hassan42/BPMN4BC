@@ -63,6 +63,12 @@ export async function fetchInstances() {
   return await response.json();
 }
 
+export async function fetchInstance(id) {
+  const response = await fetch(`${getBaseUrl()}/api/instances/${id}`);
+  if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+  return await response.json();
+}
+
 export async function deleteInstance(instanceId) {
   const response = await fetch(`${getBaseUrl()}/api/instances/${instanceId}`, {
     method: 'DELETE'
@@ -75,6 +81,17 @@ export async function fetchData(instanceId) {
   const response = await fetch(`${getBaseUrl()}/api/query?instanceId=${instanceId}`);
   if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
   return await response.json();
+}
+
+export async function queryMapping({ instanceId, contractName, networkId, varName, key }) {
+  const response = await fetch(`${getBaseUrl()}/api/queryMapping`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ instanceId, contractName, networkId, varName, key })
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.message || data.error || 'Lookup failed');
+  return data; // { value }
 }
 
 export async function executeTask(network, contractName, task, form, sender, ethAmount, instanceId) {

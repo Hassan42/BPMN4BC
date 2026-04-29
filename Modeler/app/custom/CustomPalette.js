@@ -46,14 +46,18 @@ export default class CustomPalette {
           const processElement = bpmnFactory.create('bpmn:Process');
           shape.businessObject.processRef = processElement;
 
-          // Auto-assign network ID: count existing BC pools and use the next number
+          // Assign the first of network-1 / network-2 not already in use.
+          // Collecting taken bcids from the set of existing BC participants avoids
+          // any double-count issues that arise from using .length on the filtered list.
           if (bcNode === 'true') {
-            const existingBcPools = elementRegistry.filter(
-              el => el.businessObject &&
-                    el.businessObject.$type === 'bpmn:Participant' &&
-                    el.businessObject.bc === 'true'
+            const takenIds = new Set(
+              elementRegistry
+                .filter(el => el.businessObject &&
+                              el.businessObject.$type === 'bpmn:Participant' &&
+                              el.businessObject.bcid)
+                .map(el => el.businessObject.bcid)
             );
-            businessObject.bcid = `network-${existingBcPools.length + 1}`;
+            businessObject.bcid = takenIds.has('network-1') ? 'network-2' : 'network-1';
           }
         }
 
@@ -76,7 +80,16 @@ export default class CustomPalette {
         group: 'BC',
         html: '<div class="custom-palette-label">Blockchain Components</div>',
         action: {
-          click: function () { } // Empty action to prevent unwanted clicks
+          click: function () { }
+        }
+      },
+
+      // ── Off-Chain subgroup ────────────────────────────────────────────────
+      'OnChainLabel': {
+        group: 'BC',
+        html: '<div class="custom-palette-sublabel">Off-Chain</div>',
+        action: {
+          click: function () { }
         }
       },
       'SEND': {
@@ -88,6 +101,41 @@ export default class CustomPalette {
           click: createElement("true", "SendTask")
         },
         className: 'custom-palette',
+      },
+      'BCCatchEvent': {
+        group: 'BC',
+        imageUrl: BCCATCH,
+        title: translate('Create blockchain catch event'),
+        action: {
+          dragstart: createElement("true", "IntermediateCatchEvent", "catchEvent"),
+          click: createElement("true", "IntermediateCatchEvent", "catchEvent")
+        },
+        className: 'custom-palette',
+      },
+      'BCCatchRevertEvent': {
+        group: 'BC',
+        imageUrl: BCREVCATCH,
+        title: translate('Create blockchain catch revert boundary event'),
+        action: {
+          dragstart: createElement("true", "BoundaryEvent", "catchRevertEvent"),
+          click: createElement("true", "BoundaryEvent", "catchRevertEvent")
+        },
+        className: 'custom-palette',
+      },
+      // Invisible spacer: fills the empty 4th flex-slot so On-Chain label starts on a fresh row
+      'BCOffChainSpacer': {
+        group: 'BC',
+        html: '<div class="custom-palette-spacer"></div>',
+        action: { click: function () { } }
+      },
+
+      // ── On-Chain subgroup ─────────────────────────────────────────────────
+      'OffChainLabel': {
+        group: 'BC',
+        html: '<div class="custom-palette-sublabel">On-Chain</div>',
+        action: {
+          click: function () { }
+        }
       },
       'RECEIVE': {
         group: 'BC',
@@ -119,16 +167,6 @@ export default class CustomPalette {
         },
         className: 'custom-palette',
       },
-      'BCCatchEvent': {
-        group: 'BC',
-        imageUrl: BCCATCH,
-        title: translate('Create blockchain catch event'),
-        action: {
-          dragstart: createElement("true", "IntermediateCatchEvent", "catchEvent"),
-          click: createElement("true", "IntermediateCatchEvent", "catchEvent")
-        },
-        className: 'custom-palette',
-      },
       'BCThrowRevertEvent': {
         group: 'BC',
         imageUrl: BCREVTHROW,
@@ -136,16 +174,6 @@ export default class CustomPalette {
         action: {
           dragstart: createElement("true", "EndEvent", "throwRevertEvent"),
           click: createElement("true", "EndEvent", "throwRevertEvent")
-        },
-        className: 'custom-palette',
-      },
-      'BCCatchRevertEvent': {
-        group: 'BC',
-        imageUrl: BCREVCATCH,
-        title: translate('Create blockchain catch revert boundary event'),
-        action: {
-          dragstart: createElement("true", "BoundaryEvent", "catchRevertEvent"),
-          click: createElement("true", "BoundaryEvent", "catchRevertEvent")
         },
         className: 'custom-palette',
       },

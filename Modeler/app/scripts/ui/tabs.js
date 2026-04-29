@@ -96,7 +96,7 @@ function renderSenderTabs(networkData, networkKey, instanceId, contentContainer,
     const [, entries] = senderEntries[index];
     renderSenderTasks(entries, instanceId, contentContainer);
     // DataStore sections for all contracts in this network
-    renderDataStores(networkData, contentContainer);
+    renderDataStores(networkData, networkKey, instanceId, contentContainer);
     // Balances scoped to this network only
     renderRoleBalances({ [networkKey]: networkData }, ethChfRate);
   }

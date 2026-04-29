@@ -25,6 +25,95 @@ const instancesList    = document.getElementById('instances-list');
 const instancesEmpty   = document.getElementById('instances-empty');
 const instancesSpinner = document.getElementById('instances-spinner');
 
+// Source-code viewer refs
+const sourceTabsBar  = document.getElementById('source-tabs');
+const sourcePanel    = document.getElementById('source-panel');
+const sourceLoading  = document.getElementById('source-loading');
+const sourceCodeEl   = document.getElementById('source-code');
+const diagramTab     = document.getElementById('tab-diagram');
+
+// ── Source tab helpers ────────────────────────────────────────────────────────
+const TAB_ACTIVE   = 'model-tab flex-shrink-0 px-3 py-1 text-sm rounded border border-gray-400 bg-white font-medium text-gray-800';
+const TAB_INACTIVE = 'model-tab flex-shrink-0 px-3 py-1 text-sm rounded border border-transparent text-gray-500 hover:bg-gray-200';
+
+function activateTab(btn) {
+  document.querySelectorAll('.model-tab').forEach(b => (b.className = TAB_INACTIVE));
+  btn.className = TAB_ACTIVE;
+}
+
+if (diagramTab) {
+  diagramTab.onclick = () => {
+    activateTab(diagramTab);
+    sourcePanel.classList.add('hidden');
+    diagramFrame.classList.remove('hidden');
+  };
+}
+
+// Compiled contracts cache (populated lazily on first source-tab click)
+let compiledContracts = null;
+
+async function ensureCompiled(bpmn) {
+  if (compiledContracts) return compiledContracts;
+  const res = await fetch(`${getBaseUrl()}/api/compile`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ xml: bpmn, instanceId: 0 })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || 'Compilation failed');
+  }
+  compiledContracts = await res.json();
+  return compiledContracts;
+}
+
+function buildSourceTabs(bpmn) {
+  // Placeholder tabs shown immediately; source loaded lazily on first click
+  // We need at least one compile to know how many contracts there are.
+  // We trigger a silent background compile so tabs are ready quickly.
+  ensureCompiled(bpmn).then(contracts => {
+    if (!contracts || contracts.length === 0) return;
+
+    const networkIds = [...new Set(contracts.map(c => c.networkId))];
+    const multiNetwork = networkIds.length > 1;
+
+    contracts.forEach(contract => {
+      const label = (contract.contractText && contract.contractText.trim())
+        ? contract.contractText
+        : contract.contractName;
+      const tabLabel = multiNetwork
+        ? `${label} (${contract.networkId})`
+        : label;
+
+      const tab = document.createElement('button');
+      tab.className = TAB_INACTIVE;
+      tab.textContent = tabLabel;
+
+      tab.onclick = async () => {
+        activateTab(tab);
+        diagramFrame.classList.add('hidden');
+        sourcePanel.classList.remove('hidden');
+        sourceCodeEl.textContent = '';
+        sourceLoading.classList.remove('hidden');
+        try {
+          // contracts are already compiled at this point (ensureCompiled ran above)
+          const fresh = await ensureCompiled(bpmn);
+          const match = fresh.find(c => c.contractName === contract.contractName && c.networkId === contract.networkId);
+          sourceCodeEl.textContent = (match && match.contractCode) || '// Source code not available.';
+        } catch (err) {
+          sourceCodeEl.textContent = `// Error: ${err.message}`;
+        } finally {
+          sourceLoading.classList.add('hidden');
+        }
+      };
+
+      sourceTabsBar.appendChild(tab);
+    });
+  }).catch(() => {
+    // Silently swallow — user may not have a compiler running yet
+  });
+}
+
 const deployBtn        = document.getElementById('deploy-btn');
 const deployModal      = document.getElementById('deploy-modal');
 const deployNameInput  = document.getElementById('deploy-instance-name');
@@ -210,6 +299,9 @@ async function init() {
 
     // Load diagram viewer in iframe
     diagramFrame.src = `${getBaseUrl()}/diagram-viewer.html?modelId=${modelId}`;
+
+    // Kick off background compile so source tabs appear as soon as ready
+    buildSourceTabs(model.bpmn);
 
     // Filter instances belonging to this model
     const modelInstances = allInstances.filter(i => i.modelId === parseInt(modelId));

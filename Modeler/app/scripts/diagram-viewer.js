@@ -67,8 +67,12 @@ function getTransactionElements(startElement) {
 
     result.push(element);
 
-    // Follow every outgoing sequence flow
+    // Follow only control-flow edges (SequenceFlow).
+    // Skipping DataInputAssociation / DataOutputAssociation prevents the
+    // traversal from crossing into DataStores/DataObjects and then leaking
+    // into elements that belong to a different transaction.
     (element.outgoing || []).forEach(flow => {
+      if (flow.businessObject?.$type !== 'bpmn:SequenceFlow') return;
       if (!visited.has(flow.id)) {
         visited.add(flow.id);
         result.push(flow);
