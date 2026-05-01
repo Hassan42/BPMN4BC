@@ -18,56 +18,100 @@
   <div id="js-properties-panel"></div>
 
   <!-- Sticky Button Panel -->
-  <ul
-    class="buttons fixed bottom-4 left-1/2 transform -translate-x-1/2 flex gap-3 bg-white border border-gray-300 p-3 rounded-lg shadow-sm">
-    <li>
-      <a id="js-download-diagram" href="#" title="Download BPMN diagram"
-        class="px-4 py-2 text-sm rounded border border-gray-300 bg-white hover:bg-blue-50 cursor-pointer">
-        Download Diagram
-      </a>
-    </li>
-    <li>
-      <a id="js-upload-diagram-btn" title="Upload BPMN diagram"
-        class="px-4 py-2 text-sm rounded border border-gray-300 bg-white hover:bg-blue-50 cursor-pointer">
-        Upload Diagram
-      </a>
-      <input type="file" id="js-upload-diagram" accept=".bpmn" class="hidden" />
-    </li>
-    <!-- <li>
-      <a id="js-compile-diagram" href="#" class="px-4 py-2 text-sm rounded border border-gray-300 bg-white hover:bg-blue-50 cursor-pointer">
-        Compile
-      </a>
-    </li> -->
-    <li>
-      <a id="js-compile-deploy" href="#"
-        class="px-4 py-2 text-sm rounded border border-gray-300 bg-white hover:bg-blue-50 cursor-pointer">
-        Save Model
-      </a>
-    </li>
-    <li>
-      <a id="js-my-models" href="#"
-        class="px-4 py-2 text-sm rounded border border-gray-300 bg-white hover:bg-blue-50 cursor-pointer">
-        My Models
-      </a>
-    </li>
-    <!-- <li>
-      <a id="js-execute-panel" href="#"
-        class="px-4 py-2 text-sm rounded border border-gray-300 bg-white hover:bg-blue-50 cursor-pointer">
-        Workflow Panel
-      </a>
-    </li> -->
-    <li>
-      <a id="js-open-floating-window" href="#"
-        class="px-4 py-2 text-sm rounded border border-gray-300 bg-white hover:bg-blue-50 cursor-pointer">
-        Process Variables
-      </a>
-    </li>
-  </ul>
+  <div class="fixed bottom-0 left-1/2 -translate-x-1/2 flex flex-col items-center z-50">
+
+    <!-- Main toolbar -->
+    <div id="js-toolbar"
+      class="flex items-stretch bg-white border border-gray-300 rounded-lg shadow-sm overflow-hidden mb-1">
+
+      <!-- Group 1: Diagram file operations -->
+      <div class="flex items-center gap-1 px-2 py-2">
+        <a id="js-new-diagram" href="#" title="Clear diagram and start fresh"
+          class="px-3 py-1.5 text-xs rounded border border-gray-300 bg-white hover:bg-red-50 hover:border-red-300 hover:text-red-600 cursor-pointer whitespace-nowrap">
+          New
+        </a>
+        <a id="js-download-diagram" href="#" title="Download BPMN diagram"
+          class="px-3 py-1.5 text-xs rounded border border-gray-300 bg-white hover:bg-blue-50 cursor-pointer whitespace-nowrap">
+          Download
+        </a>
+        <a id="js-upload-diagram-btn" title="Upload BPMN diagram"
+          class="px-3 py-1.5 text-xs rounded border border-gray-300 bg-white hover:bg-blue-50 cursor-pointer whitespace-nowrap">
+          Upload
+        </a>
+        <input type="file" id="js-upload-diagram" accept=".bpmn" class="hidden" />
+      </div>
+
+      <!-- Divider -->
+      <div class="w-px bg-gray-200 my-2"></div>
+
+      <!-- Group 2: Model library -->
+      <div class="flex items-center gap-1 px-2 py-2">
+        <a id="js-compile-deploy" href="#"
+          class="px-3 py-1.5 text-xs rounded border border-gray-300 bg-white hover:bg-blue-50 cursor-pointer whitespace-nowrap">
+          Save Model
+        </a>
+        <a id="js-my-models" href="#"
+          class="px-3 py-1.5 text-xs rounded border border-gray-300 bg-white hover:bg-blue-50 cursor-pointer whitespace-nowrap">
+          My Models
+        </a>
+      </div>
+
+      <!-- Divider -->
+      <div class="w-px bg-gray-200 my-2"></div>
+
+      <!-- Group 3: Analysis / inspect -->
+      <div class="flex items-center gap-1 px-2 py-2">
+        <a id="js-open-floating-window" href="#"
+          class="px-3 py-1.5 text-xs rounded border border-gray-300 bg-white hover:bg-blue-50 cursor-pointer whitespace-nowrap">
+          Variables
+        </a>
+        <a id="js-open-tx-boundary-window" href="#"
+          class="px-3 py-1.5 text-xs rounded border border-gray-300 bg-white hover:bg-blue-50 cursor-pointer whitespace-nowrap">
+          Tx Boundaries
+        </a>
+      </div>
+
+      <!-- Divider -->
+      <div class="w-px bg-gray-200 my-2"></div>
+
+      <!-- Group 4: View toggles -->
+      <div class="flex items-center gap-1 px-2 py-2">
+        <a id="js-toggle-properties" href="#"
+          class="px-3 py-1.5 text-xs rounded border border-gray-300 bg-white hover:bg-blue-50 cursor-pointer whitespace-nowrap">
+          Hide Properties
+        </a>
+      </div>
+
+    </div>
+
+    <!-- Toggle tab (always visible) -->
+    <button id="js-toolbar-toggle"
+      class="text-xs text-gray-400 hover:text-gray-700 bg-white border border-gray-300 rounded-b-md px-4 py-0.5 mb-0 leading-tight hover:bg-gray-50 select-none">
+      ▼
+    </button>
+
+  </div>
 
   <script>
     // Make the Upload button trigger file input
     document.getElementById('js-upload-diagram-btn').addEventListener('click', function () {
       document.getElementById('js-upload-diagram').click();
+    });
+
+    // Toolbar hide / show toggle
+    document.getElementById('js-toolbar-toggle').addEventListener('click', function () {
+      var toolbar = document.getElementById('js-toolbar');
+      var hidden = toolbar.style.display === 'none';
+      toolbar.style.display = hidden ? 'flex' : 'none';
+      this.textContent = hidden ? '▼' : '▲';
+    });
+
+    // Properties panel hide / show toggle
+    document.getElementById('js-toggle-properties').addEventListener('click', function () {
+      var panel = document.getElementById('js-properties-panel');
+      var hidden = panel.style.display === 'none';
+      panel.style.display = hidden ? '' : 'none';
+      this.textContent = hidden ? 'Hide Properties' : 'Show Properties';
     });
   </script>
 

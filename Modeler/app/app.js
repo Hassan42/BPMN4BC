@@ -19,6 +19,7 @@ import bcExtension from '../resources/BC';
 import $ from 'jquery';
 
 import { renderVariablesWindow } from './scripts/ui/variablesWindow.js';
+import { renderTxBoundaryWindow } from './scripts/ui/txBoundaryWindow.js';
 import { getEthChfRate, gasToCHF, formatCHF } from './scripts/pricing.js';
 import { validateSoliditySnippet, validateSolidityExpression } from './scripts/solidityValidator.js';
 
@@ -80,6 +81,28 @@ function highlightErrorElements(elementIds) {
     try {
       canvas.addMarker(id, 'bpmn-error-highlight');
       _errorHighlightedIds.add(id);
+    } catch (_) {}
+  });
+}
+
+// ── Tx boundary highlight state ───────────────────────────────────────────
+const _txHighlightedIds = new Map(); // elementId → markerClass
+
+function clearTxHighlights() {
+  const canvas = bpmnModeler.get('canvas');
+  _txHighlightedIds.forEach((markerClass, id) => {
+    try { canvas.removeMarker(id, markerClass); } catch (_) {}
+  });
+  _txHighlightedIds.clear();
+}
+
+function applyTxHighlight(transaction) {
+  clearTxHighlights();
+  const canvas = bpmnModeler.get('canvas');
+  transaction.elementIds.forEach(id => {
+    try {
+      canvas.addMarker(id, 'bpmn-tx-highlight');
+      _txHighlightedIds.set(id, 'bpmn-tx-highlight');
     } catch (_) {}
   });
 }
@@ -287,6 +310,104 @@ function collectDiagramData() {
   };
 }
 
+function collectTransactionData() {
+  const elementRegistry = bpmnModeler.get('elementRegistry');
+  const allElements = elementRegistry.getAll();
+
+  // Find BC participants (pools with bc='true')
+  const bcParticipants = allElements.filter(el =>
+    el.businessObject?.$type === 'bpmn:Participant' && el.businessObject?.bc === 'true'
+  );
+  if (bcParticipants.length === 0) return { transactions: [], hasBcElements: false };
+
+  // Collect all element ids that are inside a BC pool
+  const bcPoolIds = new Set();
+  bcParticipants.forEach(p => {
+    allElements.forEach(el => {
+      let parent = el.parent;
+      while (parent) {
+        if (parent.id === p.id) { bcPoolIds.add(el.id); break; }
+        parent = parent.parent;
+      }
+    });
+    bcPoolIds.add(p.id);
+  });
+
+  const receiveTasks = allElements.filter(el =>
+    el.businessObject?.$type === 'bpmn:ReceiveTask' &&
+    el.businessObject?.bc === 'true' &&
+    bcPoolIds.has(el.id)
+  );
+  const startEvents = allElements.filter(el =>
+    el.businessObject?.$type === 'bpmn:StartEvent' && bcPoolIds.has(el.id)
+  );
+
+  if (receiveTasks.length === 0 && startEvents.length === 0)
+    return { transactions: [], hasBcElements: false };
+
+  // BFS forward from startEl; stop at next BC ReceiveTask boundary
+  function getTransactionTasks(startEl) {
+    const tasks = [];
+    const visited = new Set([startEl.id]);
+    const queue = (startEl.outgoing || [])
+      .filter(c => c.businessObject?.$type === 'bpmn:SequenceFlow')
+      .map(c => c.target)
+      .filter(Boolean);
+
+    while (queue.length) {
+      const current = queue.shift();
+      if (!current || visited.has(current.id)) continue;
+      visited.add(current.id);
+      const bo = current.businessObject;
+      if (!bo) continue;
+      // Stop at the next BC ReceiveTask (don't include it in this transaction's tasks)
+      if (bo.$type === 'bpmn:ReceiveTask' && bo.bc === 'true') continue;
+      tasks.push(current);
+      for (const conn of (current.outgoing || [])) {
+        if (conn.businessObject?.$type !== 'bpmn:SequenceFlow') continue;
+        if (conn.target && !visited.has(conn.target.id)) queue.push(conn.target);
+      }
+    }
+    return tasks;
+  }
+
+  const transactions = [];
+
+  // Initialization group: StartEvent → first ReceiveTask
+  startEvents.forEach(startEl => {
+    const tasks = getTransactionTasks(startEl);
+    if (tasks.length > 0) {
+      transactions.push({
+        label: 'Initialization',
+        entryName: startEl.businessObject?.name || 'Start Event',
+        tasks: tasks.map(el => ({
+          id: el.id,
+          name: el.businessObject?.name || el.id,
+          type: el.businessObject?.$type?.replace('bpmn:', '') || 'Element'
+        })),
+        elementIds: [startEl.id, ...tasks.map(el => el.id)]
+      });
+    }
+  });
+
+  // One transaction per BC ReceiveTask
+  receiveTasks.forEach((rtEl, i) => {
+    const tasks = getTransactionTasks(rtEl);
+    transactions.push({
+      label: rtEl.businessObject?.name || `Transaction ${i + 1}`,
+      entryName: rtEl.businessObject?.name || rtEl.id,
+      tasks: tasks.map(el => ({
+        id: el.id,
+        name: el.businessObject?.name || el.id,
+        type: el.businessObject?.$type?.replace('bpmn:', '') || 'Element'
+      })),
+      elementIds: [rtEl.id, ...tasks.map(el => el.id)]
+    });
+  });
+
+  return { transactions, hasBcElements: true };
+}
+
 const compileDeployButton = $('#js-compile-deploy');
 // Function to toggle button state (lock/unlock & show loading animation)
 function toggleLockButton(isDisabled, isLoading = false) {
@@ -416,6 +537,12 @@ $(function () {
 
   bpmnModeler.on('commandStack.changed', exportArtifacts);
   bpmnModeler.on('commandStack.changed', clearErrorHighlights);
+  bpmnModeler.on('commandStack.changed', clearTxHighlights);
+
+  // importXML resets the command stack so commandStack.changed never fires after a load.
+  // Run exportArtifacts on import.done so download links are always populated.
+  bpmnModeler.on('import.done', exportArtifacts);
+
 
   // Handle file upload
   $('#js-upload-diagram').change(async function (e) {
@@ -802,8 +929,33 @@ $(function () {
     const baseUrl = `${window.location.origin}${window.location.pathname.replace(/\/$/, '')}`;
     window.open(`${baseUrl}/execute-panel.html`, '_blank');
   });
+  $('#js-new-diagram').click(async () => {
+    if (!confirm('Start a new diagram? Your current work will be lost.')) return;
+    localStorage.removeItem('autosave_bpmn');
+    clearErrorHighlights();
+    clearTxHighlights();
+    $('#tx-boundary-window').remove();
+    $('#floating-window').remove();
+    try {
+      await bpmnModeler.importXML(diagramXML);
+    } catch (err) {
+      console.error('Error loading blank diagram:', err);
+    }
+  });
+
   $('#js-open-floating-window').click(() => {
     $('#floating-window').remove();
     renderVariablesWindow(collectDiagramData());
+  });
+
+  $('#js-open-tx-boundary-window').click(() => {
+    $('#tx-boundary-window').remove();
+    clearTxHighlights();
+    const txData = collectTransactionData();
+    renderTxBoundaryWindow(txData, {
+      onSelect: (tx) => applyTxHighlight(tx),
+      onClear:  () => clearTxHighlights(),
+      onClose:  () => clearTxHighlights()
+    });
   });
 });

@@ -321,18 +321,36 @@ function generateEntryFunction(activity, process, roles, collaborationId, partic
   // Combined function signature params: DataStore external + DataObject external
   const externalParams = [...dsExternalParamsList, ...doExternalParamsList].join(', ');
 
+  // Compute multiplicity before processElement is defined so it is available as a closure variable
+  const taskId = activity.id.replace(/\s+/g, '');
+  const senderKey = (senderRole || '').replace(/\s+/g, '');
+  const isMultiParticipant = (participantMultiplicities[senderKey] || 0) > 1;
+  const participationGate = `if (participationCount["${taskId}"] >= requiredParticipants["${taskId}"])`;
+
   let proceedingLogic = '';
   let hasLoop = false;
 
-  function processElement(element) {
+  // Append a state-changing line: wrapped in the participation gate for multi-participant,
+  // or appended directly for single-participant.
+  function appendState(line, alreadyGated) {
+    if (isMultiParticipant && !alreadyGated) {
+      proceedingLogic += `${participationGate} { ${line} }\n`;
+    } else {
+      proceedingLogic += `${line}\n`;
+    }
+  }
+
+  // alreadyGated: true when we are already inside a gate block (e.g. inside an XOR branch
+  // that is itself wrapped), so we must not double-wrap.
+  function processElement(element, alreadyGated = false) {
     const elementContractName = getContractNameForElement(element, process, collaborationId);
 
     switch (element.$type) {
       case 'bpmn:ReceiveTask': {
         if (elementContractName !== contractName) {
-          proceedingLogic += `I${elementContractName}(contracts["${elementContractName}"]).setState("${element.id.replace(/\s+/g, '')}", 1);\n`;
+          appendState(`I${elementContractName}(contracts["${elementContractName}"]).setState("${element.id.replace(/\s+/g, '')}", 1);`, alreadyGated);
         } else {
-          proceedingLogic += `state["${element.id.replace(/\s+/g, '')}"] = State.Open;\n`;
+          appendState(`state["${element.id.replace(/\s+/g, '')}"] = State.Open;`, alreadyGated);
           if (element.id.replace(/\s+/g, '') == activity.id.replace(/\s+/g, '')) {
             hasLoop = true;
           }
@@ -422,11 +440,8 @@ function generateEntryFunction(activity, process, roles, collaborationId, partic
             ? `I${elementContractName}(contracts["${elementContractName}"]).checkGateway_${element.id}`
             : `checkGateway_${element.id}`;
 
-          proceedingLogic += `
-                    if (!${gatewayFunctionName}()) {
-                        state["${activity.id.replace(/\s+/g, '')}"] = State.Completed;
-                        return;
-                    }\n`;
+          const checkCode = `if (!${gatewayFunctionName}()) { state["${activity.id.replace(/\s+/g, '')}"] = State.Completed; return; }`;
+          appendState(checkCode, alreadyGated);
         }
         break;
       }
@@ -435,7 +450,7 @@ function generateEntryFunction(activity, process, roles, collaborationId, partic
 
         if (outgoingFlows.length === 1) {
           const branchProceedingElements = getProceedingElementsFromFlow(outgoingFlows[0], process);
-          branchProceedingElements.forEach(branchElement => processElement(branchElement));
+          branchProceedingElements.forEach(branchElement => processElement(branchElement, alreadyGated));
         } else {
           const xorFunctionName = elementContractName !== contractName
             ? `I${elementContractName}(contracts["${elementContractName}"]).checkXOR_${element.id}`
@@ -482,16 +497,23 @@ function generateEntryFunction(activity, process, roles, collaborationId, partic
           const dsReadVarsForXor = getTaskDataStoreReadVars(element);
           dsReadVarsForXor.forEach(({ varname }) => argParts.push(`dataStore.${varname}`));
 
-          proceedingLogic += `uint256 branch = ${xorFunctionName}(${argParts.join(', ')});\n`;
+          // Build the XOR block: condition + branches appended directly (no outer gate).
+          // Individual state-changing lines inside each branch are wrapped by appendState as usual.
+          let xorBlock = `uint256 branch = ${xorFunctionName}(${argParts.join(', ')});\n`;
 
           element.outgoing.forEach((flow, index) => {
             const branchProceedingElements = getProceedingElementsFromFlow(flow, process);
-            proceedingLogic += index === 0
-              ? `if ((branch & (1 << ${index})) != 0) {\n`
-              : `else if ((branch & (1 << ${index})) != 0) {\n`;
-            branchProceedingElements.forEach(branchElement => processElement(branchElement));
-            proceedingLogic += `}\n`;
+            const saved = proceedingLogic;
+            proceedingLogic = '';
+            branchProceedingElements.forEach(branchElement => processElement(branchElement, alreadyGated));
+            const branchBody = proceedingLogic;
+            proceedingLogic = saved;
+            xorBlock += index === 0
+              ? `if ((branch & (1 << ${index})) != 0) {\n${branchBody}}\n`
+              : `else if ((branch & (1 << ${index})) != 0) {\n${branchBody}}\n`;
           });
+
+          proceedingLogic += xorBlock;
         }
         break;
       }
@@ -531,7 +553,7 @@ function generateEntryFunction(activity, process, roles, collaborationId, partic
         break;
       }
       case 'bpmn:EndEvent': {
-        proceedingLogic += `revert("End Event reached: ${element.id.replace(/\s+/g, '')}, ${element.error}");\n`;
+        appendState(`revert("End Event reached: ${element.id.replace(/\s+/g, '')}, ${element.error}");`, alreadyGated);
         break;
       }
       default:
@@ -548,7 +570,7 @@ function generateEntryFunction(activity, process, roles, collaborationId, partic
       const targetElements = outgoingFlows.map(flow => process.flowElements.find(el => el.id === flow.targetRef.id));
       targetElements.forEach(target => {
         if (target && target.$type === 'bpmn:ReceiveTask' && target.id !== activity.id) {
-          proceedingLogic += `state["${target.id.replace(/\s+/g, '')}"] = State.Closed;\n`;
+          appendState(`state["${target.id.replace(/\s+/g, '')}"] = State.Closed;`, false);
         }
       });
     }
@@ -565,15 +587,9 @@ function generateEntryFunction(activity, process, roles, collaborationId, partic
   const doStructCreationsCode = doStructCreations.join('\n        ');
 
   const payableModifier = (activity.bcpayable === true || activity.bcpayable === 'true') ? 'payable ' : '';
-  const taskId = activity.id.replace(/\s+/g, '');
-  const senderKey = (senderRole || '').replace(/\s+/g, '');
-  const multiplicityCount = (participantMultiplicities[senderKey] || 0);
-  const isMultiParticipant = multiplicityCount > 1;
-
   const bpmnMarker = `// @bpmn: ${activity.id} "${(activity.name || activity.id).replace(/"/g, '')}"`;
 
   if (isMultiParticipant) {
-    // Multi-participant: track each submission; only execute body when all N have submitted
     return `
     ${bpmnMarker}
     function ${taskId}(${externalParams}) public ${payableModifier}isAccessible("${taskId}") {
@@ -581,12 +597,9 @@ function generateEntryFunction(activity, process, roles, collaborationId, partic
         hasParticipated["${taskId}"][msg.sender] = true;
         participationCount["${taskId}"]++;
         ${dataStoreAssignments}
-        if (participationCount["${taskId}"] >= requiredParticipants["${taskId}"]) {
-            ${doStructCreationsCode}
-
-            ${proceedingLogic}
-            ${!hasNextReceiveTask && !hasLoop ? `state["${taskId}"] = State.Completed;` : ''}
-        }
+        ${doStructCreationsCode}
+        ${proceedingLogic}
+        ${!hasNextReceiveTask && !hasLoop ? `${participationGate} { state["${taskId}"] = State.Completed; }` : ''}
     }
     `;
   }

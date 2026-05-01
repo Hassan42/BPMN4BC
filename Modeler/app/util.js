@@ -134,3 +134,36 @@ export function nextId(prefix) {
 
   return ids.nextPrefixed(prefix);
 }
+
+/**
+ * Ensure a DataObjectVarSelection exists for every variable on a DO connection.
+ * Uses direct moddle mutation (no commandStack) so it can be called at render time
+ * without polluting the undo history with scaffolding commands.
+ */
+export function ensureDataObjectVarSelections(conn, vars, bpmnFactory) {
+  const bo = getBusinessObject(conn);
+
+  if (!bo.extensionElements) {
+    const extElems = bpmnFactory.create('bpmn:ExtensionElements', { values: [] });
+    extElems.$parent = bo;
+    bo.extensionElements = extElems;
+  }
+  const extElems = bo.extensionElements;
+
+  let selExt = (extElems.values || []).find(e => e.$instanceOf('bpmnbc:DataObjectVarSelections'));
+  if (!selExt) {
+    selExt = bpmnFactory.create('bpmnbc:DataObjectVarSelections', { values: [] });
+    selExt.$parent = extElems;
+    extElems.values = [...(extElems.values || []), selExt];
+  }
+
+  vars.forEach(variable => {
+    if (!variable.name) return;
+    const existing = (selExt.values || []).find(s => s.varname === variable.name);
+    if (!existing) {
+      const sel = bpmnFactory.create('bpmnbc:DataObjectVarSelection', { varname: variable.name });
+      sel.$parent = selExt;
+      selExt.values = [...(selExt.values || []), sel];
+    }
+  });
+}

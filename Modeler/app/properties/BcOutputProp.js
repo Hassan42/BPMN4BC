@@ -3,11 +3,6 @@ import { TextFieldEntry, CheckboxEntry, SelectEntry } from '@bpmn-io/properties-
 import { useService } from 'bpmn-js-properties-panel';
 import { is } from 'bpmn-js/lib/util/ModelUtil';
 
-// import ExtensionList from './ExtensionList';
-
-//is output injected from external message
-let isExternal = false;
-
 export default function OutputParameterProps(props) {
 
   const {
@@ -32,40 +27,30 @@ export default function OutputParameterProps(props) {
   ];
 
   if (!is(element, "bpmn:Lane") && !is(element, "bpmn:Participant")) {
-    entries.push(
-      {
-        id: idPrefix + '-scope',
-        component: Scope,
-        idPrefix,
-        parameter
-      }
-    )
+    entries.push({
+      id: idPrefix + '-scope',
+      component: Scope,
+      idPrefix,
+      parameter
+    });
   }
 
   if (is(element, "bpmn:ReceiveTask")) {
-    entries.push(
-      {
-        id: idPrefix + '-external',
-        component: External,
-        idPrefix,
-        parameter
-      }
-    )
+    entries.push({
+      id: idPrefix + '-external',
+      component: External,
+      idPrefix,
+      parameter
+    });
   }
 
-  // Update isExternal based on the parameter
-  isExternal = parameter.external;
-  //if external we dont have hardcoded value
-  if (!isExternal) {
-    entries.push(
-      {
-        id: idPrefix + '-value',
-        component: Value,
-        idPrefix,
-        parameter
-      }
-    )
-  }
+  // Value is always in the entries list; the component itself returns null when external is true
+  entries.push({
+    id: idPrefix + '-value',
+    component: Value,
+    idPrefix,
+    parameter
+  });
 
   return entries;
 }
@@ -115,6 +100,9 @@ function Value(props) {
   const commandStack = useService('commandStack');
   const translate = useService('translate');
   const debounce = useService('debounceInput');
+
+  // Must check after hooks (hook rules) — hide field when external is enabled
+  if (parameter.external) return null;
 
   const setValue = (value) => {
     commandStack.execute('element.updateModdleProperties', {

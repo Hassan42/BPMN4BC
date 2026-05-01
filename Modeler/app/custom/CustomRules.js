@@ -460,7 +460,11 @@ CustomRules.prototype.init = function () {
           return false;
         }
       }
-      return undefined;
+      // Explicitly return the connection type so the default bpmn-js rules
+      // (which block DataInputAssociation on gateways) don't interfere.
+      return sourceIsDataObj
+        ? { type: 'bpmn:DataInputAssociation' }
+        : { type: 'bpmn:DataOutputAssociation' };
     }
 
     return;

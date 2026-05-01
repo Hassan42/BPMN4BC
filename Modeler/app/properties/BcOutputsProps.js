@@ -12,8 +12,7 @@ import {
     getDataStoreVariables,
     getDataObjectVariables,
     getDataObjectVarSelections,
-    getDataObjectVarSelectionsExtension,
-    createDataObjectVarSelections,
+    ensureDataObjectVarSelections,
     nextId
   } from '../util';
 
@@ -74,13 +73,21 @@ import {
       const rawDoName = (doEl.businessObject.name || doEl.businessObject.id).replace(/\s+/g, '');
       const doLabel = rawDoName.charAt(0).toLowerCase() + rawDoName.slice(1);
       const vars = getDataObjectVariables(doEl) || [];
+
+      // Pre-create DataObjectVarSelection for every variable so setValue and
+      // setExternal can use a single direct commandStack.execute (fires
+      // element.changed immediately → instant re-render).
+      ensureDataObjectVarSelections(conn, vars, bpmnFactory);
+      const existingSelections = getDataObjectVarSelections(conn) || [];
+
       vars.forEach((variable, vi) => {
         const doItemId = `do-write-${doEl.id}-v${vi}`;
+        const sel = existingSelections.find(s => s.varname === variable.name);
         const entries = [
-          { id: `${doItemId}-value`, conn, variable, isReceiveTask, component: DoWriteVarValue, isEdited: isTextFieldEntryEdited }
+          { id: `${doItemId}-value`, conn, variable, sel, isReceiveTask, component: DoWriteVarValue, isEdited: isTextFieldEntryEdited }
         ];
         if (isReceiveTask) {
-          entries.push({ id: `${doItemId}-external`, conn, variable, component: DoWriteVarExternal });
+          entries.push({ id: `${doItemId}-external`, conn, variable, sel, component: DoWriteVarExternal });
         }
         items.push({
           id: doItemId,
@@ -118,16 +125,14 @@ import {
             selection: sel,
             component: DsMappingExternalKey,
           });
-          // Key text field — hidden when externalKey is checked
-          if (!sel.externalKey) {
-            entries.push({
-              id: `${dsItemId}-key`,
-              element: conn,
-              selection: sel,
-              component: DsMappingKey,
-              isEdited: isTextFieldEntryEdited,
-            });
-          }
+          // Key text field — always present; component returns null when externalKey is true
+          entries.push({
+            id: `${dsItemId}-key`,
+            element: conn,
+            selection: sel,
+            component: DsMappingKey,
+            isEdited: isTextFieldEntryEdited,
+          });
           // External Value checkbox — always visible
           entries.push({
             id: `${dsItemId}-extval`,
@@ -135,16 +140,14 @@ import {
             selection: sel,
             component: DsMappingExternalValue,
           });
-          // Value text field — hidden when externalValue is checked
-          if (!sel.externalValue) {
-            entries.push({
-              id: `${dsItemId}-value`,
-              element: conn,
-              selection: sel,
-              component: DsWriteValue,
-              isEdited: isTextFieldEntryEdited,
-            });
-          }
+          // Value text field — always present; component returns null when externalValue is true
+          entries.push({
+            id: `${dsItemId}-value`,
+            element: conn,
+            selection: sel,
+            component: DsWriteValue,
+            isEdited: isTextFieldEntryEdited,
+          });
         } else {
           // Regular DS var: Value expression + optional External param (ReceiveTask only)
           entries.push({
@@ -269,39 +272,21 @@ import {
     };
   }
 
-  function DoWriteVarValue({ id, conn, variable, isReceiveTask }) {
+  function DoWriteVarValue({ id, element, conn, variable, sel, isReceiveTask }) {
     const commandStack = useService('commandStack');
     const translate = useService('translate');
     const debounce = useService('debounceInput');
-    const bpmnFactory = useService('bpmnFactory');
 
-    const getSel = () => (getDataObjectVarSelections(conn) || []).find(s => s.varname === variable.name);
+    if (isReceiveTask && sel?.external) return null;
 
-    if (isReceiveTask && getSel()?.external) return null;
-
-    const getValue = () => getSel()?.value || '';
+    const getValue = () => sel?.value || '';
 
     const setValue = value => {
-      const commands = [];
-      const bo = conn.businessObject;
-      let extElems = bo.get('extensionElements');
-      if (!extElems) {
-        extElems = createElement('bpmn:ExtensionElements', { values: [] }, bo, bpmnFactory);
-        commands.push({ cmd: 'element.updateModdleProperties', context: { element: conn, moddleElement: bo, properties: { extensionElements: extElems } } });
-      }
-      let selExt = getDataObjectVarSelectionsExtension(conn);
-      if (!selExt) {
-        selExt = createDataObjectVarSelections({ values: [] }, extElems, bpmnFactory);
-        commands.push({ cmd: 'element.updateModdleProperties', context: { element: conn, moddleElement: extElems, properties: { values: [...extElems.get('values'), selExt] } } });
-      }
-      let sel = selExt.get('values').find(s => s.varname === variable.name);
-      if (!sel) {
-        sel = bpmnFactory.create('bpmnbc:DataObjectVarSelection', { varname: variable.name });
-        sel.$parent = selExt;
-        commands.push({ cmd: 'element.updateModdleProperties', context: { element: conn, moddleElement: selExt, properties: { values: [...selExt.get('values'), sel] } } });
-      }
-      commands.push({ cmd: 'element.updateModdleProperties', context: { element: conn, moddleElement: sel, properties: { value } } });
-      commandStack.execute('properties-panel.multi-command-executor', commands);
+      commandStack.execute('element.updateModdleProperties', {
+        element,
+        moddleElement: sel,
+        properties: { value }
+      });
     };
 
     const syntaxError = validateSolidityExpression(getValue());
@@ -310,7 +295,7 @@ import {
       <div>
         <${TextFieldEntry}
           id=${id}
-          element=${conn}
+          element=${sel}
           label=${translate('Value')}
           getValue=${getValue}
           setValue=${setValue}
@@ -325,6 +310,8 @@ import {
     const commandStack = useService('commandStack');
     const translate = useService('translate');
     const debounce = useService('debounceInput');
+
+    if (selection.externalKey) return null;
 
     const getValue = () => selection.key || '';
     const setValue = value => {
@@ -397,7 +384,7 @@ import {
     const translate = useService('translate');
     const debounce = useService('debounceInput');
 
-    if (selection.external) return null;
+    if (selection.external || selection.externalValue) return null;
 
     const getValue = () => selection.value || '';
     const setValue = value => {
@@ -445,41 +432,23 @@ import {
     />`;
   }
 
-  function DoWriteVarExternal({ id, conn, variable }) {
+  function DoWriteVarExternal({ id, element, conn, sel }) {
     const commandStack = useService('commandStack');
     const translate = useService('translate');
-    const bpmnFactory = useService('bpmnFactory');
 
-    const getSel = () => (getDataObjectVarSelections(conn) || []).find(s => s.varname === variable.name);
-
-    const getValue = () => getSel()?.external || false;
+    const getValue = () => sel?.external || false;
 
     const setValue = value => {
-      const commands = [];
-      const bo = conn.businessObject;
-      let extElems = bo.get('extensionElements');
-      if (!extElems) {
-        extElems = createElement('bpmn:ExtensionElements', { values: [] }, bo, bpmnFactory);
-        commands.push({ cmd: 'element.updateModdleProperties', context: { element: conn, moddleElement: bo, properties: { extensionElements: extElems } } });
-      }
-      let selExt = getDataObjectVarSelectionsExtension(conn);
-      if (!selExt) {
-        selExt = createDataObjectVarSelections({ values: [] }, extElems, bpmnFactory);
-        commands.push({ cmd: 'element.updateModdleProperties', context: { element: conn, moddleElement: extElems, properties: { values: [...extElems.get('values'), selExt] } } });
-      }
-      let sel = selExt.get('values').find(s => s.varname === variable.name);
-      if (!sel) {
-        sel = bpmnFactory.create('bpmnbc:DataObjectVarSelection', { varname: variable.name });
-        sel.$parent = selExt;
-        commands.push({ cmd: 'element.updateModdleProperties', context: { element: conn, moddleElement: selExt, properties: { values: [...selExt.get('values'), sel] } } });
-      }
-      commands.push({ cmd: 'element.updateModdleProperties', context: { element: conn, moddleElement: sel, properties: { external: value } } });
-      commandStack.execute('properties-panel.multi-command-executor', commands);
+      commandStack.execute('element.updateModdleProperties', {
+        element,
+        moddleElement: sel,
+        properties: { external: value }
+      });
     };
 
     return html`<${CheckboxEntry}
       id=${id}
-      element=${conn}
+      element=${sel}
       label=${translate('External')}
       getValue=${getValue}
       setValue=${setValue}
