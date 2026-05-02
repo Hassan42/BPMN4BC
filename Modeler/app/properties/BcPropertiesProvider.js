@@ -101,8 +101,8 @@ export default function BcPropertiesProvider(propertiesPanel, injector, translat
         }
       }
 
-      // Non-BC participant with multiplicity enabled: show instance count field
-      if (isParticipant && businessObject.bc !== 'true' && businessObject.participantMultiplicity) {
+      // Non-BC participant: show Participant Properties (Open checkbox + optional multiplicity)
+      if (isParticipant && businessObject.bc !== 'true') {
         groups.push({
           id: 'ParticipantMultiplicity',
           label: translate('Participant Properties'),

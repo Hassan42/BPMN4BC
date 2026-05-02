@@ -1,5 +1,5 @@
 import { createCollapsibleSection } from './collapsible.js';
-import { executeTask, queryMapping } from '../api.js';
+import { executeTask, queryMapping, queryBalance } from '../api.js';
 import { toggleVisibility } from '../utils/helper.js';
 import { formatCHF } from '../pricing.js';
 
@@ -58,34 +58,90 @@ function createTaskCard(network, contractName, task, instanceId, overrideSender)
 
   if (isCompleted) return card;
 
-  // Sender (read-only display — the tab already tells us who this is for)
+  // Sender — for open tasks: free-form address input; for normal tasks: pre-filled role name
   const senderInput = document.createElement('input');
   senderInput.type = 'text';
-  senderInput.value = overrideSender || task.sender || '';
-  senderInput.className = 'w-full p-2 border rounded text-sm mb-3';
+  senderInput.className = 'w-full p-2 border rounded text-sm mb-1';
   senderInput.disabled = isClosed;
 
   const senderLabel = document.createElement('label');
   senderLabel.className = 'block text-sm font-semibold text-gray-600 mb-1';
-  senderLabel.textContent = 'Sender';
-  card.appendChild(senderLabel);
-  card.appendChild(senderInput);
 
-  // ETH amount (payable tasks only)
+  if (task.open) {
+    senderLabel.textContent = 'Caller Address (Open)';
+    senderInput.value = '';
+    senderInput.placeholder = '0x... (any Ethereum address)';
+    senderInput.disabled = false;  // Always editable for open tasks
+    card.appendChild(senderLabel);
+    card.appendChild(senderInput);
+    const openHint = document.createElement('p');
+    openHint.className = 'text-xs text-indigo-500 italic mb-3';
+    openHint.textContent = 'Open task — any Ethereum address may call this.';
+    card.appendChild(openHint);
+  } else {
+    senderLabel.textContent = 'Sender';
+    senderInput.value = overrideSender || task.sender || '';
+    senderInput.className += ' mb-3';
+    card.appendChild(senderLabel);
+    card.appendChild(senderInput);
+  }
+
+  // ETH/WEI amount (payable tasks only)
+  // isWeiMode tracks whether the user has switched to WEI input
+  let isWeiMode = false;
+
   const amountInput = document.createElement('input');
   amountInput.type = 'number';
   amountInput.step = '0.0001';
   amountInput.min  = '0';
   amountInput.value = '0';
-  amountInput.className = 'w-full p-2 border rounded text-sm mb-3';
+  amountInput.className = 'flex-1 p-2 border rounded text-sm';
   amountInput.disabled = isClosed;
 
   if (task.payable) {
+    // Label row: "Amount (ETH)" on the left, toggle button on the right
+    const amountHeader = document.createElement('div');
+    amountHeader.className = 'flex items-center justify-between mb-1';
+
     const amountLabel = document.createElement('label');
-    amountLabel.className = 'block text-sm font-semibold text-gray-600 mb-1';
+    amountLabel.className = 'text-sm font-semibold text-gray-600';
     amountLabel.textContent = 'Amount (ETH)';
-    card.appendChild(amountLabel);
-    card.appendChild(amountInput);
+
+    const unitToggle = document.createElement('button');
+    unitToggle.type = 'button';
+    unitToggle.textContent = 'Switch to WEI';
+    unitToggle.className = 'text-xs px-2 py-0.5 rounded border border-gray-300 bg-white hover:bg-gray-100 text-gray-500 transition-colors';
+    unitToggle.disabled = isClosed;
+
+    unitToggle.onclick = () => {
+      isWeiMode = !isWeiMode;
+      amountInput.value = '0';
+      if (isWeiMode) {
+        amountLabel.textContent = 'Amount (WEI)';
+        amountInput.step = '1';
+        amountInput.placeholder = 'Enter WEI (integer)';
+        unitToggle.textContent = 'Switch to ETH';
+        unitToggle.classList.add('border-indigo-400', 'text-indigo-600');
+        unitToggle.classList.remove('text-gray-500');
+      } else {
+        amountLabel.textContent = 'Amount (ETH)';
+        amountInput.step = '0.0001';
+        amountInput.placeholder = '';
+        unitToggle.textContent = 'Switch to WEI';
+        unitToggle.classList.remove('border-indigo-400', 'text-indigo-600');
+        unitToggle.classList.add('text-gray-500');
+      }
+    };
+
+    amountHeader.appendChild(amountLabel);
+    amountHeader.appendChild(unitToggle);
+
+    const amountRow = document.createElement('div');
+    amountRow.className = 'flex gap-2 items-center mb-3';
+    amountRow.appendChild(amountInput);
+
+    card.appendChild(amountHeader);
+    card.appendChild(amountRow);
   }
 
   // External params form
@@ -137,7 +193,22 @@ function createTaskCard(network, contractName, task, instanceId, overrideSender)
       <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
     </svg>`;
     try {
-      await executeTask(network, contractName, task, form, senderInput.value, parseFloat(amountInput.value) || 0, instanceId);
+      // Convert WEI → ETH using BigInt to avoid float precision loss on large values
+      let ethAmount;
+      if (isWeiMode) {
+        const weiStr = amountInput.value.trim() || '0';
+        try {
+          const wei = BigInt(weiStr);
+          const whole = wei / BigInt('1000000000000000000');
+          const frac  = wei % BigInt('1000000000000000000');
+          ethAmount = Number(whole) + Number(frac) / 1e18;
+        } catch (_) {
+          ethAmount = parseFloat(weiStr) / 1e18 || 0;
+        }
+      } else {
+        ethAmount = parseFloat(amountInput.value) || 0;
+      }
+      await executeTask(network, contractName, task, form, senderInput.value, ethAmount, instanceId);
     } catch (err) {
       console.error('Task execution failed:', err);
     } finally {
@@ -456,7 +527,7 @@ function createDataStoreSection(dataArray, mappingVars, contractName, networkKey
   return sectionDiv;
 }
 
-export function renderRoleBalances(networks, ethChfRate) {
+export function renderRoleBalances(networks, ethChfRate, instanceId) {
   const container = document.getElementById('jsonContainer');
 
   Object.entries(networks).forEach(([networkName, contracts]) => {
@@ -540,6 +611,92 @@ export function renderRoleBalances(networks, ethChfRate) {
 
       sectionContent.appendChild(roleCard);
     });
+
+    // ── Address lookup widget ─────────────────────────────────────────────────
+    // Allows querying ETH balance + escrow for any address (useful for open participants)
+    const lookupCard = document.createElement('div');
+    lookupCard.className = 'p-3 bg-gray-100 border rounded shadow-sm mb-2';
+
+    const lookupTitle = document.createElement('div');
+    lookupTitle.className = 'font-semibold text-gray-700 mb-2';
+    lookupTitle.textContent = 'Address Lookup';
+
+    const inputRow = document.createElement('div');
+    inputRow.className = 'flex gap-2 items-center';
+
+    const addrInput = document.createElement('input');
+    addrInput.type = 'text';
+    addrInput.placeholder = '0x... (any Ethereum address)';
+    addrInput.className = 'flex-1 p-2 border border-gray-300 rounded text-sm bg-white font-mono';
+
+    const lookupBtn = document.createElement('button');
+    lookupBtn.type = 'button';
+    lookupBtn.textContent = 'Lookup';
+    lookupBtn.className = 'px-3 py-2 bg-white hover:bg-gray-200 text-gray-700 text-sm rounded border border-gray-300 font-medium transition-colors';
+
+    const resultDiv = document.createElement('div');
+    resultDiv.className = 'mt-2 hidden';
+
+    lookupBtn.onclick = async () => {
+      const address = addrInput.value.trim();
+      if (!address) return;
+      lookupBtn.disabled = true;
+      lookupBtn.textContent = '…';
+      resultDiv.className = 'mt-2 text-sm space-y-1';
+      resultDiv.textContent = 'Looking up…';
+
+      try {
+        // ETH balance
+        const { balance } = await queryBalance({ address, networkId: networkName });
+        const balEth = parseFloat(balance) || 0;
+        const balChf = ethChfRate ? balEth * ethChfRate : null;
+        const balChfLabel = balChf !== null ? `  ≈  ${balEth === 0 ? 'CHF 0.00' : formatCHF(balChf)}` : '';
+
+        resultDiv.innerHTML = '';
+
+        const balRow = document.createElement('div');
+        balRow.className = 'text-blue-700 font-semibold';
+        balRow.textContent = `ETH Balance: ${balEth.toFixed(4)} ETH${balChfLabel}`;
+        resultDiv.appendChild(balRow);
+
+        // Escrow per contract (escrowOf is mapping(address=>uint) stored in wei)
+        for (const [contractKey, contract] of Object.entries(contracts)) {
+          const contractLabel = contract.contractText || contractKey;
+          try {
+            const { value: rawWei } = await queryMapping({
+              instanceId,
+              contractName: contractKey,
+              networkId: networkName,
+              varName: 'escrowOf',
+              key: address
+            });
+            const escrowEth = Number(BigInt(rawWei || '0')) / 1e18;
+            const escrowChf = ethChfRate ? escrowEth * ethChfRate : null;
+            const escrowChfLabel = escrowChf !== null ? `  ≈  ${escrowEth === 0 ? 'CHF 0.00' : formatCHF(escrowChf)}` : '';
+
+            const escrowRow = document.createElement('div');
+            escrowRow.className = 'text-blue-700 font-semibold';
+            escrowRow.textContent = `Escrow (${contractLabel}): ${escrowEth.toFixed(4)} ETH${escrowChfLabel}`;
+            resultDiv.appendChild(escrowRow);
+          } catch (_) {
+            // Contract may not have escrowOf — skip silently
+          }
+        }
+      } catch (err) {
+        resultDiv.className = 'mt-2 text-sm text-red-600';
+        resultDiv.textContent = `Error: ${err.message}`;
+      } finally {
+        lookupBtn.disabled = false;
+        lookupBtn.textContent = 'Lookup';
+      }
+    };
+
+    inputRow.appendChild(addrInput);
+    inputRow.appendChild(lookupBtn);
+    lookupCard.appendChild(lookupTitle);
+    lookupCard.appendChild(inputRow);
+    lookupCard.appendChild(resultDiv);
+    sectionContent.appendChild(lookupCard);
 
     // Use your collapsible component here
     const collapsible = createCollapsibleSection(`Role Balances – ${networkName}`, sectionContent);

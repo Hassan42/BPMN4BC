@@ -1,6 +1,15 @@
 const { getEntryFunctions, getContractNameForElement, getTaskDataObjectReads, getTaskDataStoreReadVars, isValueType, capitalize, findFlowsForElement } = require('./utils.js');
 
 /**
+ * Strips characters that would break a Solidity line comment (//) from an element name.
+ * Newlines are the primary offender — they end the comment early and expose the rest of
+ * the name as raw Solidity code, causing compilation failures.
+ */
+function sanitizeName(name) {
+    return (name || '').replace(/[\r\n\t\0]/g, ' ').replace(/"/g, '').trim();
+}
+
+/**
  * Generates Solidity functions for gateways.
  * Delegates to specific gateway function generators based on the gateway type.
  * @param {Array} gateways - The array of gateway objects.
@@ -27,7 +36,7 @@ function generateAndGateway(gateway) {
     const functionName = `checkGateway_${gateway.id}`;
 
     return `
-    // @bpmn: ${gateway.id} "${(gateway.name || gateway.id).replace(/"/g, '')}"
+    // @bpmn: ${gateway.id} "${sanitizeName(gateway.name || gateway.id)}"
     uint256 private ${functionName}Count = 0;
 
     function ${functionName}() public returns (bool) {
@@ -108,7 +117,7 @@ function generateXORGateway(gateway, process, collaborationId) {
     }).join(' || ')});`;
 
     return `
-        // @bpmn: ${gateway.id} "${(gateway.name || gateway.id).replace(/"/g, '')}"
+        // @bpmn: ${gateway.id} "${sanitizeName(gateway.name || gateway.id)}"
         function ${functionName}(${parameterList}) public payable returns (uint256) {
             ${requireState}
             return ${solidityConditions};

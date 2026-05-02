@@ -45,15 +45,6 @@ export default function (element) {
       isEdited: isTextFieldEntryEdited
     }
   );
-  } else if(is(element, 'bpmn:EndEvent')){
-    props.push(
-      {
-        id: 'error',
-        element,
-        component: Error,
-        isEdited: isTextFieldEntryEdited
-      }
-    );
   } else if (is(element, 'bpmn:Lane') || (is(element, 'bpmn:Participant') && element.businessObject.bc === 'true')) {
     // BC pool / lane: show network ID and solidity script
     props.push(
@@ -70,44 +61,19 @@ export default function (element) {
         isEdited: isTextFieldEntryEdited
       }
     );
-  } else if (is(element, 'bpmn:Participant') && element.businessObject.bc !== 'true' && element.businessObject.participantMultiplicity) {
-    // Non-BC participant with multiplicity enabled: show instance count
-    props.push({
-      id: 'multiplicityCount',
-      element,
-      component: MultiplicityCount,
-      isEdited: isTextFieldEntryEdited
-    });
+  } else if (is(element, 'bpmn:Participant') && element.businessObject.bc !== 'true') {
+    // Non-BC participant: always show Open checkbox; show instance count only when not open
+    props.push({ id: 'open', element, component: OpenCheckbox });
+    if (!element.businessObject.bcopen) {
+      props.push({
+        id: 'multiplicityCount',
+        element,
+        component: MultiplicityCount,
+        isEdited: isTextFieldEntryEdited
+      });
+    }
   }
 return props;
-}
-
-function Error(props) {
-  const { element, id } = props;
-
-  const modeling = useService('modeling');
-  const translate = useService('translate');
-  const debounce = useService('debounceInput');
-
-  const getValue = () => {
-    return element.businessObject.error || '';
-  };
-
-  const setValue = value => {
-    return modeling.updateProperties(element, {
-      error: value
-    });
-  };
-
-  return html`<${TextFieldEntry}
-    id=${id}
-    element=${element}
-    description=${translate('Revert error message.')}
-    label=${translate('Error')}
-    getValue=${getValue}
-    setValue=${setValue}
-    debounce=${debounce}
-  />`;
 }
 
 function Sender(props) {
@@ -366,7 +332,11 @@ function MultiplicityCount(props) {
     const parsed = parseInt(value, 10);
     // If empty or <= 1, remove the attribute entirely so the model is clean
     const normalized = (value === '' || isNaN(parsed) || parsed <= 1) ? undefined : String(parsed);
-    modeling.updateProperties(element, { bcmultiplicity: normalized });
+    // Mutual exclusivity: clear bcopen when a valid multiplicity is set
+    modeling.updateProperties(element, {
+      bcmultiplicity: normalized,
+      ...(normalized ? { bcopen: undefined } : {})
+    });
   };
 
   return html`<${TextFieldEntry}
@@ -377,6 +347,34 @@ function MultiplicityCount(props) {
     getValue=${getValue}
     setValue=${setValue}
     debounce=${debounce}
+  />`;
+}
+
+function OpenCheckbox(props) {
+  const { element, id } = props;
+
+  const modeling = useService('modeling');
+  const translate = useService('translate');
+
+  const getValue = () => element.businessObject.bcopen || false;
+
+  const setValue = value => {
+    const update = { bcopen: value };
+    if (value) {
+      // Mutual exclusivity: clear multiplicity when open is enabled
+      update.bcmultiplicity = undefined;
+      update.participantMultiplicity = undefined;
+    }
+    modeling.updateProperties(element, update);
+  };
+
+  return html`<${CheckboxEntry}
+    id=${id}
+    element=${element}
+    label=${translate('Open')}
+    description=${translate('Any Ethereum address with the respective role can call the connected Receive Transaction task.')}
+    getValue=${getValue}
+    setValue=${setValue}
   />`;
 }
 

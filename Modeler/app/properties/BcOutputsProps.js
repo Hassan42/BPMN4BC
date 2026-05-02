@@ -77,7 +77,8 @@ import {
       // Pre-create DataObjectVarSelection for every variable so setValue and
       // setExternal can use a single direct commandStack.execute (fires
       // element.changed immediately → instant re-render).
-      ensureDataObjectVarSelections(conn, vars, bpmnFactory);
+      // For ReceiveTasks, default external=true so the variable is a function parameter by default.
+      ensureDataObjectVarSelections(conn, vars, bpmnFactory, isReceiveTask ? { external: true } : {});
       const existingSelections = getDataObjectVarSelections(conn) || [];
 
       vars.forEach((variable, vi) => {
@@ -154,6 +155,7 @@ import {
             id: `${dsItemId}-value`,
             element: conn,
             selection: sel,
+            isReceiveTask,
             component: DsWriteValue,
             isEdited: isTextFieldEntryEdited,
           });
@@ -277,7 +279,8 @@ import {
     const translate = useService('translate');
     const debounce = useService('debounceInput');
 
-    if (isReceiveTask && sel?.external) return null;
+    // external defaults to true for ReceiveTasks — undefined means "not yet explicitly set → treat as true"
+    if (isReceiveTask && sel?.external !== false) return null;
 
     const getValue = () => sel?.value || '';
 
@@ -379,12 +382,14 @@ import {
     />`;
   }
 
-  function DsWriteValue({ id, element, selection }) {
+  function DsWriteValue({ id, element, selection, isReceiveTask }) {
     const commandStack = useService('commandStack');
     const translate = useService('translate');
     const debounce = useService('debounceInput');
 
-    if (selection.external || selection.externalValue) return null;
+    // For ReceiveTasks, undefined external means "defaulting to true" — hide the value field
+    const effectiveExternal = isReceiveTask ? (selection.external !== false) : !!selection.external;
+    if (effectiveExternal || selection.externalValue) return null;
 
     const getValue = () => selection.value || '';
     const setValue = value => {
@@ -416,7 +421,8 @@ import {
     const commandStack = useService('commandStack');
     const translate = useService('translate');
 
-    const getValue = () => selection.external || false;
+    // Treat undefined as true so new ReceiveTask connections appear checked by default
+    const getValue = () => selection.external !== false;
     const setValue = value => commandStack.execute('element.updateModdleProperties', {
       element,
       moddleElement: selection,
@@ -436,7 +442,8 @@ import {
     const commandStack = useService('commandStack');
     const translate = useService('translate');
 
-    const getValue = () => sel?.external || false;
+    // Treat undefined as true so newly-created selections appear checked
+    const getValue = () => sel?.external !== false;
 
     const setValue = value => {
       commandStack.execute('element.updateModdleProperties', {

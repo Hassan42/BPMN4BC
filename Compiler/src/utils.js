@@ -362,7 +362,11 @@ const getContractNameForElement = (element, process, collaborationId) => {
 const extractRolesFromCollaboration = (collaboration) => {
     if (!collaboration || !collaboration.participants) return [];
     return collaboration.participants.filter(participant => participant.bc !== "true").map(participant => {
-        return { role: participant.name || participant.id, address: '' };
+        return {
+            role: participant.name || participant.id,
+            address: '',
+            open: participant.bcopen === 'true' || participant.bcopen === true
+        };
     });
 };
 
@@ -411,9 +415,14 @@ const generateContractConfig = ({
         .filter(v => (v.type || 'uint') === 'mapping')
         .map(v => ({ name: v.name, keyType: v.keyType || 'uint', valueType: v.valueType || 'uint' }));
 
-    // Filter roles based on those used in ReceiveTasks and format as an array of objects
+    // Filter roles based on those used in ReceiveTasks and format as an array of objects.
+    // Open participants are excluded — they require no address assignment.
     const contractRoles = roles
+        .filter(r => !r.open)
         .map(role => ({ role: role.role }));
+
+    // Build set of open role names for task flagging
+    const openRoleNames = new Set(roles.filter(r => r.open).map(r => r.role));
 
     // Create an array to store receive tasks info
     const receiveTasksInfo = receiveTasks.map(task => {
@@ -450,8 +459,9 @@ const generateContractConfig = ({
                             });
                         }
                     } else {
-                        // Regular var: external=true makes the whole value a param
-                        if (String(sel.external).trim() !== 'true') return;
+                        // Regular var: external=true (or undefined, which defaults to true for
+                        // ReceiveTasks) makes the whole value a param. Only skip when explicitly false.
+                        if (sel.external === false || String(sel.external) === 'false') return;
                         externalParams.push({ name: sel.varname, type: varType });
                     }
                 });
@@ -460,7 +470,7 @@ const generateContractConfig = ({
                 // connection (same source as generateEntryFunction), NOT from DataObjectVariable.
                 const doVars = extractDataObjectVariables(target);
                 extractDataObjectVarSelections(conn).forEach(sel => {
-                    if (String(sel.external).trim() !== 'true' || !sel.varname) return;
+                    if (!sel.varname || sel.external === false || String(sel.external) === 'false') return;
                     const doVar = doVars.find(v => v.name === sel.varname);
                     if (!doVar) return;
                     externalParams.push({ name: sel.varname, type: doVar.type || 'uint' });
@@ -474,6 +484,7 @@ const generateContractConfig = ({
             name: task.name || '',
             state: startReceiveTaskIds.includes(task.id.replace(/\s+/g, '')) ? 'Open' : 'Closed',
             payable: task.bcpayable === true || task.bcpayable === 'true',
+            open: openRoleNames.has(task.bcsender || ''),
             externalParams
         };
     });

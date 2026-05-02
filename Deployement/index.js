@@ -201,6 +201,30 @@ app.post('/queryMapping', async (req, res) => {
   }
 });
 
+// Query ETH balance of any address on a given network
+app.post('/queryBalance', async (req, res) => {
+  const { address, networkId } = req.body;
+  if (!address || !networkId) {
+    return res.status(400).json({ message: 'address and networkId are required.' });
+  }
+
+  try {
+    const stdout = await executeHardhatTask('query-balance', networkId, { address });
+
+    const match = stdout.match(/QUERY_RESULT:(\{.*\})/);
+    if (!match) {
+      console.error('query-balance stdout:', stdout);
+      return res.status(500).json({ message: 'Unexpected output from query-balance task.' });
+    }
+
+    const { value } = JSON.parse(match[1]);
+    res.status(200).json({ balance: value });
+  } catch (err) {
+    console.error('Error querying balance:', err);
+    res.status(500).json({ message: String(err) });
+  }
+});
+
 //Execute task in contract
 app.post('/executeTask', async (req, res) => {
   try {

@@ -81,6 +81,146 @@ const viewModelBtn = document.getElementById('view-model-btn');
 const backToInstancesBtn = document.getElementById('back-to-instances-btn');
 const backToModelerBtn = document.getElementById('back-to-modeler-btn');
 
+// ── Web3 Tools dropdown ─────────────────────────────────────────────────────
+(function initWeb3Tools() {
+  const btn      = document.getElementById('web3-tools-btn');
+  const dropdown = document.getElementById('web3-tools-dropdown');
+  if (!btn || !dropdown) return;
+
+  // Toggle on button click
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const isOpen = !dropdown.classList.contains('hidden');
+    dropdown.classList.toggle('hidden', isOpen);
+  });
+
+  // Close when clicking outside
+  document.addEventListener('click', (e) => {
+    if (!document.getElementById('web3-tools-wrapper')?.contains(e.target)) {
+      dropdown.classList.add('hidden');
+    }
+  });
+
+  // ── ETH → WEI converter ──────────────────────────────────────────────────
+  const ethInput  = document.getElementById('w3t-eth-input');
+  const weiOutput = document.getElementById('w3t-wei-output');
+  const copyBtn   = document.getElementById('w3t-copy-btn');
+
+  const ethToWei = (ethStr) => {
+    const val = parseFloat(ethStr);
+    if (isNaN(val) || val < 0) return null;
+    // BigInt arithmetic to avoid floating-point precision loss
+    const [intPart, fracPart = ''] = ethStr.replace(',', '.').split('.');
+    const frac18 = (fracPart + '000000000000000000').slice(0, 18);
+    try {
+      return (BigInt(intPart) * BigInt('1000000000000000000') + BigInt(frac18)).toString();
+    } catch (_) {
+      return Math.round(val * 1e18).toString();
+    }
+  };
+
+  ethInput.addEventListener('input', () => {
+    const wei = ethToWei(ethInput.value);
+    if (wei !== null) {
+      weiOutput.textContent = `${wei} wei`;
+      weiOutput.title = `${wei} wei`;
+    } else {
+      weiOutput.textContent = '—';
+      weiOutput.title = '';
+    }
+  });
+
+  copyBtn.addEventListener('click', () => {
+    const wei = ethToWei(ethInput.value);
+    if (wei === null) return;
+
+    const flash = () => {
+      const orig = copyBtn.textContent;
+      copyBtn.textContent = '✓ Copied';
+      copyBtn.classList.add('text-green-600', 'border-green-400');
+      setTimeout(() => {
+        copyBtn.textContent = orig;
+        copyBtn.classList.remove('text-green-600', 'border-green-400');
+      }, 1500);
+    };
+
+    const execFallback = () => {
+      const ta = document.createElement('textarea');
+      ta.value = wei;
+      ta.style.cssText = 'position:fixed;opacity:0;top:0;left:0';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      try { document.execCommand('copy'); } catch (_) {}
+      ta.remove();
+      flash();
+    };
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(wei).then(flash).catch(execFallback);
+    } else {
+      execFallback();
+    }
+  });
+
+  // ── Random Ethereum address generator ────────────────────────────────────
+  const addrOutput  = document.getElementById('w3t-addr-output');
+  const addrGenBtn  = document.getElementById('w3t-addr-gen-btn');
+  const addrCopyBtn = document.getElementById('w3t-addr-copy-btn');
+
+  const genAddress = () => {
+    const bytes = crypto.getRandomValues(new Uint8Array(20));
+    return '0x' + Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+  };
+
+  // Generate one immediately so the field is never blank when the panel opens
+  let lastAddr = genAddress();
+  addrOutput.textContent = lastAddr;
+  addrOutput.title = lastAddr;
+  addrOutput.classList.remove('text-gray-500');
+  addrOutput.classList.add('text-gray-700');
+
+  addrGenBtn.addEventListener('click', () => {
+    lastAddr = genAddress();
+    addrOutput.textContent = lastAddr;
+    addrOutput.title = lastAddr;
+    addrOutput.classList.remove('text-gray-500');
+    addrOutput.classList.add('text-gray-700');
+  });
+
+  addrCopyBtn.addEventListener('click', () => {
+    if (!lastAddr || lastAddr === '0x…') return;
+
+    const flashBtn = (btn) => {
+      const orig = btn.textContent;
+      btn.textContent = '✓ Copied';
+      btn.classList.add('text-green-600', 'border-green-400');
+      setTimeout(() => {
+        btn.textContent = orig;
+        btn.classList.remove('text-green-600', 'border-green-400');
+      }, 1500);
+    };
+
+    const fallback = () => {
+      const ta = document.createElement('textarea');
+      ta.value = lastAddr;
+      ta.style.cssText = 'position:fixed;opacity:0;top:0;left:0';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      try { document.execCommand('copy'); } catch (_) {}
+      ta.remove();
+      flashBtn(addrCopyBtn);
+    };
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(lastAddr).then(() => flashBtn(addrCopyBtn)).catch(fallback);
+    } else {
+      fallback();
+    }
+  });
+})();
+
 if (instanceId) {
   // Instance view — hide list, show instance nav buttons
   if (instancesSection) instancesSection.classList.add('hidden');
@@ -90,13 +230,20 @@ if (instanceId) {
   const viewerFrame = document.getElementById('viewerFrame');
   const closeViewerBtn = document.getElementById('close-viewer-btn');
 
+  // Show the BPMN viewer + transaction log panel by default
+  const diagramUrl = `${getBaseUrl()}/diagram-viewer.html?instanceId=${instanceId}`;
+  viewerPane.classList.remove('hidden');
+  viewerPane.classList.add('flex');
+  viewerFrame.src = diagramUrl;
+
   if (viewModelBtn) {
+    // Re-open if the user previously closed the pane
     viewModelBtn.addEventListener('click', () => {
-      if (viewerFrame.src !== `${getBaseUrl()}/diagram-viewer.html?instanceId=${instanceId}`) {
-        viewerFrame.src = `${getBaseUrl()}/diagram-viewer.html?instanceId=${instanceId}`;
-      }
       viewerPane.classList.remove('hidden');
       viewerPane.classList.add('flex');
+      if (!viewerFrame.src || viewerFrame.src === 'about:blank') {
+        viewerFrame.src = diagramUrl;
+      }
     });
   }
 

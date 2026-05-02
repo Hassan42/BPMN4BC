@@ -31,7 +31,7 @@
         </div>
 
         <!-- Back to Instances + View Model buttons — shown when viewing a specific instance -->
-        <div id="instanceNavSection" class="hidden flex gap-2 mb-4">
+        <div id="instanceNavSection" class="hidden flex gap-2 mb-4 flex-wrap items-start">
           <button id="back-to-instances-btn"
             class="px-4 py-2 text-sm rounded border border-gray-300 bg-white hover:bg-blue-50">
             ← All Instances
@@ -40,6 +40,70 @@
             class="px-4 py-2 text-sm rounded border border-gray-300 bg-white hover:bg-blue-50">
             View BPMN Model
           </button>
+
+          <!-- Web3 Tools button + dropdown -->
+          <div class="relative" id="web3-tools-wrapper">
+            <button id="web3-tools-btn"
+              class="px-4 py-2 text-sm rounded border border-gray-300 bg-white hover:bg-blue-50">
+              Web3 Tools ▾
+            </button>
+
+            <div id="web3-tools-dropdown"
+              class="hidden absolute left-0 top-full mt-1 z-50 bg-white border border-gray-300 rounded-lg shadow-xl"
+              style="min-width: 340px;">
+
+              <div class="px-4 py-3 border-b border-gray-200">
+                <span class="font-semibold text-sm text-gray-700">Web3 Tools</span>
+              </div>
+
+              <!-- ── Tool: ETH → WEI Converter ── -->
+              <div class="px-4 py-3 border-b border-gray-100">
+                <div class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+                  ETH → WEI Converter
+                </div>
+                <div class="flex items-center gap-2 mb-2">
+                  <input id="w3t-eth-input" type="number" placeholder="0.0" min="0" step="any"
+                    class="w-24 px-2 py-1.5 border border-gray-300 rounded text-sm font-mono focus:outline-none focus:border-blue-400" />
+                  <span class="text-gray-400 text-sm font-medium">ETH →</span>
+                  <div id="w3t-wei-output"
+                    class="flex-1 px-2 py-1.5 bg-gray-100 border border-gray-200 rounded text-sm font-mono text-gray-700 overflow-hidden whitespace-nowrap"
+                    style="text-overflow: ellipsis; min-width: 0;"
+                    title="">—</div>
+                </div>
+                <div class="flex gap-2 justify-end">
+                  <button id="w3t-copy-btn" type="button"
+                    class="px-3 py-1 text-xs rounded border border-gray-300 bg-white hover:bg-gray-100 text-gray-600 transition-colors">
+                    Copy WEI
+                  </button>
+                </div>
+              </div>
+
+              <!-- ── Tool: Random Ethereum Address Generator ── -->
+              <div class="px-4 py-3">
+                <div class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+                  Random Address Generator
+                </div>
+                <div class="flex items-center gap-2 mb-2">
+                  <div id="w3t-addr-output"
+                    class="flex-1 px-2 py-1.5 bg-gray-100 border border-gray-200 rounded text-sm font-mono text-gray-500 overflow-hidden whitespace-nowrap"
+                    style="text-overflow: ellipsis; min-width: 0;"
+                    title="">0x…</div>
+                </div>
+                <div class="flex gap-2 justify-end">
+                  <button id="w3t-addr-gen-btn" type="button"
+                    class="px-3 py-1 text-xs rounded border border-gray-300 bg-white hover:bg-gray-100 text-gray-600 transition-colors">
+                    Generate
+                  </button>
+                  <button id="w3t-addr-copy-btn" type="button"
+                    class="px-3 py-1 text-xs rounded border border-gray-300 bg-white hover:bg-gray-100 text-gray-600 transition-colors">
+                    Copy
+                  </button>
+                </div>
+              </div>
+
+            </div><!-- /web3-tools-dropdown -->
+          </div><!-- /web3-tools-wrapper -->
+
         </div>
 
         <!-- Instances List -->

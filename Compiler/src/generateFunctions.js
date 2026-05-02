@@ -85,7 +85,7 @@ function generateDataStoreAssignments(activity, collaborationId) {
       } else {
         // Regular DataStore struct var: dataStore.varName = value;
         const instanceName = 'dataStore';
-        if (String(sel.external).trim() === 'true') {
+        if (sel.external !== false && String(sel.external) !== 'false') {
           lines.push(`${instanceName}.${sel.varname} = ${sel.varname};`);
         } else if (sel.value) {
           const raw = generateExpression(sel.value, collaborationId);
@@ -195,7 +195,7 @@ function generateScriptFunction(activity, process, collaborationId) {
   const scriptWithoutReturn = solidityScript.replace(/return\s+.*?;/g, '').trim();
   const dataStoreAssignments = generateDataStoreAssignments(activity, collaborationId);
 
-  const bpmnName = (activity.name || activity.id).replace(/"/g, '');
+  const bpmnName = (activity.name || activity.id).replace(/[\r\n\t\0]/g, ' ').replace(/"/g, '').trim();
   return `
     // @bpmn: ${activity.id} "${bpmnName}"
     function ${activity.id.replace(/\s+/g, '')}(${inputTypes}) public payable ${returnClause} {
@@ -252,8 +252,8 @@ function generateEntryFunction(activity, process, roles, collaborationId, partic
           dsExternalParamsList.push(`${valueType} ${valMem}${sel.varname}Value`);
         }
       } else {
-        // Regular var: external=true makes the whole value a function param
-        if (String(sel.external).trim() !== 'true') return;
+        // Regular var: external=true (or undefined, defaults to true) makes the whole value a function param
+        if (sel.external === false || String(sel.external) === 'false') return;
         const memoryKeyword = isValueType(sel.varname, varType) ? '' : 'memory ';
         dsExternalParamsList.push(`${varType} ${memoryKeyword}${sel.varname}`);
       }
@@ -276,7 +276,7 @@ function generateEntryFunction(activity, process, roles, collaborationId, partic
     const selections = extractDataObjectVarSelections(conn);
 
     // Collect external variables as function params (from connection selections)
-    selections.filter(sel => String(sel.external).trim() === 'true' && sel.varname).forEach(sel => {
+    selections.filter(sel => sel.varname && sel.external !== false && String(sel.external) !== 'false').forEach(sel => {
       const v = vars.find(vv => vv.name === sel.varname);
       const vType = v ? (v.type || 'uint') : 'uint';
       const memKeyword = isValueType(sel.varname, vType) ? '' : 'memory ';
@@ -287,7 +287,7 @@ function generateEntryFunction(activity, process, roles, collaborationId, partic
     const fieldAssignments = vars.map(v => {
       const sel = selections.find(s => s.varname === v.name);
       // 1. External (value comes from function param)
-      if (sel && String(sel.external).trim() === 'true') {
+      if (sel && sel.external !== false && String(sel.external) !== 'false') {
         return `${v.name}: ${v.name}`;
       }
       // 2. Per-task write value from connection selection
@@ -503,11 +503,27 @@ function generateEntryFunction(activity, process, roles, collaborationId, partic
 
           element.outgoing.forEach((flow, index) => {
             const branchProceedingElements = getProceedingElementsFromFlow(flow, process);
-            const saved = proceedingLogic;
+            const savedLogic = proceedingLogic;
+            const savedHasLoop = hasLoop;
+
             proceedingLogic = '';
+            hasLoop = false; // reset so we can detect whether THIS branch loops
+
             branchProceedingElements.forEach(branchElement => processElement(branchElement, alreadyGated));
+
+            const branchLoops = hasLoop; // true iff this branch re-opens the current task
+            hasLoop = savedHasLoop || branchLoops; // propagate back to outer scope
+
+            // Terminal branch (no ReceiveTask re-opened in this path): close the current task.
+            // This handles the case where one XOR path loops and another leads to an EndEvent or
+            // any other terminal element — without this the hasLoop flag from the looping branch
+            // would suppress the global State.Completed, leaving the terminal branch with no close.
+            if (!branchLoops) {
+              appendState(`state["${taskId}"] = State.Completed;`, alreadyGated);
+            }
+
             const branchBody = proceedingLogic;
-            proceedingLogic = saved;
+            proceedingLogic = savedLogic;
             xorBlock += index === 0
               ? `if ((branch & (1 << ${index})) != 0) {\n${branchBody}}\n`
               : `else if ((branch & (1 << ${index})) != 0) {\n${branchBody}}\n`;
@@ -553,11 +569,12 @@ function generateEntryFunction(activity, process, roles, collaborationId, partic
         break;
       }
       case 'bpmn:EndEvent': {
-        appendState(`revert("End Event reached: ${element.id.replace(/\s+/g, '')}, ${element.error}");`, alreadyGated);
+        const revertMsg = (element.name || element.id).replace(/[\r\n\t\0]/g, ' ').replace(/"/g, '').trim();
+        appendState(`revert("${revertMsg}");`, alreadyGated);
         break;
       }
       default:
-        proceedingLogic += `// Logic for ${element.name || element.id}\n`;
+        proceedingLogic += `// Logic for ${(element.name || element.id).replace(/[\r\n\t\0]/g, ' ').trim()}\n`;
     }
   }
 
@@ -587,7 +604,7 @@ function generateEntryFunction(activity, process, roles, collaborationId, partic
   const doStructCreationsCode = doStructCreations.join('\n        ');
 
   const payableModifier = (activity.bcpayable === true || activity.bcpayable === 'true') ? 'payable ' : '';
-  const bpmnMarker = `// @bpmn: ${activity.id} "${(activity.name || activity.id).replace(/"/g, '')}"`;
+  const bpmnMarker = `// @bpmn: ${activity.id} "${(activity.name || activity.id).replace(/[\r\n\t\0]/g, ' ').replace(/"/g, '').trim()}"`;
 
   if (isMultiParticipant) {
     return `

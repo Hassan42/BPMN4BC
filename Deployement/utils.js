@@ -120,6 +120,7 @@ const updateHardhatConfig = (networkId, url) => {
   require('./tasks/deployContractsTask');
   require('./tasks/queryContractsTask');
   require('./tasks/queryMappingTask');
+  require('./tasks/queryBalanceTask');
   require('./tasks/setupContractsTask');
   require('./tasks/executeTask');
   require('./tasks/executeAllTask');

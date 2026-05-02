@@ -83,6 +83,17 @@ export async function fetchData(instanceId) {
   return await response.json();
 }
 
+export async function queryBalance({ address, networkId }) {
+  const response = await fetch(`${getBaseUrl()}/api/queryBalance`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ address, networkId })
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.message || data.error || 'Balance lookup failed');
+  return data; // { balance } in ETH
+}
+
 export async function queryMapping({ instanceId, contractName, networkId, varName, key }) {
   const response = await fetch(`${getBaseUrl()}/api/queryMapping`, {
     method: 'POST',

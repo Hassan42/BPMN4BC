@@ -59,9 +59,18 @@ async function generateContract(contractParams) {
 
   const receiveFunctionCount = receiveFunctionNames.length || 0;
 
+  // Compute open participant names once (no activitytoRole entry → modifier grants access to all)
+  const openParticipantNames = new Set(
+    roles.filter(r => r.open).map(r => (r.role || '').replace(/\s+/g, ''))
+  );
+
   const activityToRoleMappings = activities.map(activity => {
       // Return the mapping string for non-ScriptTask activities
       if (activity.$type === "bpmn:ScriptTask") { return '';}
+
+      // Open participant → skip role assignment (empty activitytoRole array grants access to all)
+      const senderKey = (activity.bcsender || '').replace(/\s+/g, '');
+      if (openParticipantNames.has(senderKey)) return '';
 
       let participantsArray;
       if (typeof activity.bcsender === 'string' && activity.bcsender.startsWith('[') && activity.bcsender.endsWith(']')) {

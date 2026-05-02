@@ -98,7 +98,7 @@ function renderSenderTabs(networkData, networkKey, instanceId, contentContainer,
     // DataStore sections for all contracts in this network
     renderDataStores(networkData, networkKey, instanceId, contentContainer);
     // Balances scoped to this network only
-    renderRoleBalances({ [networkKey]: networkData }, ethChfRate);
+    renderRoleBalances({ [networkKey]: networkData }, ethChfRate, instanceId);
   }
 
   senderEntries.forEach(([senderName], i) => {

@@ -200,7 +200,8 @@ const executeTask = async (contractManager, contractName, contractInstance, task
 
 
         // Get the address and private key of the role associated with this task
-        const roleAddress = contractManager.getAddressByRole(contractName, sender);
+        // For open tasks, sender may be a raw Ethereum address (no role registered)
+        const roleAddress = contractManager.getAddressByRole(contractName, sender) || sender;
         const rolePrivateKey = contractManager.getPrivateKeyByRole(contractName, sender);
 
         let roleSigner;

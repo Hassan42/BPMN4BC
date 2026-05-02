@@ -140,7 +140,7 @@ export function nextId(prefix) {
  * Uses direct moddle mutation (no commandStack) so it can be called at render time
  * without polluting the undo history with scaffolding commands.
  */
-export function ensureDataObjectVarSelections(conn, vars, bpmnFactory) {
+export function ensureDataObjectVarSelections(conn, vars, bpmnFactory, defaults = {}) {
   const bo = getBusinessObject(conn);
 
   if (!bo.extensionElements) {
@@ -161,7 +161,10 @@ export function ensureDataObjectVarSelections(conn, vars, bpmnFactory) {
     if (!variable.name) return;
     const existing = (selExt.values || []).find(s => s.varname === variable.name);
     if (!existing) {
-      const sel = bpmnFactory.create('bpmnbc:DataObjectVarSelection', { varname: variable.name });
+      const sel = bpmnFactory.create('bpmnbc:DataObjectVarSelection', {
+        varname: variable.name,
+        ...defaults
+      });
       sel.$parent = selExt;
       selExt.values = [...(selExt.values || []), sel];
     }

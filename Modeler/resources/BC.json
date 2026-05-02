@@ -81,6 +81,11 @@
             "name": "bcmultiplicity",
             "isAttr": true,
             "type": "String"
+          },
+          {
+            "name": "bcopen",
+            "isAttr": true,
+            "type": "Boolean"
           }
         ]
       },
