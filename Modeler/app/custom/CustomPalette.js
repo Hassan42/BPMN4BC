@@ -8,6 +8,10 @@ import BCREVCATCH from '../assets/CATCH-REV-ICON.svg';
 import BCSCRIPT from '../assets/BC-SCRIPT-icon.svg';
 import BCSTIMER from '../assets/BC-TIMER-ICON.svg';
 
+// Must be < 1000 (the default bpmn-js PaletteProvider priority) so our
+// provider fires AFTER the default, letting us overwrite same-key entries.
+const OVERRIDE_PRIORITY = 500;
+
 export default class CustomPalette {
   constructor(bpmnFactory, create, elementFactory, elementRegistry, modeling, palette, translate) {
     this.bpmnFactory = bpmnFactory;
@@ -17,7 +21,7 @@ export default class CustomPalette {
     this.modeling = modeling;
     this.translate = translate;
 
-    palette.registerProvider(this);
+    palette.registerProvider(OVERRIDE_PRIORITY, this);
   }
 
   getPaletteEntries(element) {
@@ -30,6 +34,42 @@ export default class CustomPalette {
       translate
     } = this;
 
+    // Standard BPMN elements — no bc properties
+    function createStartEvent(event) {
+      create.start(event, elementFactory.createShape({ type: 'bpmn:StartEvent' }));
+    }
+
+    function createEndEvent(event) {
+      create.start(event, elementFactory.createShape({ type: 'bpmn:EndEvent' }));
+    }
+
+    function createDataObject(event) {
+      create.start(event, elementFactory.createShape({ type: 'bpmn:DataObjectReference' }));
+    }
+
+    function createDataStore(event) {
+      create.start(event, elementFactory.createShape({ type: 'bpmn:DataStoreReference' }));
+    }
+
+    function createTask(event) {
+      create.start(event, elementFactory.createShape({ type: 'bpmn:Task' }));
+    }
+
+    function createSubprocess(event) {
+      const subProcess = elementFactory.createShape({ type: 'bpmn:SubProcess', x: 0, y: 0, isExpanded: true });
+      const startEvent = elementFactory.createShape({ type: 'bpmn:StartEvent', x: 40, y: 82, parent: subProcess });
+      create.start(event, [subProcess, startEvent], { hints: { autoSelect: [subProcess] } });
+    }
+
+    function createIntermediateEvent(event) {
+      create.start(event, elementFactory.createShape({ type: 'bpmn:IntermediateThrowEvent' }));
+    }
+
+    function createParticipant(event) {
+      create.start(event, elementFactory.createParticipantShape());
+    }
+
+    // BC-specific elements (with bc properties)
     function createElement(bcNode, bcType, bcEvent) {
       return function (event) {
         const businessObject = bpmnFactory.create(`bpmn:${bcType}`);
@@ -72,15 +112,55 @@ export default class CustomPalette {
     }
 
     return {
-      'SEPERATOR': {
+      // ── Suppress default palette positions so we can re-add at correct spots.
+      'create.start-event':         { group: '_hidden' },
+      'create.end-event':           { group: '_hidden' },
+      'create.exclusive-gateway':   { group: '_hidden' },
+      'create.data-object':         { group: '_hidden' },
+      'create.data-store':          { group: '_hidden' },
+      'create.group':               { group: '_hidden' },
+      'create.task':                { group: '_hidden' },
+      'create.subprocess-expanded': { group: '_hidden' },
+      'create.intermediate-event':  { group: '_hidden' },
+      'create.participant-expanded':{ group: '_hidden' },
+
+      // ── Common subgroup ───────────────────────────────────────────────────
+      'CommonLabel': {
         group: 'BC',
-        separator: true
+        html: '<div class="custom-palette-sublabel">Common</div>',
+        action: { click: function () { } }
       },
-      'BCGroupLabel': {
+      'std.start-event': {
         group: 'BC',
-        html: '<div class="custom-palette-label">Blockchain Components</div>',
+        className: 'bpmn-icon-start-event-none',
+        title: translate('Create start event'),
+        action: { dragstart: createStartEvent, click: createStartEvent }
+      },
+      'std.end-event': {
+        group: 'BC',
+        className: 'bpmn-icon-end-event-none',
+        title: translate('Create end event'),
+        action: { dragstart: createEndEvent, click: createEndEvent }
+      },
+      'std.data-object': {
+        group: 'BC',
+        className: 'bpmn-icon-data-object',
+        title: translate('Create data object'),
+        action: { dragstart: createDataObject, click: createDataObject }
+      },
+      'std.data-store': {
+        group: 'BC',
+        className: 'bpmn-icon-data-store',
+        title: translate('Create data store'),
+        action: { dragstart: createDataStore, click: createDataStore }
+      },
+      'std.gateway': {
+        group: 'BC',
+        className: 'bpmn-icon-gateway-none',
+        title: translate('Create gateway'),
         action: {
-          click: function () { }
+          dragstart: (event) => create.start(event, elementFactory.createShape({ type: 'bpmn:ExclusiveGateway' })),
+          click:     (event) => create.start(event, elementFactory.createShape({ type: 'bpmn:ExclusiveGateway' }))
         }
       },
 
@@ -88,9 +168,7 @@ export default class CustomPalette {
       'OnChainLabel': {
         group: 'BC',
         html: '<div class="custom-palette-sublabel">Off-Chain</div>',
-        action: {
-          click: function () { }
-        }
+        action: { click: function () { } }
       },
       'SEND': {
         group: 'BC',
@@ -122,7 +200,31 @@ export default class CustomPalette {
         },
         className: 'custom-palette',
       },
-      // Invisible spacer: fills the empty 4th flex-slot so On-Chain label starts on a fresh row
+      'std.task': {
+        group: 'BC',
+        className: 'bpmn-icon-task',
+        title: translate('Create task'),
+        action: { dragstart: createTask, click: createTask }
+      },
+      'std.subprocess': {
+        group: 'BC',
+        className: 'bpmn-icon-subprocess-expanded',
+        title: translate('Create expanded sub-process'),
+        action: { dragstart: createSubprocess, click: createSubprocess }
+      },
+      'std.intermediate': {
+        group: 'BC',
+        className: 'bpmn-icon-intermediate-event-none',
+        title: translate('Create intermediate/boundary event'),
+        action: { dragstart: createIntermediateEvent, click: createIntermediateEvent }
+      },
+      'std.participant': {
+        group: 'BC',
+        className: 'bpmn-icon-participant',
+        title: translate('Create pool/participant'),
+        action: { dragstart: createParticipant, click: createParticipant }
+      },
+      // Spacer: 7 Off-Chain elements → fill slot 8 so On-Chain label starts on a fresh row
       'BCOffChainSpacer': {
         group: 'BC',
         html: '<div class="custom-palette-spacer"></div>',

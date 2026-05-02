@@ -100,7 +100,7 @@ html, body, #container {
 }
 
 .djs-palette {
-  width: 95px !important; /* Set your desired width */
+  width: 95px !important;
 }
 /* Toast notifications */
 .bpmnbc-toast {
@@ -216,6 +216,7 @@ html, body, #container {
 }
 
 /* Sublabel entries: clear all preceding floats and span the full palette width */
+.djs-palette [data-action="CommonLabel"],
 .djs-palette [data-action="OnChainLabel"],
 .djs-palette [data-action="OffChainLabel"] {
   float: none !important;
@@ -233,6 +234,9 @@ html, body, #container {
   pointer-events: none !important;
   cursor: default !important;
 }
+
+/* Hide default palette entries that we've re-homed into the BC group */
+.djs-palette [data-group="_hidden"] { display: none !important; }
 
 /* ── Error highlight: red border on faulty BPMN elements ──────────────── */
 .bpmn-error-highlight .djs-visual > :nth-child(1) {

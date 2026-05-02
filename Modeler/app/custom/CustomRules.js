@@ -290,7 +290,7 @@ CustomRules.prototype.init = function () {
       is(targetBo, 'bpmn:ReceiveTask') &&
       bcTarget === 'true'
     ) {
-      if (sourceBo.name && !targetBo.bcsender) {
+    if (sourceBo.name) {
         targetBo.bcsender = sourceBo.name;
       }
     }
