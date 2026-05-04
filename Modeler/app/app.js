@@ -543,6 +543,13 @@ $(function () {
   // Run exportArtifacts on import.done so download links are always populated.
   bpmnModeler.on('import.done', exportArtifacts);
 
+  // Race-condition guard: if the localStorage/modelId import already completed before
+  // this jQuery ready callback registered the import.done handler above, the event
+  // was missed and the download link was never populated. Calling exportArtifacts()
+  // here ensures it always runs. The 500ms debounce coalesces this with any
+  // in-flight import.done call into a single saveXML execution.
+  exportArtifacts();
+
 
   // Handle file upload
   $('#js-upload-diagram').change(async function (e) {

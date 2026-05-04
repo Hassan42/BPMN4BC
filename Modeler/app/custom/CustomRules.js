@@ -114,6 +114,29 @@ CustomRules.prototype.init = function () {
       return null;
     }
 
+    // Returns all DataStoreReference shapes that share the same logical DataStore as `dsShape`
+    // (same participant + same containing lane). Includes dsShape itself.
+    const getSiblingDataStores = (dsShape) => {
+      const allElements = this._elementRegistry.getAll();
+      const laneElements = allElements.filter(el => is(el.businessObject, 'bpmn:Lane'));
+      const getContainingLane = (el) => {
+        if (!laneElements.length) return null;
+        const cx = el.x + el.width / 2;
+        const cy = el.y + el.height / 2;
+        return laneElements.find(l =>
+          cx >= l.x && cx <= l.x + l.width &&
+          cy >= l.y && cy <= l.y + l.height
+        ) || null;
+      };
+      const myParticipant = getPool(dsShape);
+      const myLane = getContainingLane(dsShape);
+      return allElements.filter(el =>
+        is(el.businessObject, 'bpmn:DataStoreReference') &&
+        getPool(el) === myParticipant &&
+        getContainingLane(el) === myLane
+      );
+    };
+
     // Block DataObject / DataStore connections that cross outside the BC pool
     const sourceIsDataEl = is(source.businessObject, 'bpmn:DataObjectReference') || is(source.businessObject, 'bpmn:DataStoreReference');
     const targetIsDataEl = is(target.businessObject, 'bpmn:DataObjectReference') || is(target.businessObject, 'bpmn:DataStoreReference');
@@ -329,9 +352,10 @@ CustomRules.prototype.init = function () {
 
     // DataStore → XOR / ThrowEvent: early return with DataInputAssociation (no boundary check needed for stores)
     if (is(sourceBo, 'bpmn:DataStoreReference') && (targetIsXOR || targetIsBcThrow)) {
+      const siblingIds = new Set(getSiblingDataStores(source).map(s => s.id));
       const alreadyReads = (target.incoming || []).some(
         conn => is(conn.source.businessObject, 'bpmn:DataStoreReference') &&
-                conn.source.id === source.id
+                siblingIds.has(conn.source.id)
       );
       if (alreadyReads) {
         setTimeout(() => showErrorToast('A task can only read from the same DataStore once.'), 0);
@@ -346,11 +370,12 @@ CustomRules.prototype.init = function () {
       return false;
     }
 
-    // DataStore → Task: enforce read-once rule
+    // DataStore → Task: enforce read-once rule (across all sibling shapes)
     if (is(sourceBo, 'bpmn:DataStoreReference') && !is(targetBo, 'bpmn:ExclusiveGateway')) {
+      const siblingIds = new Set(getSiblingDataStores(source).map(s => s.id));
       const alreadyReads = (target.incoming || []).some(
         conn => is(conn.source.businessObject, 'bpmn:DataStoreReference') &&
-                conn.source.id === source.id
+                siblingIds.has(conn.source.id)
       );
       if (alreadyReads) {
         setTimeout(() => showErrorToast('A task can only read from the same DataStore once.'), 0);
@@ -358,11 +383,12 @@ CustomRules.prototype.init = function () {
       }
     }
 
-    // Task → DataStore: enforce write-once rule
+    // Task → DataStore: enforce write-once rule (across all sibling shapes)
     if (is(targetBo, 'bpmn:DataStoreReference')) {
+      const siblingIds = new Set(getSiblingDataStores(target).map(s => s.id));
       const alreadyWrites = (source.outgoing || []).some(
         conn => is(conn.target.businessObject, 'bpmn:DataStoreReference') &&
-                conn.target.id === target.id
+                siblingIds.has(conn.target.id)
       );
       if (alreadyWrites) {
         setTimeout(() => showErrorToast('A task can only write to the same DataStore once.'), 0);
