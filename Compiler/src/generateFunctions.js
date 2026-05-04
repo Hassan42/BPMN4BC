@@ -18,6 +18,23 @@ const {
 } = require('./utils.js');
 
 /**
+ * Returns true when a DataStore/DataObject var selection should be treated as an
+ * external function parameter (i.e. the caller supplies the value).
+ *
+ * Rules:
+ *  - ReceiveTask + external undefined  → true  (opt-out default: checked in UI by default)
+ *  - ReceiveTask + external === false  → false (user explicitly unchecked)
+ *  - Any other task type               → only true when explicitly set to true
+ *    (ScriptTasks compute values internally; undefined means "use the value field")
+ */
+function isExternalParam(sel, activity) {
+  if (activity.$type === 'bpmn:ReceiveTask') {
+    return sel.external !== false && String(sel.external) !== 'false';
+  }
+  return sel.external === true || String(sel.external) === 'true';
+}
+
+/**
  * Extracts function signatures from the Solidity code.
  * @param {string} solidityCode - The Solidity code of the contract.
  * @returns {string} The Solidity interface as a string.
@@ -85,7 +102,7 @@ function generateDataStoreAssignments(activity, collaborationId) {
       } else {
         // Regular DataStore struct var: dataStore.varName = value;
         const instanceName = 'dataStore';
-        if (sel.external !== false && String(sel.external) !== 'false') {
+        if (isExternalParam(sel, activity)) {
           lines.push(`${instanceName}.${sel.varname} = ${sel.varname};`);
         } else if (sel.value) {
           const raw = generateExpression(sel.value, collaborationId);
@@ -252,8 +269,8 @@ function generateEntryFunction(activity, process, roles, collaborationId, partic
           dsExternalParamsList.push(`${valueType} ${valMem}${sel.varname}Value`);
         }
       } else {
-        // Regular var: external=true (or undefined, defaults to true) makes the whole value a function param
-        if (sel.external === false || String(sel.external) === 'false') return;
+        // Regular var: external param only for ReceiveTasks (undefined defaults to true there)
+        if (!isExternalParam(sel, activity)) return;
         const memoryKeyword = isValueType(sel.varname, varType) ? '' : 'memory ';
         dsExternalParamsList.push(`${varType} ${memoryKeyword}${sel.varname}`);
       }
@@ -276,7 +293,7 @@ function generateEntryFunction(activity, process, roles, collaborationId, partic
     const selections = extractDataObjectVarSelections(conn);
 
     // Collect external variables as function params (from connection selections)
-    selections.filter(sel => sel.varname && sel.external !== false && String(sel.external) !== 'false').forEach(sel => {
+    selections.filter(sel => sel.varname && isExternalParam(sel, activity)).forEach(sel => {
       const v = vars.find(vv => vv.name === sel.varname);
       const vType = v ? (v.type || 'uint') : 'uint';
       const memKeyword = isValueType(sel.varname, vType) ? '' : 'memory ';
@@ -287,7 +304,7 @@ function generateEntryFunction(activity, process, roles, collaborationId, partic
     const fieldAssignments = vars.map(v => {
       const sel = selections.find(s => s.varname === v.name);
       // 1. External (value comes from function param)
-      if (sel && sel.external !== false && String(sel.external) !== 'false') {
+      if (sel && isExternalParam(sel, activity)) {
         return `${v.name}: ${v.name}`;
       }
       // 2. Per-task write value from connection selection

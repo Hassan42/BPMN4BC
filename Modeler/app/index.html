@@ -22,7 +22,7 @@
 
     <!-- Main toolbar -->
     <div id="js-toolbar"
-      class="flex items-stretch bg-white border border-gray-300 rounded-lg shadow-sm overflow-hidden mb-1">
+      class="flex items-stretch bg-white border border-gray-300 rounded-lg shadow-sm mb-1">
 
       <!-- Group 1: Diagram file operations -->
       <div class="flex items-center gap-1 px-2 py-2">
@@ -82,6 +82,67 @@
         </a>
       </div>
 
+      <!-- Divider -->
+      <div class="w-px bg-gray-200 my-2"></div>
+
+      <!-- Group 5: Web3 Tools -->
+      <div class="flex items-center px-2 py-2 relative" id="w3t-wrapper">
+        <button id="w3t-btn"
+          class="px-3 py-1.5 text-xs rounded border border-gray-300 bg-white hover:bg-blue-50 cursor-pointer whitespace-nowrap">
+          Web3 Tools ▾
+        </button>
+
+        <!-- Dropdown — opens upward -->
+        <div id="w3t-dropdown"
+          class="hidden absolute left-0 bottom-full mb-1 z-50 bg-white border border-gray-300 rounded-lg shadow-xl"
+          style="min-width:340px;">
+
+          <div class="px-4 py-3 border-b border-gray-200">
+            <span class="font-semibold text-sm text-gray-700">Web3 Tools</span>
+          </div>
+
+          <!-- ETH → WEI Converter -->
+          <div class="px-4 py-3 border-b border-gray-100">
+            <div class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">ETH → WEI Converter</div>
+            <div class="flex items-center gap-2 mb-2">
+              <input id="w3t-eth-input" type="number" placeholder="0.0" min="0" step="any"
+                class="w-24 px-2 py-1.5 border border-gray-300 rounded text-sm font-mono focus:outline-none focus:border-blue-400" />
+              <span class="text-gray-400 text-sm font-medium">ETH →</span>
+              <div id="w3t-wei-output"
+                class="flex-1 px-2 py-1.5 bg-gray-100 border border-gray-200 rounded text-sm font-mono text-gray-700 overflow-hidden whitespace-nowrap"
+                style="text-overflow:ellipsis;min-width:0;" title="">—</div>
+            </div>
+            <div class="flex gap-2 justify-end">
+              <button id="w3t-copy-btn" type="button"
+                class="px-3 py-1 text-xs rounded border border-gray-300 bg-white hover:bg-gray-100 text-gray-600 transition-colors">
+                Copy WEI
+              </button>
+            </div>
+          </div>
+
+          <!-- Random Address Generator -->
+          <div class="px-4 py-3">
+            <div class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Random Address Generator</div>
+            <div class="flex items-center gap-2 mb-2">
+              <div id="w3t-addr-output"
+                class="flex-1 px-2 py-1.5 bg-gray-100 border border-gray-200 rounded text-sm font-mono text-gray-500 overflow-hidden whitespace-nowrap"
+                style="text-overflow:ellipsis;min-width:0;" title="">0x…</div>
+            </div>
+            <div class="flex gap-2 justify-end">
+              <button id="w3t-addr-gen-btn" type="button"
+                class="px-3 py-1 text-xs rounded border border-gray-300 bg-white hover:bg-gray-100 text-gray-600 transition-colors">
+                Generate
+              </button>
+              <button id="w3t-addr-copy-btn" type="button"
+                class="px-3 py-1 text-xs rounded border border-gray-300 bg-white hover:bg-gray-100 text-gray-600 transition-colors">
+                Copy
+              </button>
+            </div>
+          </div>
+
+        </div><!-- /w3t-dropdown -->
+      </div><!-- /w3t-wrapper -->
+
     </div>
 
     <!-- Toggle tab (always visible) -->
@@ -113,6 +174,89 @@
       panel.style.display = hidden ? '' : 'none';
       this.textContent = hidden ? 'Hide Properties' : 'Show Properties';
     });
+
+    // ── Web3 Tools ────────────────────────────────────────────────────────────
+    (function () {
+      var btn      = document.getElementById('w3t-btn');
+      var dropdown = document.getElementById('w3t-dropdown');
+      var wrapper  = document.getElementById('w3t-wrapper');
+
+      btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        dropdown.classList.toggle('hidden');
+      });
+      document.addEventListener('click', function (e) {
+        if (!wrapper.contains(e.target)) dropdown.classList.add('hidden');
+      });
+
+      // ETH → WEI converter
+      var ethInput  = document.getElementById('w3t-eth-input');
+      var weiOutput = document.getElementById('w3t-wei-output');
+      var copyBtn   = document.getElementById('w3t-copy-btn');
+
+      function ethToWei(ethStr) {
+        var val = parseFloat(ethStr);
+        if (isNaN(val) || val < 0) return null;
+        var parts = ethStr.replace(',', '.').split('.');
+        var intPart = parts[0], fracPart = parts[1] || '';
+        var frac18 = (fracPart + '000000000000000000').slice(0, 18);
+        try { return (BigInt(intPart) * BigInt('1000000000000000000') + BigInt(frac18)).toString(); }
+        catch (_) { return Math.round(val * 1e18).toString(); }
+      }
+
+      ethInput.addEventListener('input', function () {
+        var wei = ethToWei(ethInput.value);
+        if (wei !== null) { weiOutput.textContent = wei + ' wei'; weiOutput.title = wei + ' wei'; }
+        else              { weiOutput.textContent = '—'; weiOutput.title = ''; }
+      });
+
+      function flash(btn) {
+        var orig = btn.textContent;
+        btn.textContent = '✓ Copied';
+        btn.classList.add('text-green-600', 'border-green-400');
+        setTimeout(function () { btn.textContent = orig; btn.classList.remove('text-green-600', 'border-green-400'); }, 1500);
+      }
+
+      function copyText(text, btn) {
+        function fallback() {
+          var ta = document.createElement('textarea');
+          ta.value = text; ta.style.cssText = 'position:fixed;opacity:0;top:0;left:0';
+          document.body.appendChild(ta); ta.focus(); ta.select();
+          try { document.execCommand('copy'); } catch (_) {}
+          ta.remove(); flash(btn);
+        }
+        if (navigator.clipboard && navigator.clipboard.writeText)
+          navigator.clipboard.writeText(text).then(function () { flash(btn); }).catch(fallback);
+        else fallback();
+      }
+
+      copyBtn.addEventListener('click', function () {
+        var wei = ethToWei(ethInput.value);
+        if (wei !== null) copyText(wei, copyBtn);
+      });
+
+      // Random address generator
+      var addrOutput  = document.getElementById('w3t-addr-output');
+      var addrGenBtn  = document.getElementById('w3t-addr-gen-btn');
+      var addrCopyBtn = document.getElementById('w3t-addr-copy-btn');
+      var lastAddr    = '';
+
+      function genAddress() {
+        var bytes = crypto.getRandomValues(new Uint8Array(20));
+        return '0x' + Array.from(bytes, function (b) { return b.toString(16).padStart(2, '0'); }).join('');
+      }
+
+      function setAddr(addr) {
+        lastAddr = addr;
+        addrOutput.textContent = addr; addrOutput.title = addr;
+        addrOutput.classList.replace('text-gray-500', 'text-gray-700');
+      }
+
+      setAddr(genAddress());
+
+      addrGenBtn.addEventListener('click',  function () { setAddr(genAddress()); });
+      addrCopyBtn.addEventListener('click', function () { if (lastAddr) copyText(lastAddr, addrCopyBtn); });
+    })();
   </script>
 
   <!-- Warning Note -->

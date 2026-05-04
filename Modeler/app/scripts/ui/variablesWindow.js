@@ -106,7 +106,7 @@ export function renderVariablesWindow(data) {
   ` : '';
 
   const dsSection = dsVarRows.length > 0 ? `
-    <h3 class="font-semibold text-sm px-1 mb-1 mt-2">Data Stores</h3>
+    <h3 class="font-semibold text-sm px-1 mb-1 mt-2">Data Store</h3>
     <table class="w-full border-collapse border border-[#b1b1b1]">
       <thead class="bg-[#d8d9d9]">
         <tr>
@@ -125,7 +125,11 @@ export function renderVariablesWindow(data) {
       <span class="font-semibold">Process Variables</span>
       <span class="close-btn cursor-pointer text-lg px-2 py-1 bg-gray-300 rounded-md hover:bg-gray-400">X</span>
     </div>
-    <div id="floating-window-content" class="p-3 overflow-auto bg-white" style="max-height: calc(80vh - 40px);">
+    <div style="padding:7px 12px; background:#f0f0f0; border-bottom:1px solid #d4d4d4; font-size:11.5px; color:#555; line-height:1.5;">
+      <strong>Data Object (DO)</strong> — temporary variable scoped to a single transaction boundary.&ensp;
+      <strong>Data Store (DS)</strong> — persistent on-chain state. multiple DS shapes in the diagram all refer to the <em>same</em> single storage instance.
+    </div>
+    <div id="floating-window-content" class="p-3 overflow-auto bg-white" style="max-height: calc(80vh - 70px);">
       ${hasData
         ? doSection + dsSection
         : '<p class="text-gray-400 text-sm">No data objects or data stores found in the diagram.</p>'}

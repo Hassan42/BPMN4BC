@@ -343,7 +343,7 @@ function MultiplicityCount(props) {
     id=${id}
     element=${element}
     label=${translate('Number of Instances')}
-    description=${translate('Number of participant instances per role.')}
+    description=${translate('Number of participant instances per role (multiplicity should be enabled).')}
     getValue=${getValue}
     setValue=${setValue}
     debounce=${debounce}

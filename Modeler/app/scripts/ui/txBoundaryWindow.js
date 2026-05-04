@@ -33,6 +33,14 @@ export function renderTxBoundaryWindow(txData, { onSelect, onClear, onClose }) {
     </div>
   `;
 
+  // ── Description note ─────────────────────────────────────────────────────
+  const note = document.createElement('div');
+  note.style.cssText =
+    'padding:7px 12px; background:#f0f0f0; border-bottom:1px solid #d4d4d4; font-size:11.5px; color:#555; line-height:1.5; flex-shrink:0;';
+  note.innerHTML =
+    'A <strong>transaction boundary</strong> is the set of BPMN elements that execute atomically ' +
+    'within a single blockchain transaction. Click a boundary to highlight it on the diagram.';
+
   // ── Scrollable content ────────────────────────────────────────────────────
   const content = document.createElement('div');
   content.className = 'p-3 bg-white';
@@ -131,6 +139,7 @@ export function renderTxBoundaryWindow(txData, { onSelect, onClear, onClose }) {
   }
 
   floatingWindow.appendChild(header);
+  floatingWindow.appendChild(note);
   floatingWindow.appendChild(content);
   document.body.appendChild(floatingWindow);
 

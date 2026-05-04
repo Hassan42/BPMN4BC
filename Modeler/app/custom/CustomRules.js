@@ -121,6 +121,21 @@ CustomRules.prototype.init = function () {
     if (sourceIsDataEl || targetIsDataEl) {
       const dataEl  = sourceIsDataEl ? source : target;
       const otherEl = sourceIsDataEl ? target : source;
+
+      // Only enforce for meaningful flow elements (tasks, events, gateways, other data elements).
+      // Skip when otherEl is a connection line, label, or anything without a businessObject —
+      // those appear during hover/drag validation and should not trigger the error.
+      const otherBo = otherEl && otherEl.businessObject;
+      const otherIsMeaningful = otherBo && (
+        is(otherBo, 'bpmn:Activity') ||
+        is(otherBo, 'bpmn:Event') ||
+        is(otherBo, 'bpmn:Gateway') ||
+        is(otherBo, 'bpmn:DataObjectReference') ||
+        is(otherBo, 'bpmn:DataStoreReference') ||
+        is(otherBo, 'bpmn:Participant')
+      );
+      if (!otherIsMeaningful) return;
+
       const dataPool  = getPool(dataEl);
       const otherPool = getPool(otherEl);
 

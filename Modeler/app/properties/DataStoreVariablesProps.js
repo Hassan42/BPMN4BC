@@ -1,4 +1,4 @@
-import { getBusinessObject } from 'bpmn-js/lib/util/ModelUtil';
+import { getBusinessObject, is } from 'bpmn-js/lib/util/ModelUtil';
 import { without } from 'min-dash';
 
 import {
@@ -58,9 +58,46 @@ function removeFactory({ commandStack, element, variable, elementRegistry }) {
       }
     ];
 
-    // Cascade: remove any selections referencing this variable from connected connections
-    elementRegistry.getAll().forEach(connEl => {
-      if (connEl.source !== element && connEl.target !== element) return;
+    // Find all sibling DataStore shapes (same participant + same lane as element).
+    // Multiple DS shapes in the same lane share the same variable set, so all of
+    // their connections must be cleaned up — not just the one shape clicked.
+    const allElements = elementRegistry.getAll();
+
+    const getParticipant = (el) => {
+      let p = el.parent;
+      while (p) {
+        if (is(p.businessObject, 'bpmn:Participant')) return p;
+        p = p.parent;
+      }
+      return null;
+    };
+
+    const laneElements = allElements.filter(el => is(el.businessObject, 'bpmn:Lane'));
+    const getContainingLane = (el) => {
+      if (!laneElements.length) return null;
+      const cx = el.x + el.width / 2;
+      const cy = el.y + el.height / 2;
+      return laneElements.find(l =>
+        cx >= l.x && cx <= l.x + l.width &&
+        cy >= l.y && cy <= l.y + l.height
+      ) || null;
+    };
+
+    const myParticipant = getParticipant(element);
+    const myLane = getContainingLane(element);
+
+    const siblingShapes = new Set(
+      allElements.filter(el =>
+        is(el.businessObject, 'bpmn:DataStoreReference') &&
+        getParticipant(el) === myParticipant &&
+        getContainingLane(el) === myLane
+      )
+    );
+
+    // Cascade: remove selections referencing the deleted variable from every
+    // connection that touches any sibling DataStore shape.
+    allElements.forEach(connEl => {
+      if (!siblingShapes.has(connEl.source) && !siblingShapes.has(connEl.target)) return;
       const selExt = getDataStoreVarSelectionsExtension(connEl);
       if (!selExt) return;
       const filtered = selExt.get('values').filter(sel => sel.varname !== removedName);

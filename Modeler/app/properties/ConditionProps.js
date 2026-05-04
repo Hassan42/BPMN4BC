@@ -143,6 +143,7 @@ function ConditionExpression(props) {
     element,
     id: "conditionExpression",
     label: translate("Condition Expression"),
+    description: translate("For string comparisons use compareStrings(a, b)."),
     getValue,
     setValue,
     debounce
