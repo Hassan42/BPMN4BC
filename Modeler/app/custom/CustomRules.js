@@ -137,6 +137,21 @@ CustomRules.prototype.init = function () {
       );
     };
 
+    // Returns all DataObjectReference shapes that represent the same logical DataObject as `doShape`.
+    // Primary key: name (if set). Fallback: shared dataObjectRef id (same underlying DataObject element).
+    const getSiblingDataObjects = (doShape) => {
+      const bo = doShape.businessObject;
+      const myName = bo && bo.name;
+      const myRefId = bo && bo.dataObjectRef && bo.dataObjectRef.id;
+      return this._elementRegistry.getAll().filter(el => {
+        if (!is(el.businessObject, 'bpmn:DataObjectReference')) return false;
+        const elBo = el.businessObject;
+        if (myName) return elBo.name === myName;
+        if (myRefId) return elBo.dataObjectRef && elBo.dataObjectRef.id === myRefId;
+        return el.id === doShape.id; // last resort: exact shape only
+      });
+    };
+
     // Block DataObject / DataStore connections that cross outside the BC pool
     const sourceIsDataEl = is(source.businessObject, 'bpmn:DataObjectReference') || is(source.businessObject, 'bpmn:DataStoreReference');
     const targetIsDataEl = is(target.businessObject, 'bpmn:DataObjectReference') || is(target.businessObject, 'bpmn:DataStoreReference');
@@ -409,29 +424,63 @@ CustomRules.prototype.init = function () {
         taskEl.businessObject?.bc === 'true';
       if (!inBlockchain) return undefined;
 
-      // Enforce: a task may only write to a given DataObject once and read from it once
-      if (targetIsDataObj) {
-        const alreadyWrites = (taskEl.outgoing || []).some(
-          conn => is(conn.target.businessObject, 'bpmn:DataObjectReference') &&
-                  conn.target.id === dataEl.id
+      // Enforce DataObject connection rules:
+      //   Same shape  → read + write both allowed, but not write+write or read+read
+      //   Other sibling → blocked entirely once the task is already connected to any sibling
+      {
+        const otherSiblingIds = new Set(
+          getSiblingDataObjects(dataEl)
+            .filter(s => s.id !== dataEl.id)  // exclude the shape being connected right now
+            .map(s => s.id)
         );
-        if (alreadyWrites) {
-          setTimeout(() => showErrorToast(
-            'A task can only write to the same DataObject once.'
-          ), 0);
-          return false;
+
+        // Is the task already connected (read or write) to any OTHER sibling shape?
+        const connectedToOtherSibling =
+          (taskEl.outgoing || []).some(
+            conn => is(conn.target.businessObject, 'bpmn:DataObjectReference') &&
+                    otherSiblingIds.has(conn.target.id)
+          ) ||
+          (taskEl.incoming || []).some(
+            conn => is(conn.source.businessObject, 'bpmn:DataObjectReference') &&
+                    otherSiblingIds.has(conn.source.id)
+          );
+
+        if (targetIsDataObj) {
+          // Block: already writing to the exact same shape
+          const alreadyWrites = (taskEl.outgoing || []).some(
+            conn => is(conn.target.businessObject, 'bpmn:DataObjectReference') &&
+                    conn.target.id === dataEl.id
+          );
+          if (alreadyWrites) {
+            setTimeout(() => showErrorToast('A task can only write to the same DataObject once.'), 0);
+            return false;
+          }
+          // Block: task is already connected to a different shape of the same logical DO
+          if (connectedToOtherSibling) {
+            setTimeout(() => showErrorToast(
+              'A task cannot connect to multiple shapes of the same DataObject.'
+            ), 0);
+            return false;
+          }
         }
-      }
-      if (sourceIsDataObj) {
-        const alreadyReads = (taskEl.incoming || []).some(
-          conn => is(conn.source.businessObject, 'bpmn:DataObjectReference') &&
-                  conn.source.id === dataEl.id
-        );
-        if (alreadyReads) {
-          setTimeout(() => showErrorToast(
-            'A task can only read from the same DataObject once.'
-          ), 0);
-          return false;
+
+        if (sourceIsDataObj) {
+          // Block: already reading from the exact same shape
+          const alreadyReads = (taskEl.incoming || []).some(
+            conn => is(conn.source.businessObject, 'bpmn:DataObjectReference') &&
+                    conn.source.id === dataEl.id
+          );
+          if (alreadyReads) {
+            setTimeout(() => showErrorToast('A task can only read from the same DataObject once.'), 0);
+            return false;
+          }
+          // Block: task is already connected to a different shape of the same logical DO
+          if (connectedToOtherSibling) {
+            setTimeout(() => showErrorToast(
+              'A task cannot connect to multiple shapes of the same DataObject.'
+            ), 0);
+            return false;
+          }
         }
       }
 
