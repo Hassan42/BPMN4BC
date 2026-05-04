@@ -510,7 +510,11 @@ app.post('/deploy_instance', async (req, res) => {
 // ── GET /instances ───────────────────────────────────────────────────────────
 
 app.get('/instances', (req, res) => {
-  const instances = readInstances();
+  let instances = readInstances();
+  if (req.query.modelId !== undefined) {
+    const mid = parseInt(req.query.modelId, 10);
+    instances = instances.filter(i => i.modelId === mid);
+  }
   res.status(200).json(instances);
 });
 

@@ -57,8 +57,9 @@ export async function deleteModel(id) {
   return await response.json();
 }
 
-export async function fetchInstances() {
-  const response = await fetch(`${getBaseUrl()}/api/instances`);
+export async function fetchInstances(modelId) {
+  const qs = modelId !== undefined ? `?modelId=${encodeURIComponent(modelId)}` : '';
+  const response = await fetch(`${getBaseUrl()}/api/instances${qs}`);
   if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
   return await response.json();
 }

@@ -1,5 +1,17 @@
 import { fetchModel, fetchInstances, deleteInstance } from './api.js';
 import { gasToCHF, getEthChfRate, formatCHF } from './pricing.js';
+import hljs from 'highlight.js/lib/core';
+import { solidity } from 'highlightjs-solidity';
+
+hljs.registerLanguage('solidity', solidity);
+
+function highlightSolidity(code) {
+  try {
+    return hljs.highlight(code || '', { language: 'solidity' }).value;
+  } catch (_) {
+    return (code || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+}
 
 function getBaseUrl() {
   const origin   = window.location.origin;
@@ -99,9 +111,10 @@ function buildSourceTabs(bpmn) {
           // contracts are already compiled at this point (ensureCompiled ran above)
           const fresh = await ensureCompiled(bpmn);
           const match = fresh.find(c => c.contractName === contract.contractName && c.networkId === contract.networkId);
-          sourceCodeEl.textContent = (match && match.contractCode) || '// Source code not available.';
+          const code = (match && match.contractCode) || '// Source code not available.';
+          sourceCodeEl.innerHTML = highlightSolidity(code);
         } catch (err) {
-          sourceCodeEl.textContent = `// Error: ${err.message}`;
+          sourceCodeEl.innerHTML = highlightSolidity(`// Error: ${err.message}`);
         } finally {
           sourceLoading.classList.add('hidden');
         }
@@ -285,9 +298,9 @@ async function init() {
   instancesSpinner.classList.remove('hidden');
 
   try {
-    const [model, allInstances, ethChfRate] = await Promise.all([
+    const [model, modelInstances, ethChfRate] = await Promise.all([
       fetchModel(modelId),
-      fetchInstances(),
+      fetchInstances(modelId),   // server-side filtered — only this model's instances
       getEthChfRate()
     ]);
 
@@ -303,8 +316,6 @@ async function init() {
     // Kick off background compile so source tabs appear as soon as ready
     buildSourceTabs(model.bpmn);
 
-    // Filter instances belonging to this model
-    const modelInstances = allInstances.filter(i => i.modelId === parseInt(modelId));
     renderInstances(modelInstances, ethChfRate);
 
   } catch (err) {

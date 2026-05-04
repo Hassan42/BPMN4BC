@@ -93,23 +93,16 @@ const CUSTOM_SCRIPTS = [
 
 function injectStyles() {
   if (document.getElementById('sol-hljs-styles')) return;
+
+  // highlight.js github theme — covers all token classes automatically
+  const link = document.createElement('link');
+  link.id = 'sol-hljs-styles';
+  link.rel = 'stylesheet';
+  link.href = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css';
+  document.head.appendChild(link);
+
   const style = document.createElement('style');
-  style.id = 'sol-hljs-styles';
   style.textContent = `
-    #script-editor-window .sol-pre { color: #333; background: #fff; }
-    #script-editor-window .sol-pre .hljs-keyword    { color: #0000cc; font-weight: bold; }
-    #script-editor-window .sol-pre .hljs-string      { color: #a31515; }
-    #script-editor-window .sol-pre .hljs-number      { color: #098658; }
-    #script-editor-window .sol-pre .hljs-comment     { color: #008000; font-style: italic; }
-    #script-editor-window .sol-pre .hljs-type        { color: #267f99; }
-    #script-editor-window .sol-pre .hljs-built_in    { color: #0070c1; }
-    #script-editor-window .sol-pre .hljs-title       { color: #795e26; }
-    #script-editor-window .sol-pre .hljs-params      { color: #001080; }
-    #script-editor-window .sol-pre .hljs-literal     { color: #0000ff; }
-    #script-editor-window .sol-pre .hljs-variable    { color: #001080; }
-    #script-editor-window .sol-pre .hljs-operator    { color: #333; }
-    #script-editor-window .sol-pre .hljs-punctuation { color: #333; }
-    #script-editor-window .sol-pre .hljs-attr        { color: #e65100; }
 
     /* param-form overlay */
     #sol-param-form {

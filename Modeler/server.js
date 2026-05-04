@@ -69,10 +69,11 @@ async function safeFetch(url, options = {}) {
   }
 }
 
-// **Relay GET request to fetch all instances**
+// **Relay GET request to fetch all instances (optionally filtered by ?modelId=)**
 app.get('/api/instances', async (req, res) => {
   try {
-    const data = await safeFetch(`${DEP_API_BASE_URL}/instances`);
+    const qs = req.query.modelId !== undefined ? `?modelId=${encodeURIComponent(req.query.modelId)}` : '';
+    const data = await safeFetch(`${DEP_API_BASE_URL}/instances${qs}`);
     res.json(data);
   } catch (error) {
     res.status(500).json({ error: `${error.message}` });

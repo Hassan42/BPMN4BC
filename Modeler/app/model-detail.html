@@ -7,6 +7,7 @@
   <title>Model Detail – BPMN4BC</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="./model-detail.js" defer></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
   <style>
     html, body { height: 100%; overflow: hidden; }
   </style>
@@ -51,15 +52,15 @@
           <iframe id="diagram-frame" src="" class="absolute inset-0 w-full h-full border-none"></iframe>
 
           <!-- Source code panel -->
-          <div id="source-panel" class="absolute inset-0 bg-gray-900 hidden flex flex-col">
+          <div id="source-panel" class="absolute inset-0 bg-white hidden flex flex-col">
             <!-- Compiling spinner -->
             <div id="source-loading" class="absolute inset-0 flex items-center justify-center hidden">
-              <svg class="animate-spin h-8 w-8 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <svg class="animate-spin h-8 w-8 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
               </svg>
             </div>
-            <pre id="source-code" class="flex-1 p-4 text-gray-100 text-xs font-mono whitespace-pre-wrap leading-relaxed overflow-y-auto"></pre>
+            <pre id="source-code" class="flex-1 p-4 text-xs font-mono whitespace-pre-wrap leading-relaxed overflow-y-auto border-t border-gray-100"></pre>
           </div>
         </div>
 
