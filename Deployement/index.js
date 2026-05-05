@@ -389,12 +389,20 @@ app.get('/models/:id', (req, res) => {
 });
 
 app.delete('/models/:id', (req, res) => {
+  const mid    = parseInt(req.params.id);
   const models = readModels();
-  const idx    = models.findIndex(m => m.id === parseInt(req.params.id));
+  const idx    = models.findIndex(m => m.id === mid);
   if (idx === -1) return res.status(404).json({ message: 'Model not found.' });
   models.splice(idx, 1);
   writeModels(models);
-  res.status(200).json({ message: `Model ${req.params.id} deleted.` });
+
+  // Cascade-delete all instances that belonged to this model
+  const instances        = readInstances();
+  const remaining        = instances.filter(i => i.modelId !== mid);
+  const deletedCount     = instances.length - remaining.length;
+  writeInstances(remaining);
+
+  res.status(200).json({ message: `Model ${req.params.id} deleted.`, instancesDeleted: deletedCount });
 });
 
 // ── Validate (compile BPMN → Solidity + Hardhat compile, no deploy) ──────────

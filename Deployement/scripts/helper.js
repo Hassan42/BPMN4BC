@@ -210,9 +210,10 @@ const executeTask = async (contractManager, contractName, contractInstance, task
             const provider = (await ethers.getSigners())[0].provider;
             roleSigner = new ethers.Wallet(rolePrivateKey, provider);
         } else {
-            // Fallback: find among Hardhat signers (legacy / deployer roles)
+            // Find among Ganache signers by address (case-insensitive)
             const signers = await ethers.getSigners();
-            roleSigner = signers.find(s => s.address === roleAddress) || signers[0];
+            const needle = roleAddress.toLowerCase();
+            roleSigner = signers.find(s => s.address.toLowerCase() === needle) || signers[0];
         }
 
         // Attach to the contract instance with the role signer
