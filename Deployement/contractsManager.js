@@ -213,40 +213,50 @@ const createContractManager = (instanceId) => {
         return contract.address;
     };
 
-    const addOpenCaller = (contractName, roleName, address, privateKey) => {
-        const contracts = readContracts();
-        const contract = contracts.find(c => c.contractName === contractName);
-        if (!contract) throw new Error(`Contract "${contractName}" not found.`);
-        if (!contract.openCallers) contract.openCallers = {};
-        if (!contract.openCallers[roleName]) contract.openCallers[roleName] = [];
-        contract.openCallers[roleName].push({ address, privateKey });
-        writeContracts(contracts);
+    // ── Instance-level open-caller wallet pool ───────────────────────────────
+    // Wallets are shared across all open tasks in the instance, regardless of role.
+
+    const readInstanceOpenCallers = () => {
+        ensureInstancesFile();
+        const instances = JSON.parse(fs.readFileSync(instancesPath, 'utf8'));
+        const instance = instances.find(i => i.id === instanceId);
+        if (!instance) throw new Error(`Instance ${instanceId} not found in instances.json`);
+        return instance.openCallers || [];
     };
 
-    const getPrivateKeyByCallerAddress = (contractName, address) => {
-        const contracts = readContracts();
-        const contract = contracts.find(c => c.contractName === contractName);
-        if (!contract || !contract.openCallers) return undefined;
+    const writeInstanceOpenCallers = (openCallers) => {
+        ensureInstancesFile();
+        const instances = JSON.parse(fs.readFileSync(instancesPath, 'utf8'));
+        const idx = instances.findIndex(i => i.id === instanceId);
+        if (idx === -1) throw new Error(`Instance ${instanceId} not found in instances.json`);
+        instances[idx].openCallers = openCallers;
+        fs.writeFileSync(instancesPath, JSON.stringify(instances, null, 2), 'utf8');
+    };
+
+    const addInstanceCaller = (address, privateKey) => {
+        const callers = readInstanceOpenCallers();
+        callers.push({ address, privateKey });
+        writeInstanceOpenCallers(callers);
+    };
+
+    const getPrivateKeyByCallerAddress = (address) => {
+        const callers = readInstanceOpenCallers();
         const lc = address.toLowerCase();
-        for (const callers of Object.values(contract.openCallers)) {
-            const match = callers.find(c => c.address.toLowerCase() === lc);
-            if (match) return match.privateKey;
-        }
-        return undefined;
+        const match = callers.find(c => c.address.toLowerCase() === lc);
+        return match ? match.privateKey : undefined;
     };
 
     const getContractsState = (network) => {
         const contracts = readContracts();
         const networkContracts = contracts.filter(c => c.networkId === network);
+        // All open tasks in this instance share the same caller pool
+        const callerAddresses = readInstanceOpenCallers().map(c => c.address);
         return networkContracts.reduce((acc, contract) => {
-            const { contractName, contractRoles, contractText, balance, receiveTasks, dataStore, mappingVars, openCallers } = contract;
-            // Inject callers list (addresses only, no private keys) into each open task
-            const tasksWithCallers = (receiveTasks || []).map(task => {
-                if (task.open && openCallers && openCallers[task.sender]) {
-                    return { ...task, callers: openCallers[task.sender].map(c => c.address) };
-                }
-                return task;
-            });
+            const { contractName, contractRoles, contractText, balance, receiveTasks, dataStore, mappingVars } = contract;
+            // Inject the full instance-level caller list into every open task
+            const tasksWithCallers = (receiveTasks || []).map(task =>
+                task.open ? { ...task, callers: callerAddresses } : task
+            );
             acc[contractName] = { contractText, receiveTasks: tasksWithCallers, dataStore, mappingVars: mappingVars || [], contractRoles, balance };
             return acc;
         }, {});
@@ -368,7 +378,7 @@ const createContractManager = (instanceId) => {
         updateContractBalance,
         getTransactions,
         appendTransaction,
-        addOpenCaller,
+        addInstanceCaller,
         getPrivateKeyByCallerAddress
     };
 };

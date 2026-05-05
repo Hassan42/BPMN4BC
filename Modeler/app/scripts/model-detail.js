@@ -195,7 +195,7 @@ function renderInstances(instances, ethChfRate) {
 
     const openBtn = document.createElement('button');
     openBtn.className = 'flex-1 px-3 py-1.5 text-xs rounded border border-blue-400 text-blue-600 bg-white hover:bg-blue-50 font-medium';
-    openBtn.textContent = 'Open Workflow';
+    openBtn.textContent = 'Open Instance';
     openBtn.onclick = () => {
       window.location.href = `${getBaseUrl()}/execute-panel.html?instanceId=${instance.id}&modelId=${modelId}`;
     };

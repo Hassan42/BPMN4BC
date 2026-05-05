@@ -1,4 +1,4 @@
-import { fetchData, fetchInstances, deleteInstance } from './api.js';
+import { fetchData, fetchInstance, fetchInstances, deleteInstance } from './api.js';
 import { renderTabs, renderTransactionLog } from './ui/tabs.js';
 import { GAS_PRICE_GWEI, getEthChfRate, gasToCHF, formatCHF } from './pricing.js';
 
@@ -266,10 +266,19 @@ if (instanceId) {
   (async () => {
     try {
       loadingSpinner.classList.remove('hidden');
-      const [data, ethChfRate] = await Promise.all([
+      const [data, instance, ethChfRate] = await Promise.all([
         fetchData(instanceId),
+        fetchInstance(instanceId),
         getEthChfRate()
       ]);
+
+      // Show instance name below the panel title
+      const nameDisplay = document.getElementById('instanceNameDisplay');
+      if (nameDisplay && instance && instance.name) {
+        nameDisplay.textContent = instance.name;
+        nameDisplay.classList.remove('hidden');
+        document.title = `${instance.name} – BPMN4BC`;
+      }
 
       renderTabs(data.result, instanceId, ethChfRate);
       renderTransactionLog(data.transactions, ethChfRate);

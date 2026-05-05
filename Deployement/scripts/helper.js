@@ -217,9 +217,9 @@ const executeTask = async (contractManager, contractName, contractInstance, task
             if (matched) {
                 roleSigner = matched;
             } else {
-                // Check open-caller wallets stored for this instance
+                // Check instance-level open-caller wallet pool
                 const provider = signers[0].provider;
-                const callerKey = contractManager.getPrivateKeyByCallerAddress(contractName, roleAddress);
+                const callerKey = contractManager.getPrivateKeyByCallerAddress(roleAddress);
                 if (callerKey) {
                     roleSigner = new ethers.Wallet(callerKey, provider);
                 } else {

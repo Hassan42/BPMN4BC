@@ -201,14 +201,14 @@ app.post('/queryMapping', async (req, res) => {
   }
 });
 
-// Create a funded open-caller wallet for an open-participant task
+// Create a funded wallet shared across all open-participant tasks in an instance
 app.post('/createOpenCaller', async (req, res) => {
-  const { instanceId, contractName, role, networkId } = req.body;
-  if (!instanceId || !contractName || !role || !networkId) {
-    return res.status(400).json({ message: 'instanceId, contractName, role, and networkId are required.' });
+  const { instanceId, networkId } = req.body;
+  if (!instanceId || !networkId) {
+    return res.status(400).json({ message: 'instanceId and networkId are required.' });
   }
   try {
-    const stdout = await executeHardhatTask('create-open-caller', networkId, { instanceId, contractName, role });
+    const stdout = await executeHardhatTask('create-open-caller', networkId, { instanceId });
     const match = stdout.match(/CREATE_CALLER_RESULT:(\{.*\})/);
     if (!match) {
       console.error('create-open-caller stdout:', stdout);
@@ -216,7 +216,7 @@ app.post('/createOpenCaller', async (req, res) => {
     }
     res.status(200).json(JSON.parse(match[1])); // { address }
   } catch (err) {
-    res.status(500).json({ message: 'Failed to create open caller.', error: String(err) });
+    res.status(500).json({ message: 'Failed to create open caller wallet.', error: String(err) });
   }
 });
 
