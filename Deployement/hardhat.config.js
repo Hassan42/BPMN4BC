@@ -8,6 +8,7 @@
   require('./tasks/executeTask');
   require('./tasks/executeAllTask');
   require('./tasks/executePropertyExample');
+  require('./tasks/fundAddressTask');
 
   /** @type import('hardhat/config').HardhatUserConfig */
 

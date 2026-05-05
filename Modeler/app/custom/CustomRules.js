@@ -244,21 +244,32 @@ CustomRules.prototype.init = function () {
     }
 
     // BC ReceiveTask rules:
-    // 1. ReceiveTask → Participant/SendTask: always blocked (wrong direction)
-    // 2. Participant/SendTask → ReceiveTask: allowed only if the ReceiveTask has no existing participant connection
+    // 1. ReceiveTask → anything cross-pool: always blocked (ReceiveTasks never send message flows)
+    // 2. anything cross-pool → ReceiveTask: only allowed from a non-BC Participant or a BC SendTask
+    // 3. Valid sender → ReceiveTask: allowed only if the ReceiveTask has no existing sender connection
     const isNonBcParticipantOrSendTask = (el) =>
       (is(el.businessObject, 'bpmn:Participant') && el.businessObject.bc !== 'true') ||
-      is(el.businessObject, 'bpmn:SendTask');
+      (is(el.businessObject, 'bpmn:SendTask') && el.businessObject.bc === 'true');
+
+    const RECEIVE_TASK_SENDER_MSG =
+      'A Receive Transaction Task can only receive message flows from a non-BC Participant or a BC Send Task.';
 
     if (is(source.businessObject, 'bpmn:ReceiveTask') && source.businessObject.bc === 'true') {
-      if (isNonBcParticipantOrSendTask(target)) {
-        setTimeout(() => showErrorToast('Receive Transaction Task is already assigned to a participant.'), 0);
+      // ReceiveTask can never be the source of a cross-pool (message flow) connection.
+      // Guard: targetPool must be non-null so we don't fire spuriously when hovering
+      // over the collaboration background or lane boundaries.
+      if (targetPool && sourcePool !== targetPool) {
+        // Only show a toast for the specific mistake: ReceiveTask → standard SendTask
+        if (is(target.businessObject, 'bpmn:SendTask') && target.businessObject.bc !== 'true') {
+          setTimeout(() => showErrorToast(RECEIVE_TASK_SENDER_MSG), 0);
+        }
         return false;
       }
     }
 
     if (is(target.businessObject, 'bpmn:ReceiveTask') && target.businessObject.bc === 'true') {
       if (isNonBcParticipantOrSendTask(source)) {
+        // Valid sender type — enforce one-sender limit
         const allConns = [...(target.incoming || []), ...(target.outgoing || [])];
         const alreadyHasParticipant = allConns.some(conn => {
           const other = conn.source === target ? conn.target : conn.source;
@@ -268,6 +279,12 @@ CustomRules.prototype.init = function () {
           setTimeout(() => showErrorToast('A Receive Task can only be connected to one participant.'), 0);
           return false;
         }
+      } else if (sourcePool !== targetPool) {
+        // Only show a toast for the specific mistake: standard SendTask → ReceiveTask
+        if (is(source.businessObject, 'bpmn:SendTask') && source.businessObject.bc !== 'true') {
+          setTimeout(() => showErrorToast(RECEIVE_TASK_SENDER_MSG), 0);
+        }
+        return false;
       }
     }
 
@@ -319,20 +336,19 @@ CustomRules.prototype.init = function () {
     }
 
 
-    // Assign role to the receive task
+    // Assign role to the receive task when a BC SendTask connects to a BC ReceiveTask.
+    // Use the SendTask's parent pool name (or pool id as fallback) so bcsender is
+    // always populated even when the pool hasn't been named yet.
     if (
       is(sourceBo, "bpmn:SendTask") &&
       is(targetBo, "bpmn:ReceiveTask") &&
       bcSource === "true" &&
       bcTarget === "true"
     ) {
-      let participantBo = source.parent && source.parent.businessObject;
-      let participantRole = participantBo.name;
-
-      if (participantRole) {
-        targetBo.bcsender = participantRole;
-        sourceBo.bcid = targetBo.bcid;
-      }
+      const pool = getPool(source);
+      const poolBo = pool && pool.businessObject;
+      targetBo.bcsender = (poolBo && (poolBo.name || poolBo.id)) || sourceBo.name || sourceBo.id;
+      sourceBo.bcid = targetBo.bcid;
     }
 
     // Auto-fill bcsender when a non-BC collapsed Participant (external pool) connects
@@ -343,11 +359,10 @@ CustomRules.prototype.init = function () {
       is(targetBo, 'bpmn:ReceiveTask') &&
       bcTarget === 'true'
     ) {
-    if (sourceBo.name) {
-        targetBo.bcsender = sourceBo.name;
-      }
+    // Use name if set, otherwise fall back to participant ID
+    targetBo.bcsender = sourceBo.name || sourceBo.id;
     }
-    
+
     // ReceiveTask cannot read from a DataStore
     if (
       is(sourceBo, 'bpmn:DataStoreReference') &&

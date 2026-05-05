@@ -31,6 +31,47 @@ export default function ParticipantSync(eventBus, commandStack, elementRegistry)
     context._oldParticipantName = shape.businessObject.name || '';
   });
 
+  const isNonBcParticipantOrSendTask = (el) =>
+    (is(el.businessObject, 'bpmn:Participant') && el.businessObject.bc !== 'true') ||
+    (is(el.businessObject, 'bpmn:SendTask') && el.businessObject.bc === 'true');
+
+  // When the message-flow connection from a Participant/SendTask is removed,
+  // clear the bcsender on the ReceiveTask.
+  //
+  // Two-step: capture source/target in preExecute (before diagram-js clears them),
+  // then apply the bcsender wipe in postExecute.
+  this.preExecute('connection.delete', ({ context }) => {
+    const conn = context.connection;
+    if (!conn) return;
+    // Store refs on context so postExecute can still read them after deletion
+    context._msgFlowSrc = conn.source;
+    context._msgFlowTgt = conn.target;
+  });
+
+  this.postExecute('connection.delete', ({ context }) => {
+    if (syncing) return;
+    const src = context._msgFlowSrc;
+    const tgt = context._msgFlowTgt;
+    if (!src || !tgt) return;
+
+    // Only act when a Participant/SendTask → BC ReceiveTask message flow is deleted
+    if (
+      !isNonBcParticipantOrSendTask(src) ||
+      !is(tgt.businessObject, 'bpmn:ReceiveTask') ||
+      tgt.businessObject.bc !== 'true'
+    ) return;
+
+    syncing = true;
+    try {
+      commandStack.execute('properties-panel.multi-command-executor', [{
+        cmd: 'element.updateModdleProperties',
+        context: { element: tgt, moddleElement: tgt.businessObject, properties: { bcsender: undefined } }
+      }]);
+    } finally {
+      syncing = false;
+    }
+  });
+
   this.postExecute(['element.updateLabel', 'element.updateProperties'], ({ context }) => {
     if (syncing) return;
     if (context._oldParticipantName === undefined) return;
@@ -42,17 +83,22 @@ export default function ParticipantSync(eventBus, commandStack, elementRegistry)
     const oldName = context._oldParticipantName;
     const newName = shape.businessObject.name || '';
 
-    if (!oldName || oldName === newName) return;
+    // When participant had no name, bcsender was set to the participant ID (fallback).
+    // When participant has no name after rename (cleared), fall back to ID again.
+    const oldKey = oldName || shape.id;
+    const newKey = newName || shape.id;
 
-    // Find every ReceiveTask whose bcsender matched the old participant name
+    if (oldKey === newKey) return;
+
+    // Find every ReceiveTask whose bcsender matched the old key (name or ID)
     const commands = [];
     elementRegistry.getAll().forEach(el => {
       const bo = el.businessObject;
       if (!is(bo, 'bpmn:ReceiveTask')) return;
-      if (bo.bcsender !== oldName) return;
+      if (bo.bcsender !== oldKey) return;
       commands.push({
         cmd: 'element.updateModdleProperties',
-        context: { element: el, moddleElement: bo, properties: { bcsender: newName } }
+        context: { element: el, moddleElement: bo, properties: { bcsender: newKey } }
       });
     });
 

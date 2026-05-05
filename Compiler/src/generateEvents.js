@@ -1,5 +1,11 @@
 const { extractDataObjectVariables, extractDataStoreVariables, extractDataStoreVarSelections } = require('./utils.js');
 
+// Strip newlines, tabs, null chars and quotes from an event name so it is safe
+// to embed inside Solidity source (same approach as generateGateways.js).
+function sanitizeName(name) {
+  return (name || '').replace(/[\r\n\t\0]/g, ' ').replace(/"/g, '').trim();
+}
+
 /**
  * Collects Solidity event parameters from a ThrowEvent's DataInputAssociations.
  * DataObject inputs → all their variables become individual params.
@@ -50,11 +56,11 @@ function generateEvents(events) {
   return events.map(event => {
     if (event.$type !== 'bpmn:IntermediateThrowEvent') return '';
 
-    const eventName = (event.name || event.id).replace(/\s+/g, '');
+    const eventName = sanitizeName(event.name || event.id).replace(/\s+/g, '');
     const params = getThrowEventParams(event);
     const paramList = params.map(p => `${p.type} ${p.name}`).join(', ');
 
-    return `// @bpmn: ${event.id} "${(event.name || event.id).replace(/"/g, '')}"\nevent ${eventName}(${paramList});`;
+    return `// @bpmn: ${event.id} "${sanitizeName(event.name || event.id)}"\nevent ${eventName}(${paramList});`;
   }).join('\n');
 }
 
@@ -69,14 +75,14 @@ function generateEmitFunctions(events) {
   return events.map(event => {
     if (event.$type !== 'bpmn:IntermediateThrowEvent') return '';
 
-    const eventName = (event.name || event.id).replace(/\s+/g, '');
+    const eventName = sanitizeName(event.name || event.id).replace(/\s+/g, '');
     const params = getThrowEventParams(event);
     // Prefix all parameter names with _ to avoid collision when a param has the
     // same name as the event itself (e.g. event "test" with param "test").
     const paramList = params.map(p => `${p.type} _${p.name}`).join(', ');
     const argList  = params.map(p => `_${p.name}`).join(', ');
 
-    return `// @bpmn: ${event.id} "${(event.name || event.id).replace(/"/g, '')}"\nfunction emit_${eventName}(${paramList}) public {\n    emit ${eventName}(${argList});\n}`;
+    return `// @bpmn: ${event.id} "${sanitizeName(event.name || event.id)}"\nfunction emit_${eventName}(${paramList}) public {\n    emit ${eventName}(${argList});\n}`;
   }).join('\n');
 }
 

@@ -201,6 +201,26 @@ app.post('/queryMapping', async (req, res) => {
   }
 });
 
+// Fund any address with ETH from the deployer (signer[0])
+app.post('/fundAddress', async (req, res) => {
+  const { to, amountEth, networkId } = req.body;
+  if (!to || !amountEth || !networkId) {
+    return res.status(400).json({ message: 'to, amountEth, and networkId are required.' });
+  }
+  try {
+    const stdout = await executeHardhatTask('fund-address', networkId, { to, amountEth });
+    const match = stdout.match(/FUND_RESULT:(\{.*\})/);
+    if (!match) {
+      console.error('fund-address stdout:', stdout);
+      return res.status(500).json({ message: 'Unexpected output from fund-address task.' });
+    }
+    res.status(200).json(JSON.parse(match[1]));
+  } catch (err) {
+    console.error('Error funding address:', err);
+    res.status(500).json({ message: String(err) });
+  }
+});
+
 // Query ETH balance of any address on a given network
 app.post('/queryBalance', async (req, res) => {
   const { address, networkId } = req.body;

@@ -225,6 +225,20 @@ app.post('/api/queryMapping', async (req, res) => {
   }
 });
 
+// **Relay POST request to fund any address from the deployer**
+app.post('/api/fundAddress', async (req, res) => {
+  try {
+    const data = await safeFetch(`${DEP_API_BASE_URL}/fundAddress`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req.body)
+    });
+    res.json(data);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // **Relay POST request to query a balance by key**
 app.post('/api/queryBalance', async (req, res) => {
   try {

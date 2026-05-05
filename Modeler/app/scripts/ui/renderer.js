@@ -1,5 +1,5 @@
 import { createCollapsibleSection } from './collapsible.js';
-import { executeTask, queryMapping, queryBalance } from '../api.js';
+import { executeTask, queryMapping, queryBalance, fundAddress } from '../api.js';
 import { toggleVisibility } from '../utils/helper.js';
 import { formatCHF } from '../pricing.js';
 
@@ -125,7 +125,7 @@ function createTaskCard(network, contractName, task, instanceId, overrideSender)
         unitToggle.classList.remove('text-gray-500');
       } else {
         amountLabel.textContent = 'Amount (ETH)';
-        amountInput.step = '0.0001';
+        amountInput.step = '0.1';
         amountInput.placeholder = '';
         unitToggle.textContent = 'Switch to WEI';
         unitToggle.classList.remove('border-indigo-400', 'text-indigo-600');
@@ -577,6 +577,22 @@ export function renderRoleBalances(networks, ethChfRate, instanceId) {
       }
     });
 
+    // Map of address → balance <div> so we can refresh them after funding
+    const roleBalanceEls = new Map();
+
+    // Re-fetches the live wallet balance for every role card and updates its text
+    const refreshBalances = async () => {
+      for (const [addr, el] of roleBalanceEls) {
+        try {
+          const { balance } = await queryBalance({ address: addr, networkId: networkName });
+          const eth = parseFloat(balance) || 0;
+          const chf = ethChfRate ? eth * ethChfRate : null;
+          const chfLabel = chf !== null ? `  ≈  ${eth === 0 ? 'CHF 0.00' : formatCHF(chf)}` : '';
+          el.innerText = `Balance: ${eth.toFixed(4)} ETH${chfLabel}`;
+        } catch { /* leave stale value on error */ }
+      }
+    };
+
     // Render roles
     uniqueRoles.forEach(({ role, address, balance, escrow }) => {
       const roleCard = document.createElement('div');
@@ -596,6 +612,9 @@ export function renderRoleBalances(networks, ethChfRate, instanceId) {
       const roleChf = ethChfRate ? roleEth * ethChfRate : null;
       const roleChfLabel = roleChf !== null ? `  ≈  ${roleEth === 0 ? 'CHF 0.00' : formatCHF(roleChf)}` : '';
       roleBalance.innerText = `Balance: ${roleEth.toFixed(4)} ETH${roleChfLabel}`;
+
+      // Track this element so refreshBalances() can update it later
+      roleBalanceEls.set(address, roleBalance);
 
       roleCard.appendChild(roleName);
       roleCard.appendChild(roleAddress);
@@ -697,6 +716,71 @@ export function renderRoleBalances(networks, ethChfRate, instanceId) {
     lookupCard.appendChild(inputRow);
     lookupCard.appendChild(resultDiv);
     sectionContent.appendChild(lookupCard);
+
+    // ── Fund Address widget ───────────────────────────────────────────────────
+    // Sends ETH from the deployer (signer[0]) to any address the user specifies.
+    const fundCard = document.createElement('div');
+    fundCard.className = 'p-3 bg-gray-100 border rounded shadow-sm mb-2';
+
+    const fundTitle = document.createElement('div');
+    fundTitle.className = 'font-semibold text-gray-700 mb-2';
+    fundTitle.textContent = 'Fund Address';
+
+    const fundRow = document.createElement('div');
+    fundRow.className = 'flex gap-2 items-center mb-2';
+
+    const fundAddrInput = document.createElement('input');
+    fundAddrInput.type = 'text';
+    fundAddrInput.placeholder = '0x... address to fund';
+    fundAddrInput.className = 'flex-1 p-2 border border-gray-300 rounded text-sm bg-white font-mono';
+
+    const fundAmountInput = document.createElement('input');
+    fundAmountInput.type = 'number';
+    fundAmountInput.min = '0';
+    fundAmountInput.step = '0.01';
+    fundAmountInput.placeholder = 'ETH';
+    fundAmountInput.className = 'w-24 p-2 border border-gray-300 rounded text-sm bg-white';
+
+    const fundBtn = document.createElement('button');
+    fundBtn.type = 'button';
+    fundBtn.textContent = 'Fund';
+    fundBtn.className = 'px-3 py-2 bg-white hover:bg-gray-200 text-gray-700 text-sm rounded border border-gray-300 font-medium transition-colors';
+
+    const fundResultDiv = document.createElement('div');
+    fundResultDiv.className = 'hidden text-xs mt-1';
+
+    fundBtn.onclick = async () => {
+      const to = fundAddrInput.value.trim();
+      const amountEth = fundAmountInput.value.trim();
+      if (!to || !amountEth || parseFloat(amountEth) <= 0) return;
+
+      fundBtn.disabled = true;
+      fundBtn.textContent = '…';
+      fundResultDiv.className = 'text-xs mt-1 text-gray-500';
+      fundResultDiv.textContent = 'Sending…';
+
+      try {
+        await fundAddress({ to, amountEth, networkId: networkName });
+        fundResultDiv.className = 'text-xs mt-1 text-green-600';
+        fundResultDiv.textContent = `Balance set to ${amountEth} ETH for ${to.slice(0, 10)}…`;
+        // Refresh live wallet balances for all roles in this network
+        await refreshBalances();
+      } catch (err) {
+        fundResultDiv.className = 'text-xs mt-1 text-red-600';
+        fundResultDiv.textContent = `Error: ${err.message}`;
+      } finally {
+        fundBtn.disabled = false;
+        fundBtn.textContent = 'Fund';
+      }
+    };
+
+    fundRow.appendChild(fundAddrInput);
+    fundRow.appendChild(fundAmountInput);
+    fundRow.appendChild(fundBtn);
+    fundCard.appendChild(fundTitle);
+    fundCard.appendChild(fundRow);
+    fundCard.appendChild(fundResultDiv);
+    sectionContent.appendChild(fundCard);
 
     // Use your collapsible component here
     const collapsible = createCollapsibleSection(`Role Balances – ${networkName}`, sectionContent);

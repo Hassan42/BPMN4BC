@@ -551,8 +551,10 @@ function generateEntryFunction(activity, process, roles, collaborationId, partic
         break;
       }
       case 'bpmn:IntermediateThrowEvent': {
-        // Event name comes from element name; args from DataInputAssociations
-        const eventName = (element.name || element.id).replace(/\s+/g, '');
+        // Event name comes from element name; args from DataInputAssociations.
+        // sanitizeName strips newlines/tabs/quotes before collapsing whitespace
+        // so a multi-line label doesn't break the generated Solidity.
+        const eventName = (element.name || element.id).replace(/[\r\n\t\0]/g, ' ').replace(/"/g, '').trim().replace(/\s+/g, '');
 
         const argParts = [];
         const seenArgs = new Set();

@@ -84,6 +84,17 @@ export async function fetchData(instanceId) {
   return await response.json();
 }
 
+export async function fundAddress({ to, amountEth, networkId }) {
+  const response = await fetch(`${getBaseUrl()}/api/fundAddress`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ to, amountEth, networkId })
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.message || data.error || 'Funding failed');
+  return data; // { txHash, to, amountEth }
+}
+
 export async function queryBalance({ address, networkId }) {
   const response = await fetch(`${getBaseUrl()}/api/queryBalance`, {
     method: 'POST',
