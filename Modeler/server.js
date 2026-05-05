@@ -225,6 +225,20 @@ app.post('/api/queryMapping', async (req, res) => {
   }
 });
 
+// **Relay POST request to create a funded open-caller wallet**
+app.post('/api/createOpenCaller', async (req, res) => {
+  try {
+    const data = await safeFetch(`${DEP_API_BASE_URL}/createOpenCaller`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req.body)
+    });
+    res.json(data);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // **Relay POST request to fund any address from the deployer**
 app.post('/api/fundAddress', async (req, res) => {
   try {

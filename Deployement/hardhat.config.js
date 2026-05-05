@@ -9,6 +9,7 @@
   require('./tasks/executeAllTask');
   require('./tasks/executePropertyExample');
   require('./tasks/fundAddressTask');
+  require('./tasks/createOpenCallerTask');
 
   /** @type import('hardhat/config').HardhatUserConfig */
 

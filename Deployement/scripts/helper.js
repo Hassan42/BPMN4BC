@@ -210,10 +210,24 @@ const executeTask = async (contractManager, contractName, contractInstance, task
             const provider = (await ethers.getSigners())[0].provider;
             roleSigner = new ethers.Wallet(rolePrivateKey, provider);
         } else {
-            // Find among Ganache signers by address (case-insensitive)
+            // Find among Hardhat signers by address (case-insensitive)
             const signers = await ethers.getSigners();
             const needle = roleAddress.toLowerCase();
-            roleSigner = signers.find(s => s.address.toLowerCase() === needle) || signers[0];
+            const matched = signers.find(s => s.address.toLowerCase() === needle);
+            if (matched) {
+                roleSigner = matched;
+            } else {
+                // Check open-caller wallets stored for this instance
+                const provider = signers[0].provider;
+                const callerKey = contractManager.getPrivateKeyByCallerAddress(contractName, roleAddress);
+                if (callerKey) {
+                    roleSigner = new ethers.Wallet(callerKey, provider);
+                } else {
+                    // Truly unknown address — should not happen in normal flow since the
+                    // UI requires selecting a generated wallet before executing.
+                    throw new Error(`No signer available for address ${roleAddress}. Generate a caller wallet first.`);
+                }
+            }
         }
 
         // Attach to the contract instance with the role signer

@@ -1,5 +1,5 @@
 import { createCollapsibleSection } from './collapsible.js';
-import { executeTask, queryMapping, queryBalance, fundAddress } from '../api.js';
+import { executeTask, queryMapping, queryBalance, fundAddress, createOpenCaller } from '../api.js';
 import { toggleVisibility } from '../utils/helper.js';
 import { formatCHF } from '../pricing.js';
 
@@ -58,7 +58,7 @@ function createTaskCard(network, contractName, task, instanceId, overrideSender)
 
   if (isCompleted) return card;
 
-  // Sender — for open tasks: free-form address input; for normal tasks: pre-filled role name
+  // Sender — for open tasks: wallet dropdown + locked display; for normal tasks: pre-filled role name
   const senderInput = document.createElement('input');
   senderInput.type = 'text';
   senderInput.className = 'w-full p-2 border rounded text-sm mb-1';
@@ -67,16 +67,56 @@ function createTaskCard(network, contractName, task, instanceId, overrideSender)
   const senderLabel = document.createElement('label');
   senderLabel.className = 'block text-sm font-semibold text-gray-600 mb-1';
 
+  // These are set inside the open-task block and used when wiring executeBtn below
+  let openCallerSelect = null;
+  let openNewWalletBtn = null;
+
   if (task.open) {
-    senderLabel.textContent = 'Caller Address (Open)';
-    senderInput.value = '';
-    senderInput.placeholder = '0x... (any Ethereum address)';
-    senderInput.disabled = false;  // Always editable for open tasks
-    card.appendChild(senderLabel);
-    card.appendChild(senderInput);
+    senderLabel.textContent = 'Caller Wallet (Open)';
+
+    // Dropdown of previously generated caller wallets
+    openCallerSelect = document.createElement('select');
+    openCallerSelect.className = 'w-full p-2 border rounded text-sm mb-1 bg-white';
+
+    const placeholderOpt = document.createElement('option');
+    placeholderOpt.value = '';
+    placeholderOpt.textContent = '— No wallet generated yet —';
+    placeholderOpt.disabled = true;
+    placeholderOpt.selected = !task.callers || task.callers.length === 0;
+    openCallerSelect.appendChild(placeholderOpt);
+
+    (task.callers || []).forEach((addr, i) => {
+      const opt = document.createElement('option');
+      opt.value = addr;
+      opt.textContent = `Caller ${i + 1}: ${addr.slice(0, 10)}…${addr.slice(-6)}`;
+      openCallerSelect.appendChild(opt);
+    });
+
+    // Pre-select the most-recently created wallet
+    if (task.callers && task.callers.length > 0) {
+      openCallerSelect.value = task.callers[task.callers.length - 1];
+    }
+
+    // Locked address display (synced to dropdown selection)
+    senderInput.value = openCallerSelect.value || '';
+    senderInput.disabled = true;
+    senderInput.className = 'w-full p-2 border rounded text-sm mb-1 bg-gray-100 font-mono text-xs text-gray-600';
+    senderInput.placeholder = 'Select or generate a wallet above';
+
+    // "New Wallet" button
+    openNewWalletBtn = document.createElement('button');
+    openNewWalletBtn.type = 'button';
+    openNewWalletBtn.textContent = '+ New Wallet';
+    openNewWalletBtn.className = 'mt-1 px-3 py-1 text-xs rounded border border-gray-400 text-gray-700 bg-white hover:bg-gray-100 transition-colors';
+
     const openHint = document.createElement('p');
-    openHint.className = 'text-xs text-indigo-500 italic mb-3';
-    openHint.textContent = 'Open task — any Ethereum address may call this.';
+    openHint.className = 'text-xs text-gray-600 italic mb-3 mt-2';
+    openHint.textContent = 'Open task — any generated wallet can call this.';
+
+    card.appendChild(senderLabel);
+    card.appendChild(openCallerSelect);
+    card.appendChild(senderInput);
+    card.appendChild(openNewWalletBtn);
     card.appendChild(openHint);
   } else {
     senderLabel.textContent = 'Sender';
@@ -178,11 +218,54 @@ function createTaskCard(network, contractName, task, instanceId, overrideSender)
   // Execute button
   const executeBtn = document.createElement('button');
   executeBtn.type = 'button';
-  executeBtn.disabled = !isOpen;
+  // For open tasks, also disable when no wallet has been selected yet
+  const noWalletSelected = task.open && !senderInput.value;
+  executeBtn.disabled = !isOpen || noWalletSelected;
   executeBtn.className = `w-full text-white px-4 py-2 rounded mt-3 font-medium transition-colors ${
-    isOpen ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
+    isOpen && !noWalletSelected ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
   }`;
   executeBtn.textContent = 'Execute';
+
+  // Wire up open-task interactions now that executeBtn exists
+  if (task.open && openCallerSelect) {
+    openCallerSelect.addEventListener('change', () => {
+      senderInput.value = openCallerSelect.value;
+      executeBtn.disabled = !isOpen || !openCallerSelect.value;
+      executeBtn.className = `w-full text-white px-4 py-2 rounded mt-3 font-medium transition-colors ${
+        isOpen && openCallerSelect.value ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
+      }`;
+    });
+
+    openNewWalletBtn.addEventListener('click', async () => {
+      openNewWalletBtn.disabled = true;
+      openNewWalletBtn.textContent = 'Generating…';
+      try {
+        const { address } = await createOpenCaller({
+          instanceId,
+          contractName,
+          role: task.sender,
+          networkId: network
+        });
+        const walletNum = openCallerSelect.options.length; // placeholder + existing = 1-based index for new one
+        const opt = document.createElement('option');
+        opt.value = address;
+        opt.textContent = `Caller ${walletNum}: ${address.slice(0, 10)}…${address.slice(-6)}`;
+        openCallerSelect.appendChild(opt);
+        openCallerSelect.value = address;
+        senderInput.value = address;
+        executeBtn.disabled = !isOpen;
+        executeBtn.className = `w-full text-white px-4 py-2 rounded mt-3 font-medium transition-colors ${
+          isOpen ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
+        }`;
+      } catch (err) {
+        console.error('Failed to create open caller:', err);
+        alert(`Failed to generate wallet: ${err.message}`);
+      } finally {
+        openNewWalletBtn.disabled = false;
+        openNewWalletBtn.textContent = '+ New Wallet';
+      }
+    });
+  }
 
   executeBtn.onclick = async () => {
     if (!isOpen) return;

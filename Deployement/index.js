@@ -201,6 +201,25 @@ app.post('/queryMapping', async (req, res) => {
   }
 });
 
+// Create a funded open-caller wallet for an open-participant task
+app.post('/createOpenCaller', async (req, res) => {
+  const { instanceId, contractName, role, networkId } = req.body;
+  if (!instanceId || !contractName || !role || !networkId) {
+    return res.status(400).json({ message: 'instanceId, contractName, role, and networkId are required.' });
+  }
+  try {
+    const stdout = await executeHardhatTask('create-open-caller', networkId, { instanceId, contractName, role });
+    const match = stdout.match(/CREATE_CALLER_RESULT:(\{.*\})/);
+    if (!match) {
+      console.error('create-open-caller stdout:', stdout);
+      return res.status(500).json({ message: 'Unexpected output from create-open-caller task.' });
+    }
+    res.status(200).json(JSON.parse(match[1])); // { address }
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to create open caller.', error: String(err) });
+  }
+});
+
 // Fund any address with ETH from the deployer (signer[0])
 app.post('/fundAddress', async (req, res) => {
   const { to, amountEth, networkId } = req.body;

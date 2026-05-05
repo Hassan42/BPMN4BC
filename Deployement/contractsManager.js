@@ -213,12 +213,41 @@ const createContractManager = (instanceId) => {
         return contract.address;
     };
 
+    const addOpenCaller = (contractName, roleName, address, privateKey) => {
+        const contracts = readContracts();
+        const contract = contracts.find(c => c.contractName === contractName);
+        if (!contract) throw new Error(`Contract "${contractName}" not found.`);
+        if (!contract.openCallers) contract.openCallers = {};
+        if (!contract.openCallers[roleName]) contract.openCallers[roleName] = [];
+        contract.openCallers[roleName].push({ address, privateKey });
+        writeContracts(contracts);
+    };
+
+    const getPrivateKeyByCallerAddress = (contractName, address) => {
+        const contracts = readContracts();
+        const contract = contracts.find(c => c.contractName === contractName);
+        if (!contract || !contract.openCallers) return undefined;
+        const lc = address.toLowerCase();
+        for (const callers of Object.values(contract.openCallers)) {
+            const match = callers.find(c => c.address.toLowerCase() === lc);
+            if (match) return match.privateKey;
+        }
+        return undefined;
+    };
+
     const getContractsState = (network) => {
         const contracts = readContracts();
         const networkContracts = contracts.filter(c => c.networkId === network);
         return networkContracts.reduce((acc, contract) => {
-            const { contractName, contractRoles, contractText, balance, receiveTasks, dataStore, mappingVars } = contract;
-            acc[contractName] = { contractText, receiveTasks, dataStore, mappingVars: mappingVars || [], contractRoles, balance };
+            const { contractName, contractRoles, contractText, balance, receiveTasks, dataStore, mappingVars, openCallers } = contract;
+            // Inject callers list (addresses only, no private keys) into each open task
+            const tasksWithCallers = (receiveTasks || []).map(task => {
+                if (task.open && openCallers && openCallers[task.sender]) {
+                    return { ...task, callers: openCallers[task.sender].map(c => c.address) };
+                }
+                return task;
+            });
+            acc[contractName] = { contractText, receiveTasks: tasksWithCallers, dataStore, mappingVars: mappingVars || [], contractRoles, balance };
             return acc;
         }, {});
     };
@@ -338,7 +367,9 @@ const createContractManager = (instanceId) => {
         updateRoleEscrow,
         updateContractBalance,
         getTransactions,
-        appendTransaction
+        appendTransaction,
+        addOpenCaller,
+        getPrivateKeyByCallerAddress
     };
 };
 

@@ -84,6 +84,17 @@ export async function fetchData(instanceId) {
   return await response.json();
 }
 
+export async function createOpenCaller({ instanceId, contractName, role, networkId }) {
+  const response = await fetch(`${getBaseUrl()}/api/createOpenCaller`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ instanceId, contractName, role, networkId })
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.message || data.error || 'Failed to create caller wallet');
+  return data; // { address }
+}
+
 export async function fundAddress({ to, amountEth, networkId }) {
   const response = await fetch(`${getBaseUrl()}/api/fundAddress`, {
     method: 'POST',
