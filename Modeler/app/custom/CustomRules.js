@@ -56,6 +56,7 @@ CustomRules.prototype.init = function () {
         is(shapeBo, "bpmn:DataStoreReference")) &&
         (!is(shapeBo, "bpmn:SendTask")) &&
         (!is(shapeBo, "bpmn:IntermediateCatchEvent")) &&
+        (!is(shapeBo, "bpmn:BoundaryEvent")) &&
         (!is(shapeBo, "bpmn:Participant"));
     }
 
