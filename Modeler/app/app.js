@@ -866,6 +866,17 @@ $(function () {
       return;
     }
 
+    // Require at least one blockchain pool (Participant with bc="true")
+    const elementRegistry = bpmnModeler.get('elementRegistry');
+    const hasBlockchainPool = elementRegistry.getAll().some(
+      el => el.type === 'bpmn:Participant' && el.businessObject?.bc === 'true'
+    );
+    if (!hasBlockchainPool) {
+      $('#deploy-modal').addClass('hidden');
+      showDeployError('Missing Blockchain Pool', 'The model must contain at least one Blockchain Pool. Add a Blockchain Pool before saving.', []);
+      return;
+    }
+
     $('#deploy-modal').addClass('hidden');
     toggleLockButton(true, true);
 
