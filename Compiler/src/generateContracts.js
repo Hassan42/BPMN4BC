@@ -30,8 +30,8 @@ async function generateContract(contractParams) {
     participantMultiplicities,
     contractText,
     multiInstance,      // default true — per-instance contract
-    coupledDataStore,   // default false — DataStore inside main contract
-    dsMultiInstance     // default true — new DataStore per instance (when coupled)
+    coupledDataStore,   // default true — DataStore has its own contract (external calls)
+    dsMultiInstance     // default true — new DataStore per instance
   } = contractParams;
 
   // Resolve flags with defaults
@@ -476,6 +476,19 @@ async function generateContracts(definitions, instanceId) {
         // Shared-pool contracts do not embed instanceId in their name
         const effectiveInstanceSuffix = multiInstance && instanceId != null ? '_' + instanceId : '';
 
+        // Read DataStore architecture flags from the process's DataStore elements.
+        // Semantics: bccoupled = true  → DataStore is EMBEDDED (inline) in the process contract.
+        //            bccoupled = false (default/unchecked) → DataStore is a SEPARATE contract
+        //            with its own getter/setter functions; the process contract calls it externally.
+        const dsRefs = findDataStoreReferencesForProcess(process);
+        const firstDs = dsRefs[0] || null;
+        const coupledDataStore = firstDs
+          ? !(firstDs.bccoupled === true || firstDs.bccoupled === 'true')
+          : false;
+        const dsMultiInstance = firstDs
+          ? (firstDs.bcmultiinstance !== false && firstDs.bcmultiinstance !== 'false')
+          : true;
+
         const lanes = findLanesForProcess(process);
         if (lanes.length === 0) {
           const contractParams = {
@@ -493,6 +506,8 @@ async function generateContracts(definitions, instanceId) {
             participantMultiplicities,
             contractText: participant.name,
             multiInstance,
+            coupledDataStore,
+            dsMultiInstance,
           };
           const { contractConfig, dsContractConfig } = await generateContract(contractParams);
           contracts.push(contractConfig);
@@ -521,6 +536,8 @@ async function generateContracts(definitions, instanceId) {
               participantMultiplicities,
               contractText: lane.name,
               multiInstance,
+              coupledDataStore,
+              dsMultiInstance,
             };
             const { contractConfig, dsContractConfig } = await generateContract(contractParams);
             contracts.push(contractConfig);

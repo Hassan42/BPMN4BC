@@ -424,7 +424,7 @@ function DataStoreCoupledCheckbox(props) {
     id=${id}
     element=${element}
     label=${translate('Coupled')}
-    description=${translate('Generate a separate smart contract for this data store (getter/setter only). The process contract will call it externally.')}
+    description=${translate('When checked, the DataStore is embedded inline inside the process contract. When unchecked (default), the DataStore is compiled as its own separate smart contract with getter/setter functions and the process contract calls it externally.')}
     getValue=${getValue}
     setValue=${setValue}
   />`;

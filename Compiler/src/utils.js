@@ -411,10 +411,12 @@ const generateContractConfig = ({
     const dataStoreRefs = findDataStoreReferencesForProcess(process);
     const allDsVars = dataStoreRefs.length > 0 ? extractDataStoreVariables(dataStoreRefs[0]) : [];
 
-    // Coupled / multi-instance flags from the DataStore element
+    // Coupled / multi-instance flags from the DataStore element.
+    // bccoupled = true  → DataStore EMBEDDED in process contract (inline).
+    // bccoupled = false (default) → DataStore has its OWN contract (external calls).
     const firstDs = dataStoreRefs[0] || null;
     const coupledDataStore = firstDs
-        ? (firstDs.bccoupled === true || firstDs.bccoupled === 'true')
+        ? !(firstDs.bccoupled === true || firstDs.bccoupled === 'true')
         : false;
     const dsMultiInstance = firstDs
         ? (firstDs.bcmultiinstance !== false && firstDs.bcmultiinstance !== 'false')
