@@ -35,6 +35,6 @@ task('execute-task', 'Execute a contracts task')
     // Attach to the contract
     const contractInstance = contractFactory.attach(contractAddress);
 
-    await executeTask(contractManager, contractName, contractInstance, taskId, sender, inputs, value);
+    await executeTask(contractManager, contractName, contractInstance, taskId, sender, inputs, value, parseInt(instanceId));
 
   });

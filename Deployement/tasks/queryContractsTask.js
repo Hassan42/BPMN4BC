@@ -37,7 +37,7 @@ task('query-contracts', 'query all contracts and updates contracts.json')
         // Attach to the contract
         const contractInstance = contractFactory.attach(contractAddress);
 
-        await queryContract(contractManager, contractName, contractInstance);
+        await queryContract(contractManager, contractName, contractInstance, parseInt(instanceId));
     }
 });
 

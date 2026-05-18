@@ -399,7 +399,9 @@ const generateContractConfig = ({
     startReceiveTaskIds,
     formattedSolidityCode,
     formattedSolidityInterface,
-    contractText
+    contractText,
+    multiInstance,
+    isDataStore
 }) => {
 
     const receiveTasks = activities.filter(activity => activity.$type === 'bpmn:ReceiveTask');
@@ -408,6 +410,15 @@ const generateContractConfig = ({
     // Always search the process; DataStoreSync ensures all lanes share the same variables.
     const dataStoreRefs = findDataStoreReferencesForProcess(process);
     const allDsVars = dataStoreRefs.length > 0 ? extractDataStoreVariables(dataStoreRefs[0]) : [];
+
+    // Coupled / multi-instance flags from the DataStore element
+    const firstDs = dataStoreRefs[0] || null;
+    const coupledDataStore = firstDs
+        ? (firstDs.bccoupled === true || firstDs.bccoupled === 'true')
+        : false;
+    const dsMultiInstance = firstDs
+        ? (firstDs.bcmultiinstance !== false && firstDs.bcmultiinstance !== 'false')
+        : true;
     const dataStore = allDsVars
         .filter(v => (v.type || 'uint') !== 'mapping')
         .map(v => ({ name: v.name, type: v.type || 'uint' }));
@@ -498,7 +509,13 @@ const generateContractConfig = ({
         contractInterface: formattedSolidityInterface,
         dataStore: dataStore,
         mappingVars: mappingVars,
-        contractText
+        contractText,
+        // Architecture variant flags
+        multiInstance:         multiInstance !== false,   // default true
+        coupledDataStore,
+        dsMultiInstance,
+        dataStoreContractName: coupledDataStore ? `DataStore_${contractName}` : null,
+        isDataStore:           isDataStore === true
     };
 }
 

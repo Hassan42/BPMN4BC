@@ -46,7 +46,7 @@ export default function (element) {
     }
   );
   } else if (is(element, 'bpmn:Lane') || (is(element, 'bpmn:Participant') && element.businessObject.bc === 'true')) {
-    // BC pool / lane: show network ID and solidity script
+    // BC pool / lane: show network ID, solidity script, and multi-instance toggle
     props.push(
       {
         id: 'bcId',
@@ -59,8 +59,16 @@ export default function (element) {
         element,
         component: Script,
         isEdited: isTextFieldEntryEdited
+      },
+      {
+        id: 'multiinstance',
+        element,
+        component: PoolMultiInstanceCheckbox
       }
     );
+  } else if (is(element, 'bpmn:DataStoreReference')) {
+    props.push({ id: 'coupled',         element, component: DataStoreCoupledCheckbox });
+    props.push({ id: 'dsmultiinstance', element, component: DataStoreMultiInstanceCheckbox });
   } else if (is(element, 'bpmn:Participant') && element.businessObject.bc !== 'true') {
     // Non-BC participant: always show Open checkbox; show instance count only when not open
     props.push({ id: 'open', element, component: OpenCheckbox });
@@ -373,6 +381,72 @@ function OpenCheckbox(props) {
     element=${element}
     label=${translate('Open')}
     description=${translate('Any Ethereum address with the respective role can call the connected Receive Transaction task.')}
+    getValue=${getValue}
+    setValue=${setValue}
+  />`;
+}
+
+function PoolMultiInstanceCheckbox(props) {
+  const { element, id } = props;
+  const modeling  = useService('modeling');
+  const translate = useService('translate');
+
+  // Default is true (current behaviour: deploy fresh contract per instance).
+  // When the user unchecks, bcmultiinstance is explicitly set to false.
+  const getValue = () => element.businessObject.bcmultiinstance !== false;
+
+  const setValue = value => {
+    modeling.updateProperties(element, { bcmultiinstance: value });
+  };
+
+  return html`<${CheckboxEntry}
+    id=${id}
+    element=${element}
+    label=${translate('Multi-instance')}
+    description=${translate('Deploy a new contract for each process instance. Uncheck to share one contract across all instances via ID mappings.')}
+    getValue=${getValue}
+    setValue=${setValue}
+  />`;
+}
+
+function DataStoreCoupledCheckbox(props) {
+  const { element, id } = props;
+  const modeling  = useService('modeling');
+  const translate = useService('translate');
+
+  const getValue = () => element.businessObject.bccoupled === true || element.businessObject.bccoupled === 'true';
+
+  const setValue = value => {
+    modeling.updateProperties(element, { bccoupled: value });
+  };
+
+  return html`<${CheckboxEntry}
+    id=${id}
+    element=${element}
+    label=${translate('Coupled')}
+    description=${translate('Generate a separate smart contract for this data store (getter/setter only). The process contract will call it externally.')}
+    getValue=${getValue}
+    setValue=${setValue}
+  />`;
+}
+
+function DataStoreMultiInstanceCheckbox(props) {
+  const { element, id } = props;
+  const modeling  = useService('modeling');
+  const translate = useService('translate');
+
+  // Default is true (new DataStore contract per instance when coupled).
+  const getValue = () => element.businessObject.bcmultiinstance !== false;
+
+  const setValue = value => {
+    modeling.updateProperties(element, { bcmultiinstance: value });
+  };
+
+  return html`<${CheckboxEntry}
+    id=${id}
+    element=${element}
+    label=${translate('Multi-instance')}
+    description=${translate('Deploy a new data store contract per process instance (only relevant when Coupled is enabled). Uncheck to share one data store contract across all instances.')}
     getValue=${getValue}
     setValue=${setValue}
   />`;

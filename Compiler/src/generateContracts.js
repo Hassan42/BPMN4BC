@@ -1,6 +1,6 @@
-const { getParentLaneOrPool, generateContractConfig, findCollaboration, findProcessForParticipant, findLanesForProcess, findActivitiesForLane, findActivitiesForProcess, findGatewaysForProcess, findGatewaysForLane, formatSolidityCode, findEventsForProcess, findEventsForLane, extractRolesFromCollaboration, extractParticipantMultiplicities, findReceiveTask } = require('./utils.js');
+const { getParentLaneOrPool, generateContractConfig, findCollaboration, findProcessForParticipant, findLanesForProcess, findActivitiesForLane, findActivitiesForProcess, findGatewaysForProcess, findGatewaysForLane, formatSolidityCode, findEventsForProcess, findEventsForLane, extractRolesFromCollaboration, extractParticipantMultiplicities, findReceiveTask, findDataStoreReferencesForProcess } = require('./utils.js');
 const { generateFunctions, generateFunctionSignatures } = require('./generateFunctions.js');
-const { generateDataStoreStructs, generateDataObjectStructs } = require('./generateStorage.js');
+const { generateDataStoreStructs, generateDataObjectStructs, generateDataStoreContract } = require('./generateStorage.js');
 const { generateGateways } = require('./generateGateways.js');
 const { generateEvents, generateEmitFunctions } = require('./generateEvents.js');
 const fs = require('fs');
@@ -28,13 +28,21 @@ async function generateContract(contractParams) {
     collaborationId,
     instanceId,
     participantMultiplicities,
-    contractText
+    contractText,
+    multiInstance,      // default true — per-instance contract
+    coupledDataStore,   // default false — DataStore inside main contract
+    dsMultiInstance     // default true — new DataStore per instance (when coupled)
   } = contractParams;
 
-  const { dataStoreStructs, dataStoreInitCode, dataStoreReadFunctions } = generateDataStoreStructs(process, lane);
+  // Resolve flags with defaults
+  const isMultiInstance   = multiInstance   !== false;
+  const isCoupled         = coupledDataStore === true;
+  const isDsMultiInstance = dsMultiInstance  !== false;
+
+  const { dataStoreStructs, dataStoreInitCode, dataStoreReadFunctions } = generateDataStoreStructs(process, lane, isCoupled, isMultiInstance);
   const dataObjectStructs = generateDataObjectStructs(process);
-  const functions = generateFunctions(activities, process, roles, collaborationId, participantMultiplicities).join('\n');
-  const gatewayFunctions = generateGateways(gateways, process, collaborationId);
+  const functions = generateFunctions(activities, process, roles, collaborationId, participantMultiplicities, isMultiInstance, isCoupled, contractName).join('\n');
+  const gatewayFunctions = generateGateways(gateways, process, collaborationId, isMultiInstance);
   const solidityEvents = generateEvents(events);
   const emitFunctions = generateEmitFunctions(events);
 
@@ -94,11 +102,17 @@ async function generateContract(contractParams) {
     }
   ).join('\n');
 
-  const stateMappings = receiveFunctionNames.map(name => {
-    return startReceiveTaskIds.includes(name) ? `state["${name}"] = State.Open;` : `state["${name}"] = State.Closed;`;
+  // ── State-mapping init lines (used in constructor or initInstance) ──────────
+  const stateMappingsPerInstance = receiveFunctionNames.map(name => {
+    const isOpen = startReceiveTaskIds.includes(name);
+    if (isMultiInstance) {
+      return isOpen ? `state["${name}"] = State.Open;` : `state["${name}"] = State.Closed;`;
+    } else {
+      return isOpen ? `state[instanceId]["${name}"] = State.Open;` : `state[instanceId]["${name}"] = State.Closed;`;
+    }
   }).join('\n');
 
-  // Multi-participant: requiredParticipants init and state variable block
+  // ── Multi-participant: requiredParticipants init + state variable block ────
   const multiParticipantInits = receiveTasks
     .filter(task => {
       const key = (task.bcsender || '').replace(/\s+/g, '');
@@ -116,13 +130,8 @@ async function generateContract(contractParams) {
     return ((participantMultiplicities || {})[key] || 0) > 1;
   });
 
-  const multiParticipantVars = hasMultiParticipant ? `
-      mapping(string => mapping(address => bool)) public hasParticipated;
-      mapping(string => uint) public participationCount;
-      mapping(string => uint) public requiredParticipants;
-  ` : '';
-
-  const instanceSuffix = instanceId != null ? '_' + instanceId : '';
+  // ── Per-instance-mode specific blocks ───────────────────────────────────────
+  const instanceSuffix = (isMultiInstance && instanceId != null) ? '_' + instanceId : '';
 
   const contractsMapping = lanes.map((lane, index) => {
     return `contracts["${lane.id.replace(/\s+/g, '')}_Contract_${collaborationId}${instanceSuffix}"] = addresses[${index}];`;
@@ -132,40 +141,50 @@ async function generateContract(contractParams) {
     return `import './I${lane.id.replace(/\s+/g, '')}_Contract_${collaborationId}${instanceSuffix}.sol';`;
   }).join('\n');
 
-  const solidityCode = `
+  // ── Coupled DataStore import ────────────────────────────────────────────────
+  const dsContractName = `DataStore_${contractName}`;
+  const dsImport    = isCoupled ? `import './I${dsContractName}.sol';` : '';
+  const dsAddrVar   = isCoupled ? `address public dataStoreAddress;` : '';
+  const dsAddrFn    = isCoupled ? `function setDataStoreAddress(address _addr) public { dataStoreAddress = _addr; }` : '';
+
+  // ── Build Solidity template ─────────────────────────────────────────────────
+  let solidityCode;
+
+  if (isMultiInstance) {
+    // ═══════════════════════════════════════════════
+    // STANDARD per-instance contract (existing behaviour)
+    // ═══════════════════════════════════════════════
+    const multiParticipantVars = hasMultiParticipant ? `
+      mapping(string => mapping(address => bool)) public hasParticipated;
+      mapping(string => uint) public participationCount;
+      mapping(string => uint) public requiredParticipants;
+    ` : '';
+
+    solidityCode = `
   // SPDX-License-Identifier: MIT
   pragma solidity ^0.8.0;
   ${contractsImports}
+  ${dsImport}
   contract ${contractName} {
       enum State { Closed, Open, Completed }
 
       mapping(string => State) public state;
-
       uint receiveFunctionCount = ${receiveFunctionCount};
-
       mapping(string => address) public contracts;
-
       mapping(address => string) public addressToRole;
-
       mapping(string => address) public addressOf;
-
       mapping(string => string[]) public activitytoRole;
-
       mapping(address => uint) public escrowOf;
-
+      ${dsAddrVar}
       ${multiParticipantVars}
 
       modifier isAccessible(string memory _activity) {
           require(state[_activity] == State.Open, "Activity is not open");
-
           string memory userRole = addressToRole[msg.sender];
           bool hasRequiredRole = false;
-
-          // If no roles are defined for the activity, grant access
           if (activitytoRole[_activity].length == 0) {
               hasRequiredRole = true;
           } else {
-              // Iterate through the array of roles for the activity
               for (uint256 i = 0; i < activitytoRole[_activity].length; i++) {
                   if (bytes(activitytoRole[_activity][i]).length == 0 || compareStrings(userRole, activitytoRole[_activity][i])) {
                       hasRequiredRole = true;
@@ -173,57 +192,54 @@ async function generateContract(contractParams) {
                   }
               }
           }
-
           require(hasRequiredRole, "Caller does not have the required role");
           _;
       }
-      
-      ${customScript}
 
+      ${customScript}
       ${solidityEvents}
       ${dataObjectStructs}
       ${dataStoreStructs}
 
       constructor() {
-          ${stateMappings}
+          ${stateMappingsPerInstance}
           ${activityToRoleMappings}
           ${dataStoreInitCode}
           ${multiParticipantInits}
       }
 
-      function setContracts(address[] memory addresses) public{
+      function setContracts(address[] memory addresses) public {
           ${contractsMapping}
       }
-      
+
+      ${dsAddrFn}
       ${emitFunctions}
       ${dataStoreReadFunctions}
 
       function setResources(string[] memory _roles, address[] memory _addresses) public {
-        require(_roles.length == _addresses.length, "Roles and addresses arrays must be of the same length");
-      
-        for (uint i = 0; i < _addresses.length; i++) {
-            addressToRole[_addresses[i]] = _roles[i];
-            addressOf[_roles[i]] = _addresses[i];
-        }
+          require(_roles.length == _addresses.length, "Roles and addresses arrays must be of the same length");
+          for (uint i = 0; i < _addresses.length; i++) {
+              addressToRole[_addresses[i]] = _roles[i];
+              addressOf[_roles[i]] = _addresses[i];
+          }
       }
 
       function setResource(string memory _role, address _address) public {
-        addressToRole[_address] = _role;
-        addressOf[_role] = _address;
+          addressToRole[_address] = _role;
+          addressOf[_role] = _address;
       }
 
       function setState(string memory _activity, uint8 _state) public {
-        require(_state <= 3, "Not Valid State");
-        state[_activity] = State(_state);
+          require(_state <= 3, "Not Valid State");
+          state[_activity] = State(_state);
       }
 
       function getState(string memory _activity) public view returns (State) {
-        return state[_activity];
+          return state[_activity];
       }
 
-      //To be replaced with ENUM
       function compareStrings(string memory a, string memory b) internal pure returns (bool) {
-        return keccak256(abi.encodePacked(a)) == keccak256(abi.encodePacked(b));
+          return keccak256(abi.encodePacked(a)) == keccak256(abi.encodePacked(b));
       }
 
       ${functions}
@@ -231,12 +247,147 @@ async function generateContract(contractParams) {
   }
   `;
 
+  } else {
+    // ═══════════════════════════════════════════════
+    // SHARED contract — one deployment, all instances via mapping(instanceId→…)
+    // ═══════════════════════════════════════════════
+    const sharedMultiParticipantVars = hasMultiParticipant ? `
+      mapping(uint256 => mapping(string => mapping(address => bool))) public hasParticipated;
+      mapping(uint256 => mapping(string => uint)) public participationCount;
+      mapping(string => uint) public requiredParticipants;
+    ` : '';
+
+    solidityCode = `
+  // SPDX-License-Identifier: MIT
+  pragma solidity ^0.8.0;
+  ${contractsImports}
+  ${dsImport}
+  contract ${contractName} {
+      enum State { Closed, Open, Completed }
+
+      mapping(uint256 => mapping(string => State)) public state;
+      mapping(uint256 => bool) public initialized;
+      uint receiveFunctionCount = ${receiveFunctionCount};
+      mapping(string => address) public contracts;
+      mapping(uint256 => mapping(address => string)) public addressToRole;
+      mapping(uint256 => mapping(string => address)) public addressOf;
+      mapping(string => string[]) public activitytoRole;
+      mapping(address => uint) public escrowOf;
+      ${dsAddrVar}
+      ${sharedMultiParticipantVars}
+
+      ${dataObjectStructs}
+      ${dataStoreStructs}
+
+      modifier isAccessible(uint256 instanceId, string memory _activity) {
+          require(initialized[instanceId], "Instance not initialized");
+          require(state[instanceId][_activity] == State.Open, "Activity is not open");
+          string memory userRole = addressToRole[instanceId][msg.sender];
+          bool hasRequiredRole = false;
+          if (activitytoRole[_activity].length == 0) {
+              hasRequiredRole = true;
+          } else {
+              for (uint256 i = 0; i < activitytoRole[_activity].length; i++) {
+                  if (bytes(activitytoRole[_activity][i]).length == 0 || compareStrings(userRole, activitytoRole[_activity][i])) {
+                      hasRequiredRole = true;
+                      break;
+                  }
+              }
+          }
+          require(hasRequiredRole, "Caller does not have the required role");
+          _;
+      }
+
+      ${customScript}
+      ${solidityEvents}
+
+      constructor() {
+          ${activityToRoleMappings}
+          ${multiParticipantInits}
+      }
+
+      function initInstance(uint256 instanceId) public {
+          require(!initialized[instanceId], "Already initialized");
+          ${stateMappingsPerInstance}
+          ${dataStoreInitCode}
+          initialized[instanceId] = true;
+      }
+
+      function setContracts(address[] memory addresses) public {
+          ${contractsMapping}
+      }
+
+      ${dsAddrFn}
+      ${emitFunctions}
+      ${dataStoreReadFunctions}
+
+      function setResources(uint256 instanceId, string[] memory _roles, address[] memory _addresses) public {
+          require(_roles.length == _addresses.length, "Roles and addresses arrays must be of the same length");
+          for (uint i = 0; i < _addresses.length; i++) {
+              addressToRole[instanceId][_addresses[i]] = _roles[i];
+              addressOf[instanceId][_roles[i]] = _addresses[i];
+          }
+      }
+
+      function setResource(uint256 instanceId, string memory _role, address _address) public {
+          addressToRole[instanceId][_address] = _role;
+          addressOf[instanceId][_role] = _address;
+      }
+
+      function setState(uint256 instanceId, string memory _activity, uint8 _state) public {
+          require(_state <= 3, "Not Valid State");
+          state[instanceId][_activity] = State(_state);
+      }
+
+      function getState(uint256 instanceId, string memory _activity) public view returns (State) {
+          return state[instanceId][_activity];
+      }
+
+      function compareStrings(string memory a, string memory b) internal pure returns (bool) {
+          return keccak256(abi.encodePacked(a)) == keccak256(abi.encodePacked(b));
+      }
+
+      ${functions}
+      ${gatewayFunctions}
+  }
+  `;
+  }
+
   try {
     const formattedSolidityCode = await formatSolidityCode(solidityCode);
     const formattedSolidityInterface = await generateInterfaceFromCode(contractName, formattedSolidityCode, dataObjectStructs);
     const outputPath = path.resolve('./output/contracts', `${contractName}.sol`);
     fs.writeFileSync(outputPath, formattedSolidityCode, 'utf8');
     console.log(`Generated Solidity contract: ${contractName}`);
+
+    // ── Coupled DataStore: generate the separate DS contract ────────────────
+    let dsContractConfig = null;
+    if (isCoupled) {
+      const dataStoreRefs = findDataStoreReferencesForProcess(process);
+      const firstDs = dataStoreRefs[0];
+      if (firstDs) {
+        const { dsContractName: dsName, dsContractCode, dsInterfaceCode } = await generateDataStoreContract(
+          firstDs, contractName, isDsMultiInstance, formatSolidityCode
+        );
+        dsContractConfig = {
+          contractName:  dsName,
+          networkId,
+          contractRoles: [],
+          receiveTasks:  [],
+          contractCode:  dsContractCode,
+          contractInterface: dsInterfaceCode,
+          dataStore:     [],
+          mappingVars:   [],
+          contractText:  `DataStore for ${contractText || contractName}`,
+          multiInstance: isDsMultiInstance,
+          coupledDataStore: false,
+          dsMultiInstance: true,
+          dataStoreContractName: null,
+          isDataStore: true
+        };
+      }
+    }
+
     // Expand roles for multi-participant: Customer(N=3) → Customer_1, Customer_2, Customer_3
     const expandedRoles = roles.flatMap(role => {
       const key = (role.role || '').replace(/\s+/g, '');
@@ -247,7 +398,6 @@ async function generateContract(contractParams) {
       return [role];
     });
 
-    //TODO: refactor contracts meta
     const contractConfig = generateContractConfig({
       contractName,
       networkId,
@@ -259,12 +409,13 @@ async function generateContract(contractParams) {
       startReceiveTaskIds,
       formattedSolidityCode,
       formattedSolidityInterface,
-      contractText
+      contractText,
+      multiInstance: isMultiInstance
     });
-    return contractConfig;
+    return { contractConfig, dsContractConfig };
   } catch (error) {
     console.log(solidityCode);
-    throw new Error('Error formatting or writing Solidity code:', error);
+    throw new Error('Error formatting or writing Solidity code: ' + error.message);
   }
 }
 
@@ -320,10 +471,15 @@ async function generateContracts(definitions, instanceId) {
       } else if (!process.flowElements || process.flowElements.length === 0) {
         throw new Error(`Blockchain pool "${participant.name || participant.id}" is empty. Please add at least one activity before compiling.`);
       } else {
+        // Read architecture flags from the participant
+        const multiInstance = participant.bcmultiinstance !== false && participant.bcmultiinstance !== 'false';
+        // Shared-pool contracts do not embed instanceId in their name
+        const effectiveInstanceSuffix = multiInstance && instanceId != null ? '_' + instanceId : '';
+
         const lanes = findLanesForProcess(process);
         if (lanes.length === 0) {
           const contractParams = {
-            contractName: `${process.id.replace(/\s+/g, '')}_DefaultContract_${participant.id}_${collaboration.id}${instanceId != null ? '_' + instanceId : ''}`,
+            contractName: `${process.id.replace(/\s+/g, '')}_DefaultContract_${participant.id}_${collaboration.id}${effectiveInstanceSuffix}`,
             networkId,
             activities: findActivitiesForProcess(process),
             gateways: findGatewaysForProcess(process),
@@ -336,9 +492,11 @@ async function generateContracts(definitions, instanceId) {
             instanceId,
             participantMultiplicities,
             contractText: participant.name,
+            multiInstance,
           };
-          const contractConfig = await generateContract(contractParams);
+          const { contractConfig, dsContractConfig } = await generateContract(contractParams);
           contracts.push(contractConfig);
+          if (dsContractConfig) contracts.push(dsContractConfig);
         } else {
           // Skip empty lanes so no contract/interface/import is generated for them
           const nonEmptyLanes = lanes.filter(lane =>
@@ -348,7 +506,7 @@ async function generateContracts(definitions, instanceId) {
           );
           for (const lane of nonEmptyLanes) {
             const contractParams = {
-              contractName: lane.id.replace(/\s+/g, '') + '_Contract_' + collaboration.id + (instanceId != null ? '_' + instanceId : ''),
+              contractName: lane.id.replace(/\s+/g, '') + '_Contract_' + collaboration.id + effectiveInstanceSuffix,
               networkId,
               activities: findActivitiesForLane(lane),
               gateways: findGatewaysForLane(lane),
@@ -362,9 +520,11 @@ async function generateContracts(definitions, instanceId) {
               instanceId,
               participantMultiplicities,
               contractText: lane.name,
+              multiInstance,
             };
-            const contractConfig = await generateContract(contractParams);
+            const { contractConfig, dsContractConfig } = await generateContract(contractParams);
             contracts.push(contractConfig);
+            if (dsContractConfig) contracts.push(dsContractConfig);
           }
         }
       }

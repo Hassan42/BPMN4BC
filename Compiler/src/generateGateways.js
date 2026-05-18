@@ -15,12 +15,12 @@ function sanitizeName(name) {
  * @param {Array} gateways - The array of gateway objects.
  * @returns {string} The Solidity functions as a string.
  */
-function generateGateways(gateways, process, collaborationId) {
+function generateGateways(gateways, process, collaborationId, multiInstance = true) {
     return gateways.map(gateway => {
         if (gateway.$type === 'bpmn:ParallelGateway' && gateway.incoming.length > 1) {
-            return generateAndGateway(gateway);
+            return generateAndGateway(gateway, multiInstance);
         } else if (gateway.$type === 'bpmn:ExclusiveGateway' && gateway.outgoing.length > 1) {
-            return generateXORGateway(gateway, process, collaborationId);
+            return generateXORGateway(gateway, process, collaborationId, multiInstance);
         }
         return ''; // Unsupported gateway type
     }).join('\n');
@@ -31,9 +31,28 @@ function generateGateways(gateways, process, collaborationId) {
  * @param {Object} gateway - The gateway object.
  * @returns {string} The Solidity function as a string.
  */
-function generateAndGateway(gateway) {
+function generateAndGateway(gateway, multiInstance = true) {
     const incomingCount = gateway.incoming.length;
     const functionName = `checkGateway_${gateway.id}`;
+
+    if (!multiInstance) {
+        // Shared pool: counter is keyed by instanceId so parallel branches stay independent per instance
+        return `
+    // @bpmn: ${gateway.id} "${sanitizeName(gateway.name || gateway.id)}"
+    mapping(uint256 => uint256) private ${functionName}Counts;
+
+    function ${functionName}(uint256 instanceId) public returns (bool) {
+        ${functionName}Counts[instanceId] += 1;
+
+        if (${functionName}Counts[instanceId] == ${incomingCount}) {
+            ${functionName}Counts[instanceId] = 0;
+            return true;
+        }
+
+        return false;
+    }
+    `;
+    }
 
     return `
     // @bpmn: ${gateway.id} "${sanitizeName(gateway.name || gateway.id)}"
@@ -52,7 +71,7 @@ function generateAndGateway(gateway) {
     `;
 }
 
-function generateXORGateway(gateway, process, collaborationId) {
+function generateXORGateway(gateway, process, collaborationId, multiInstance = true) {
     const functionName = `checkXOR_${gateway.id}`;
 
     // Parameters: DO reads as structs, DS selected read vars as individual params
@@ -110,15 +129,28 @@ function generateXORGateway(gateway, process, collaborationId) {
 
     const requireState = `require(${entryFunctions.map((entryFunction) => {
         const entryFunctionContractName = getContractNameForElement(entryFunction, process, collaborationId);
-        const entryFunctionState = entryFunctionContractName !== contractName
-            ? `I${entryFunctionContractName}(contracts["${entryFunctionContractName}"]).getState("${entryFunction.id}")`
-            : `state["${entryFunction.id}"]`;
+        let entryFunctionState;
+        if (entryFunctionContractName !== contractName) {
+            const getStateArgs = !multiInstance
+                ? `instanceId, "${entryFunction.id}"`
+                : `"${entryFunction.id}"`;
+            entryFunctionState = `I${entryFunctionContractName}(contracts["${entryFunctionContractName}"]).getState(${getStateArgs})`;
+        } else {
+            entryFunctionState = !multiInstance
+                ? `state[instanceId]["${entryFunction.id}"]`
+                : `state["${entryFunction.id}"]`;
+        }
         return `uint256(${entryFunctionState}) == uint256(State.Open)`;
     }).join(' || ')});`;
 
+    // Shared pool: prepend instanceId so the gateway function is instance-aware
+    const fullParamList = !multiInstance
+        ? `uint256 instanceId${parameterList ? ', ' + parameterList : ''}`
+        : parameterList;
+
     return `
         // @bpmn: ${gateway.id} "${sanitizeName(gateway.name || gateway.id)}"
-        function ${functionName}(${parameterList}) public payable returns (uint256) {
+        function ${functionName}(${fullParamList}) public payable returns (uint256) {
             ${requireState}
             return ${solidityConditions};
         }

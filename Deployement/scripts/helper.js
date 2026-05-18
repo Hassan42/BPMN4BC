@@ -21,11 +21,12 @@ const setContracts = async (contractManager, network, contractName, contractInst
     }
 }
 
-const setResources = async (contractManager, network, contractName, contractInstance) => {
+const setResources = async (contractManager, network, contractName, contractInstance, instanceId) => {
     try {
         const { ethers } = require("hardhat");
 
         const contractInfo = contractManager.getContractByName(contractName);
+        const isShared = contractInfo.multiInstance === false;
 
         // Fetch all roles used by contracts
         const roles = contractManager.getAllRoles(network);
@@ -54,8 +55,13 @@ const setResources = async (contractManager, network, contractName, contractInst
         const roleArray = Object.keys(roleSignerMap);
         const addressArray = Object.values(roleSignerMap);
 
-        // Call setResources function on the contract instance
-        const tx = await contractInstance.setResources(roleArray, addressArray);
+        // Shared-pool contracts: roles are instance-scoped, so pass instanceId first
+        let tx;
+        if (isShared && instanceId != null) {
+            tx = await contractInstance.setResources(instanceId, roleArray, addressArray);
+        } else {
+            tx = await contractInstance.setResources(roleArray, addressArray);
+        }
         const receipt = await tx.wait();
 
         // Get the current deploy gas for the contract and increment it
@@ -67,6 +73,38 @@ const setResources = async (contractManager, network, contractName, contractInst
         console.log(`Roles and addresses successfully set in ${contractName}.`);
     } catch (error) {
         console.error(`Error setting roles and addresses in ${contractName}:`, error);
+    }
+};
+
+/**
+ * Calls initInstance(instanceId) on a shared-pool contract to seed per-instance state.
+ */
+const initInstance = async (contractManager, network, contractName, contractInstance, instanceId) => {
+    try {
+        const tx = await contractInstance.initInstance(instanceId);
+        const receipt = await tx.wait();
+        const contractInfo = contractManager.getContractByName(contractName);
+        const currentDeployGas = contractInfo.deployGas || 0;
+        contractManager.updateDeployGas(contractName, currentDeployGas + Number(receipt.gasUsed), network);
+        console.log(`initInstance(${instanceId}) called on ${contractName}.`);
+    } catch (error) {
+        console.error(`Error calling initInstance on ${contractName}:`, error.message);
+    }
+};
+
+/**
+ * Calls setDataStoreAddress(address) on a process contract to wire up the coupled DataStore.
+ */
+const setDataStoreAddress = async (contractManager, network, contractName, contractInstance, dsAddress) => {
+    try {
+        const tx = await contractInstance.setDataStoreAddress(dsAddress);
+        const receipt = await tx.wait();
+        const contractInfo = contractManager.getContractByName(contractName);
+        const currentDeployGas = contractInfo.deployGas || 0;
+        contractManager.updateDeployGas(contractName, currentDeployGas + Number(receipt.gasUsed), network);
+        console.log(`DataStore address set to ${dsAddress} in ${contractName}.`);
+    } catch (error) {
+        console.error(`Error setting DataStore address in ${contractName}:`, error.message);
     }
 };
 
@@ -83,22 +121,36 @@ const bigIntToStateString = (bigIntValue) => {
 };
 
 //Query contract data
-const queryContract = async (contractManager, contractName, contractInstance) => {
+const queryContract = async (contractManager, contractName, contractInstance, instanceId) => {
     const { ethers } = require("hardhat");
 
     const taskIds = contractManager.getAllTaskIds(contractName);
+    const contractInfo = contractManager.getContractByName(contractName);
+    const isShared = contractInfo.multiInstance === false;
 
-    // Update dataStore
-    if (typeof contractInstance.dataStore === 'function') {
-        const newData = await contractInstance.dataStore();
-        const newDataArray = Array.isArray(newData) ? newData : [newData];
-        contractManager.updateDataStore(contractName, newDataArray);
+    // Update dataStore — shared pool uses instanceData(instanceId), per-instance uses dataStore()
+    if (isShared) {
+        if (typeof contractInstance.instanceData === 'function' && instanceId != null) {
+            try {
+                const newData = await contractInstance.instanceData(instanceId);
+                const newDataArray = Array.isArray(newData) ? newData : [newData];
+                contractManager.updateDataStore(contractName, newDataArray);
+            } catch (_) { /* instanceData may not exist if no DataStore */ }
+        }
+    } else if (typeof contractInstance.dataStore === 'function') {
+        try {
+            const newData = await contractInstance.dataStore();
+            const newDataArray = Array.isArray(newData) ? newData : [newData];
+            contractManager.updateDataStore(contractName, newDataArray);
+        } catch (_) { /* dataStore may not exist on contracts without one */ }
     }
 
     // Update task states
     for (const taskId of taskIds) {
         try {
-            const newState = await contractInstance.getState(taskId);
+            const newState = isShared && instanceId != null
+                ? await contractInstance.getState(instanceId, taskId)
+                : await contractInstance.getState(taskId);
             contractManager.updateTaskState(contractName, taskId, bigIntToStateString(newState));
             console.log(`Updated state of task ${taskId}`);
         } catch (error) {
@@ -188,11 +240,17 @@ const queryContracts = async (contractManager) => {
 }
 
 
-const executeTask = async (contractManager, contractName, contractInstance, taskId, sender, inputs, value) => {
+const executeTask = async (contractManager, contractName, contractInstance, taskId, sender, inputs, value, instanceId) => {
     const timestamp = new Date().toISOString();
     const log = (entry) => appendTransactionLog(contractManager, entry);
     try {
         const { ethers } = require("hardhat");
+
+        // Shared-pool contracts: prepend instanceId so the function can look up per-instance state
+        const contractInfo = contractManager.getContractByName(contractName);
+        const finalInputs = (contractInfo.multiInstance === false && instanceId != null)
+            ? [instanceId, ...inputs]
+            : inputs;
 
         // Get the task by its ID
         // const task = contractManager.getTaskById(contractName, taskId);
@@ -243,9 +301,9 @@ const executeTask = async (contractManager, contractName, contractInstance, task
 
         // Unpack inputs and call the function on the contract instance
         if (typeof contractWithSigner[taskId] === 'function') {
-            // const gasEstimate = await contractWithSigner[taskId].estimateGas(...inputs);
+            // const gasEstimate = await contractWithSigner[taskId].estimateGas(...finalInputs);
             // console.log(`Estimated gas for ${taskId}: ${gasEstimate.toString()}`);
-            const txResponse = await contractWithSigner[taskId](...inputs, txOptions); // Call the contract function with unpacked inputs
+            const txResponse = await contractWithSigner[taskId](...finalInputs, txOptions); // Call the contract function with unpacked inputs
             const receipt = await txResponse.wait();
             const gasUsed = receipt.gasUsed.toString();
             contractManager.updateTaskGas(contractName, taskId, gasUsed);
@@ -272,7 +330,7 @@ const executeTask = async (contractManager, contractName, contractInstance, task
                 contract: contractName,
                 task: taskId,
                 sender,
-                inputs,
+                inputs: finalInputs,
                 value: value || "0",
                 txHash: txResponse.hash,
                 gasUsed,
@@ -289,7 +347,7 @@ const executeTask = async (contractManager, contractName, contractInstance, task
             contract: contractName,
             task: taskId,
             sender,
-            inputs,
+            inputs: (typeof finalInputs !== 'undefined' ? finalInputs : inputs),
             value: value || "0",
             status: "failed",
             error: error.revert?.args?.[0] ?? error.reason ?? error.data?.reason ?? String(error)
@@ -318,6 +376,8 @@ const generateRandomValue = (type) => {
 module.exports = {
     setContracts,
     setResources,
+    initInstance,
+    setDataStoreAddress,
     bigIntToStateString,
     queryContract,
     queryContracts,

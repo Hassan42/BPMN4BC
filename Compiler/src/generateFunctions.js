@@ -63,11 +63,14 @@ function generateFunctionSignatures(solidityCode) {
 
 /**
  * Generates DataStore write assignments for a task's outgoing DataOutputAssociations.
- * @param {Object} activity - The activity object.
- * @param {string} collaborationId - The collaboration ID.
+ * @param {Object}  activity        - The activity object.
+ * @param {string}  collaborationId - The collaboration ID.
+ * @param {boolean} [multiInstance=true]    - When false, use instanceData[instanceId].
+ * @param {boolean} [coupledDataStore=false] - When true, use IDataStore interface calls.
+ * @param {string}  [dsContractName='']     - Name of the DataStore contract (when coupled).
  * @returns {string} Solidity assignment statements.
  */
-function generateDataStoreAssignments(activity, collaborationId) {
+function generateDataStoreAssignments(activity, collaborationId, multiInstance = true, coupledDataStore = false, dsContractName = '') {
   if (!activity.dataOutputAssociations || activity.dataOutputAssociations.length === 0) return '';
   const lines = [];
   activity.dataOutputAssociations.forEach(conn => {
@@ -98,18 +101,33 @@ function generateDataStoreAssignments(activity, collaborationId) {
         }
 
         if (!keyExpr || !valueExpr) return;
-        lines.push(`${sel.varname}[${keyExpr}] = ${valueExpr};`);
+
+        if (coupledDataStore) {
+          // Coupled: external interface call to DataStore contract setter
+          const idArg = !multiInstance ? 'instanceId, ' : '';
+          lines.push(`I${dsContractName}(dataStoreAddress).set${capitalize(sel.varname)}(${idArg}${keyExpr}, ${valueExpr});`);
+        } else if (!multiInstance) {
+          // Shared pool inline mapping: keyed by instanceId
+          lines.push(`${sel.varname}[instanceId][${keyExpr}] = ${valueExpr};`);
+        } else {
+          lines.push(`${sel.varname}[${keyExpr}] = ${valueExpr};`);
+        }
       } else {
-        // Regular DataStore struct var: dataStore.varName = value;
-        const instanceName = 'dataStore';
-        if (isExternalParam(sel, activity)) {
-          lines.push(`${instanceName}.${sel.varname} = ${sel.varname};`);
-        } else if (sel.value) {
+        // Regular DataStore struct var
+        const value = isExternalParam(sel, activity) ? sel.varname : (() => {
+          if (!sel.value) return null;
           const raw = generateExpression(sel.value, collaborationId);
-          const formatted = (varType === 'string' && !sel.value.includes('${') && !raw.startsWith('"'))
-            ? `"${raw}"`
-            : raw;
-          lines.push(`${instanceName}.${sel.varname} = ${formatted};`);
+          return (varType === 'string' && !sel.value.includes('${') && !raw.startsWith('"')) ? `"${raw}"` : raw;
+        })();
+        if (value === null) return;
+
+        if (coupledDataStore) {
+          const idArg = !multiInstance ? 'instanceId, ' : '';
+          lines.push(`I${dsContractName}(dataStoreAddress).set${capitalize(sel.varname)}(${idArg}${value});`);
+        } else if (!multiInstance) {
+          lines.push(`instanceData[instanceId].${sel.varname} = ${value};`);
+        } else {
+          lines.push(`dataStore.${sel.varname} = ${value};`);
         }
       }
     });
@@ -235,7 +253,7 @@ function generateScriptFunction(activity, process, collaborationId) {
  * @param {string} collaborationId - The collaboration ID.
  * @returns {string} The logic for the entry function.
  */
-function generateEntryFunction(activity, process, roles, collaborationId, participantMultiplicities = {}) {
+function generateEntryFunction(activity, process, roles, collaborationId, participantMultiplicities = {}, multiInstance = true, coupledDataStore = false, dsContractName = '') {
   const contractName = getContractNameForElement(activity, process, collaborationId);
   const senderRole = activity.bcsender?.replace(/\s+/g, '') || '';
 
@@ -342,7 +360,31 @@ function generateEntryFunction(activity, process, roles, collaborationId, partic
   const taskId = activity.id.replace(/\s+/g, '');
   const senderKey = (senderRole || '').replace(/\s+/g, '');
   const isMultiParticipant = (participantMultiplicities[senderKey] || 0) > 1;
-  const participationGate = `if (participationCount["${taskId}"] >= requiredParticipants["${taskId}"])`;
+
+  // Helper: build a state reference appropriate for the pool mode
+  const stateRef = (id) => multiInstance
+    ? `state["${id}"]`
+    : `state[instanceId]["${id}"]`;
+
+  const participationCountRef = (id) => multiInstance
+    ? `participationCount["${id}"]`
+    : `participationCount[instanceId]["${id}"]`;
+
+  const hasParticipatedRef = (id) => multiInstance
+    ? `hasParticipated["${id}"][msg.sender]`
+    : `hasParticipated[instanceId]["${id}"][msg.sender]`;
+
+  const participationGate = `if (${participationCountRef(taskId)} >= requiredParticipants["${taskId}"])`;
+
+  // Helper: build the correct DataStore read expression for the current pool/DS mode
+  const dsReadExpr = (varname) => {
+    if (coupledDataStore) {
+      const idArg = !multiInstance ? 'instanceId' : '';
+      return `I${dsContractName}(dataStoreAddress).get${capitalize(varname)}(${idArg})`;
+    }
+    if (!multiInstance) return `instanceData[instanceId].${varname}`;
+    return `dataStore.${varname}`;
+  };
 
   let proceedingLogic = '';
   let hasLoop = false;
@@ -365,9 +407,12 @@ function generateEntryFunction(activity, process, roles, collaborationId, partic
     switch (element.$type) {
       case 'bpmn:ReceiveTask': {
         if (elementContractName !== contractName) {
-          appendState(`I${elementContractName}(contracts["${elementContractName}"]).setState("${element.id.replace(/\s+/g, '')}", 1);`, alreadyGated);
+          const setStateArgs = !multiInstance
+            ? `instanceId, "${element.id.replace(/\s+/g, '')}", 1`
+            : `"${element.id.replace(/\s+/g, '')}", 1`;
+          appendState(`I${elementContractName}(contracts["${elementContractName}"]).setState(${setStateArgs});`, alreadyGated);
         } else {
-          appendState(`state["${element.id.replace(/\s+/g, '')}"] = State.Open;`, alreadyGated);
+          appendState(`${stateRef(element.id.replace(/\s+/g, ''))} = State.Open;`, alreadyGated);
           if (element.id.replace(/\s+/g, '') == activity.id.replace(/\s+/g, '')) {
             hasLoop = true;
           }
@@ -426,7 +471,7 @@ function generateEntryFunction(activity, process, roles, collaborationId, partic
           seenCallStructs.add(structName);
           inputArgParts.push(structName.charAt(0).toLowerCase() + structName.slice(1));
         });
-        dsReadVarsForCall.forEach(({ varname }) => inputArgParts.push(`dataStore.${varname}`));
+        dsReadVarsForCall.forEach(({ varname }) => inputArgParts.push(dsReadExpr(varname)));
         const inputs = inputArgParts.join(', ');
 
         // Build return assignment targets
@@ -457,7 +502,8 @@ function generateEntryFunction(activity, process, roles, collaborationId, partic
             ? `I${elementContractName}(contracts["${elementContractName}"]).checkGateway_${element.id}`
             : `checkGateway_${element.id}`;
 
-          const checkCode = `if (!${gatewayFunctionName}()) { state["${activity.id.replace(/\s+/g, '')}"] = State.Completed; return; }`;
+          const gwArgs = !multiInstance ? 'instanceId' : '';
+          const checkCode = `if (!${gatewayFunctionName}(${gwArgs})) { ${stateRef(activity.id.replace(/\s+/g, ''))} = State.Completed; return; }`;
           appendState(checkCode, alreadyGated);
         }
         break;
@@ -512,11 +558,12 @@ function generateEntryFunction(activity, process, roles, collaborationId, partic
           });
           // DS reads → pass only the specifically selected read variables
           const dsReadVarsForXor = getTaskDataStoreReadVars(element);
-          dsReadVarsForXor.forEach(({ varname }) => argParts.push(`dataStore.${varname}`));
+          dsReadVarsForXor.forEach(({ varname }) => argParts.push(dsReadExpr(varname)));
 
           // Build the XOR block: condition + branches appended directly (no outer gate).
           // Individual state-changing lines inside each branch are wrapped by appendState as usual.
-          let xorBlock = `uint256 branch = ${xorFunctionName}(${argParts.join(', ')});\n`;
+          const xorCallArgs = !multiInstance ? ['instanceId', ...argParts] : argParts;
+          let xorBlock = `uint256 branch = ${xorFunctionName}(${xorCallArgs.join(', ')});\n`;
 
           element.outgoing.forEach((flow, index) => {
             const branchProceedingElements = getProceedingElementsFromFlow(flow, process);
@@ -536,7 +583,7 @@ function generateEntryFunction(activity, process, roles, collaborationId, partic
             // any other terminal element — without this the hasLoop flag from the looping branch
             // would suppress the global State.Completed, leaving the terminal branch with no close.
             if (!branchLoops) {
-              appendState(`state["${taskId}"] = State.Completed;`, alreadyGated);
+              appendState(`${stateRef(taskId)} = State.Completed;`, alreadyGated);
             }
 
             const branchBody = proceedingLogic;
@@ -573,7 +620,7 @@ function generateEntryFunction(activity, process, roles, collaborationId, partic
               extractDataStoreVarSelections(conn).forEach(sel => {
                 if (!sel.varname || seenArgs.has(sel.varname)) return;
                 seenArgs.add(sel.varname);
-                argParts.push(`dataStore.${sel.varname}`);
+                argParts.push(dsReadExpr(sel.varname));
               });
             }
           });
@@ -606,7 +653,7 @@ function generateEntryFunction(activity, process, roles, collaborationId, partic
       const targetElements = outgoingFlows.map(flow => process.flowElements.find(el => el.id === flow.targetRef.id));
       targetElements.forEach(target => {
         if (target && target.$type === 'bpmn:ReceiveTask' && target.id !== activity.id) {
-          appendState(`state["${target.id.replace(/\s+/g, '')}"] = State.Closed;`, false);
+          appendState(`${stateRef(target.id.replace(/\s+/g, ''))} = State.Closed;`, false);
         }
       });
     }
@@ -619,34 +666,42 @@ function generateEntryFunction(activity, process, roles, collaborationId, partic
   // Determine if the current activity loops back to itself
   const hasNextReceiveTask = proceedingElements.some(element => element.$type === 'bpmn:ReceiveTask' && element.id === activity.id);
 
-  const dataStoreAssignments = generateDataStoreAssignments(activity, collaborationId);
+  const dataStoreAssignments = generateDataStoreAssignments(activity, collaborationId, multiInstance, coupledDataStore, dsContractName);
   const doStructCreationsCode = doStructCreations.join('\n        ');
 
   const payableModifier = (activity.bcpayable === true || activity.bcpayable === 'true') ? 'payable ' : '';
   const bpmnMarker = `// @bpmn: ${activity.id} "${(activity.name || activity.id).replace(/[\r\n\t\0]/g, ' ').replace(/"/g, '').trim()}"`;
 
+  // Shared-pool: prepend instanceId to the function signature; use instance-aware modifier
+  const signatureParams = !multiInstance
+    ? `uint256 instanceId${externalParams ? ', ' + externalParams : ''}`
+    : externalParams;
+  const accessibleModifier = !multiInstance
+    ? `isAccessible(instanceId, "${taskId}")`
+    : `isAccessible("${taskId}")`;
+
   if (isMultiParticipant) {
     return `
     ${bpmnMarker}
-    function ${taskId}(${externalParams}) public ${payableModifier}isAccessible("${taskId}") {
-        require(!hasParticipated["${taskId}"][msg.sender], "Participated already called this activity");
-        hasParticipated["${taskId}"][msg.sender] = true;
-        participationCount["${taskId}"]++;
+    function ${taskId}(${signatureParams}) public ${payableModifier}${accessibleModifier} {
+        require(!${hasParticipatedRef(taskId)}, "Participated already called this activity");
+        ${hasParticipatedRef(taskId)} = true;
+        ${participationCountRef(taskId)}++;
         ${dataStoreAssignments}
         ${doStructCreationsCode}
         ${proceedingLogic}
-        ${!hasNextReceiveTask && !hasLoop ? `${participationGate} { state["${taskId}"] = State.Completed; }` : ''}
+        ${!hasNextReceiveTask && !hasLoop ? `${participationGate} { ${stateRef(taskId)} = State.Completed; }` : ''}
     }
     `;
   }
 
   return `
     ${bpmnMarker}
-    function ${taskId}(${externalParams}) public ${payableModifier}isAccessible("${taskId}") {
+    function ${taskId}(${signatureParams}) public ${payableModifier}${accessibleModifier} {
         ${doStructCreationsCode}
         ${dataStoreAssignments}
         ${proceedingLogic}
-        ${!hasNextReceiveTask && !hasLoop ? `state["${taskId}"] = State.Completed;` : ''}
+        ${!hasNextReceiveTask && !hasLoop ? `${stateRef(taskId)} = State.Completed;` : ''}
     }
   `;
 }
@@ -656,7 +711,7 @@ function generateEntryFunction(activity, process, roles, collaborationId, partic
  * @param {Array} activities - The list of activities.
  * @returns {Array} The list of generated Solidity functions.
  */
-function generateFunctions(activities, process, roles, collaborationId, participantMultiplicities = {}) {
+function generateFunctions(activities, process, roles, collaborationId, participantMultiplicities = {}, multiInstance = true, coupledDataStore = false, dsContractName = '') {
   let functions = [];
 
   activities.forEach(activity => {
@@ -667,7 +722,7 @@ function generateFunctions(activities, process, roles, collaborationId, particip
         functionLogic = generateScriptFunction(activity, process, collaborationId);
         break;
       case 'bpmn:ReceiveTask':
-        functionLogic = generateEntryFunction(activity, process, roles, collaborationId, participantMultiplicities);
+        functionLogic = generateEntryFunction(activity, process, roles, collaborationId, participantMultiplicities, multiInstance, coupledDataStore, dsContractName);
         break;
       default:
         throw new Error(`Activity "${activity.name || activity.id}" has an unsupported type: ${activity.$type}`);

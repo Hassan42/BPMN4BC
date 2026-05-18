@@ -122,6 +122,16 @@
           "name": "bcopen",
           "isAttr": true,
           "type": "Boolean"
+        },
+        {
+          "name": "bcmultiinstance",
+          "isAttr": true,
+          "type": "Boolean"
+        },
+        {
+          "name": "bccoupled",
+          "isAttr": true,
+          "type": "Boolean"
         }
       ]
     },

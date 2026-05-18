@@ -354,9 +354,18 @@ app.post('/executeAll', async (req, res) => {
 
 // ── Instance helpers ────────────────────────────────────────────────────────
 
-const instancesPath = path.join(__dirname, 'instances.json');
-const modelsPath    = path.join(__dirname, 'data', 'models.json');
+const instancesPath        = path.join(__dirname, 'instances.json');
+const modelsPath           = path.join(__dirname, 'data', 'models.json');
+const sharedContractsPath  = path.join(__dirname, 'sharedContracts.json');
 fs.ensureDirSync(path.join(__dirname, 'data'));
+
+// ── Shared-contract registry helpers ────────────────────────────────────────
+const readSharedContracts = () => {
+  if (!fs.existsSync(sharedContractsPath)) return [];
+  try { return JSON.parse(fs.readFileSync(sharedContractsPath, 'utf8')); } catch { return []; }
+};
+const writeSharedContracts = (list) =>
+  fs.writeFileSync(sharedContractsPath, JSON.stringify(list, null, 2), 'utf8');
 
 const readModels = () => {
   if (!fs.existsSync(modelsPath)) fs.writeFileSync(modelsPath, '[]', 'utf8');
@@ -420,6 +429,10 @@ app.delete('/models/:id', (req, res) => {
   const remaining        = instances.filter(i => i.modelId !== mid);
   const deletedCount     = instances.length - remaining.length;
   writeInstances(remaining);
+
+  // Remove shared-contract registry entries for this model
+  const sharedRegistry = readSharedContracts();
+  writeSharedContracts(sharedRegistry.filter(e => e.modelId !== mid));
 
   res.status(200).json({ message: `Model ${req.params.id} deleted.`, instancesDeleted: deletedCount });
 });
@@ -496,6 +509,21 @@ app.post('/deploy_instance', async (req, res) => {
       fs.writeFileSync(path.join(contractsDir, `I${contract.contractName}.sol`), contract.contractInterface, 'utf8');
     });
 
+    // Step 4b: Pre-populate addresses for already-deployed shared contracts so the
+    //          deploy-contracts task skips re-deploying them.
+    const sharedRegistry = readSharedContracts();
+    contracts.forEach(contract => {
+      if (contract.multiInstance === false) {
+        const existing = sharedRegistry.find(
+          e => e.contractName === contract.contractName && e.networkId === contract.networkId
+        );
+        if (existing) {
+          contract.address = existing.address;
+          console.log(`Reusing shared contract ${contract.contractName} at ${existing.address}`);
+        }
+      }
+    });
+
     // Step 5: Initialize instance in instances.json BEFORE Hardhat tasks
     // contractsManager reads from here during deploy/setup tasks
     const instance = {
@@ -517,6 +545,28 @@ app.post('/deploy_instance', async (req, res) => {
       await executeHardhatTask('compile', network);
       await executeHardhatTask('deploy-contracts', network, { contractNames, network, instanceId });
       await executeHardhatTask('setup-contracts', network, { contractNames, network, instanceId });
+    }
+
+    // Step 6b: Register any newly deployed shared contracts in the registry
+    const afterInstances = readInstances();
+    const afterInstance  = afterInstances.find(i => i.id === instanceId);
+    if (afterInstance) {
+      afterInstance.contracts.forEach(contract => {
+        if (contract.multiInstance === false && contract.address) {
+          const alreadyRegistered = sharedRegistry.some(
+            e => e.contractName === contract.contractName && e.networkId === contract.networkId
+          );
+          if (!alreadyRegistered) {
+            sharedRegistry.push({
+              modelId:      modelId || null,
+              contractName: contract.contractName,
+              networkId:    contract.networkId,
+              address:      contract.address
+            });
+          }
+        }
+      });
+      writeSharedContracts(sharedRegistry);
     }
 
     // Step 7: Read back final instance state (now includes contract addresses)

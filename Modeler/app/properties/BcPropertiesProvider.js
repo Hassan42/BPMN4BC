@@ -127,6 +127,11 @@ export default function BcPropertiesProvider(propertiesPanel, injector, translat
 
       if (is(businessObject, 'bpmn:DataStoreReference')) {
         groups.push({
+          id: 'BCDataStoreProps',
+          label: translate('DataStore Properties'),
+          entries: BcProps(element),
+        });
+        groups.push({
           id: 'BCDataStore',
           label: translate('Data Store Variables'),
           component: ListGroup,
