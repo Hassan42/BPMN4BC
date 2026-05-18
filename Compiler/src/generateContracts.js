@@ -41,7 +41,7 @@ async function generateContract(contractParams) {
 
   const { dataStoreStructs, dataStoreInitCode, dataStoreReadFunctions } = generateDataStoreStructs(process, lane, isCoupled, isMultiInstance);
   const dataObjectStructs = generateDataObjectStructs(process);
-  const functions = generateFunctions(activities, process, roles, collaborationId, participantMultiplicities, isMultiInstance, isCoupled, contractName).join('\n');
+  const functions = generateFunctions(activities, process, roles, collaborationId, participantMultiplicities, isMultiInstance, isCoupled, `DataStore_${contractName}`).join('\n');
   const gatewayFunctions = generateGateways(gateways, process, collaborationId, isMultiInstance);
   const solidityEvents = generateEvents(events);
   const emitFunctions = generateEmitFunctions(events);
