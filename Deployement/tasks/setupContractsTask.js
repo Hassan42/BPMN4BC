@@ -71,7 +71,12 @@ task('setup-contracts', 'Execute the contracts setup')
             c => c.contractName === contract.dataStoreContractName && c.networkId === network
           );
           if (dsContract && dsContract.address) {
-            await setDataStoreAddress(contractManager, network, contractName, contractInstance, dsContract.address);
+            // Shared pool + per-instance DS: setDataStoreAddress(instanceId, dsAddr)
+            const needsInstanceId = contract.multiInstance === false && contract.dsMultiInstance !== false;
+            await setDataStoreAddress(
+              contractManager, network, contractName, contractInstance, dsContract.address,
+              needsInstanceId ? numericInstanceId : undefined
+            );
           } else {
             console.warn(`DataStore contract "${contract.dataStoreContractName}" not found or has no address yet.`);
           }

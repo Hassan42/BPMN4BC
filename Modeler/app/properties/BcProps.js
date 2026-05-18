@@ -67,8 +67,14 @@ export default function (element) {
       }
     );
   } else if (is(element, 'bpmn:DataStoreReference')) {
-    props.push({ id: 'coupled',         element, component: DataStoreCoupledCheckbox });
-    props.push({ id: 'dsmultiinstance', element, component: DataStoreMultiInstanceCheckbox });
+    props.push({ id: 'coupled', element, component: DataStoreCoupledCheckbox });
+    // DS Multi-instance only makes sense when the DataStore is a separate contract (Coupled = OFF).
+    // When Coupled is checked (inline), the DataStore is embedded in the pool and its MI setting
+    // must match the pool — showing the checkbox would allow an invalid combination.
+    const isInline = element.businessObject.bccoupled === true || element.businessObject.bccoupled === 'true';
+    if (!isInline) {
+      props.push({ id: 'dsmultiinstance', element, component: DataStoreMultiInstanceCheckbox });
+    }
   } else if (is(element, 'bpmn:Participant') && element.businessObject.bc !== 'true') {
     // Non-BC participant: always show Open checkbox; show instance count only when not open
     props.push({ id: 'open', element, component: OpenCheckbox });

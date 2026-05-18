@@ -93,11 +93,17 @@ const initInstance = async (contractManager, network, contractName, contractInst
 };
 
 /**
- * Calls setDataStoreAddress(address) on a process contract to wire up the coupled DataStore.
+ * Calls setDataStoreAddress on a process contract to wire up the coupled DataStore.
+ * When instanceId is provided (shared pool + per-instance DS), calls the two-arg form:
+ *   setDataStoreAddress(instanceId, dsAddress)
+ * Otherwise the one-arg form:
+ *   setDataStoreAddress(dsAddress)
  */
-const setDataStoreAddress = async (contractManager, network, contractName, contractInstance, dsAddress) => {
+const setDataStoreAddress = async (contractManager, network, contractName, contractInstance, dsAddress, instanceId) => {
     try {
-        const tx = await contractInstance.setDataStoreAddress(dsAddress);
+        const tx = instanceId != null
+            ? await contractInstance.setDataStoreAddress(instanceId, dsAddress)
+            : await contractInstance.setDataStoreAddress(dsAddress);
         const receipt = await tx.wait();
         const contractInfo = contractManager.getContractByName(contractName);
         const currentDeployGas = contractInfo.deployGas || 0;

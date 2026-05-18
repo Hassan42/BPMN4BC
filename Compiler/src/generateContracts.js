@@ -41,7 +41,7 @@ async function generateContract(contractParams) {
 
   const { dataStoreStructs, dataStoreInitCode, dataStoreReadFunctions } = generateDataStoreStructs(process, lane, isCoupled, isMultiInstance);
   const dataObjectStructs = generateDataObjectStructs(process);
-  const functions = generateFunctions(activities, process, roles, collaborationId, participantMultiplicities, isMultiInstance, isCoupled, `DataStore_${contractName}`).join('\n');
+  const functions = generateFunctions(activities, process, roles, collaborationId, participantMultiplicities, isMultiInstance, isCoupled, `DataStore_${contractName}`, isDsMultiInstance).join('\n');
   const gatewayFunctions = generateGateways(gateways, process, collaborationId, isMultiInstance);
   const solidityEvents = generateEvents(events);
   const emitFunctions = generateEmitFunctions(events);
@@ -143,9 +143,23 @@ async function generateContract(contractParams) {
 
   // ── Coupled DataStore import ────────────────────────────────────────────────
   const dsContractName = `DataStore_${contractName}`;
-  const dsImport    = isCoupled ? `import './I${dsContractName}.sol';` : '';
-  const dsAddrVar   = isCoupled ? `address public dataStoreAddress;` : '';
-  const dsAddrFn    = isCoupled ? `function setDataStoreAddress(address _addr) public { dataStoreAddress = _addr; }` : '';
+  const dsImport = isCoupled ? `import './I${dsContractName}.sol';` : '';
+
+  // Shared pool + per-instance DS (pool MI=false, DS MI=true):
+  //   The pool contract can't store a single dataStoreAddress — each instance gets its own DS.
+  //   Use a mapping(instanceId → dsAddress) and a two-arg setter.
+  // All other coupled cases: single dataStoreAddress + one-arg setter.
+  const sharedPoolPerInstanceDs = isCoupled && !isMultiInstance && isDsMultiInstance;
+  const dsAddrVar = isCoupled
+    ? (sharedPoolPerInstanceDs
+        ? `mapping(uint256 => address) public dataStoreOf;`
+        : `address public dataStoreAddress;`)
+    : '';
+  const dsAddrFn = isCoupled
+    ? (sharedPoolPerInstanceDs
+        ? `function setDataStoreAddress(uint256 instanceId, address _addr) public { dataStoreOf[instanceId] = _addr; }`
+        : `function setDataStoreAddress(address _addr) public { dataStoreAddress = _addr; }`)
+    : '';
 
   // ── Build Solidity template ─────────────────────────────────────────────────
   let solidityCode;

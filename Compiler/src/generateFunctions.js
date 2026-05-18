@@ -70,7 +70,23 @@ function generateFunctionSignatures(solidityCode) {
  * @param {string}  [dsContractName='']     - Name of the DataStore contract (when coupled).
  * @returns {string} Solidity assignment statements.
  */
-function generateDataStoreAssignments(activity, collaborationId, multiInstance = true, coupledDataStore = false, dsContractName = '') {
+/**
+ * Returns the DataStore contract address expression and the optional instanceId prefix
+ * for external DataStore calls, based on the pool / DS multi-instance combination.
+ *
+ * Combinations:
+ *   Pool MI + DS MI    → single address "dataStoreAddress", no instanceId to DS
+ *   Pool MI + DS !MI   → single address "dataStoreAddress", pass instanceId to DS
+ *   Pool !MI + DS MI   → per-instance mapping "dataStoreOf[instanceId]", no instanceId to DS
+ *   Pool !MI + DS !MI  → single address "dataStoreAddress", pass instanceId to DS
+ */
+function dsCallParts(multiInstance, dsMultiInstance) {
+  const addr  = (!multiInstance && dsMultiInstance) ? 'dataStoreOf[instanceId]' : 'dataStoreAddress';
+  const idArg = !dsMultiInstance ? 'instanceId, ' : '';
+  return { addr, idArg };
+}
+
+function generateDataStoreAssignments(activity, collaborationId, multiInstance = true, coupledDataStore = false, dsContractName = '', dsMultiInstance = true) {
   if (!activity.dataOutputAssociations || activity.dataOutputAssociations.length === 0) return '';
   const lines = [];
   activity.dataOutputAssociations.forEach(conn => {
@@ -103,11 +119,9 @@ function generateDataStoreAssignments(activity, collaborationId, multiInstance =
         if (!keyExpr || !valueExpr) return;
 
         if (coupledDataStore) {
-          // Coupled: external interface call to DataStore contract setter
-          const idArg = !multiInstance ? 'instanceId, ' : '';
-          lines.push(`I${dsContractName}(dataStoreAddress).set${capitalize(sel.varname)}(${idArg}${keyExpr}, ${valueExpr});`);
+          const { addr, idArg } = dsCallParts(multiInstance, dsMultiInstance);
+          lines.push(`I${dsContractName}(${addr}).set${capitalize(sel.varname)}(${idArg}${keyExpr}, ${valueExpr});`);
         } else if (!multiInstance) {
-          // Shared pool inline mapping: keyed by instanceId
           lines.push(`${sel.varname}[instanceId][${keyExpr}] = ${valueExpr};`);
         } else {
           lines.push(`${sel.varname}[${keyExpr}] = ${valueExpr};`);
@@ -122,8 +136,8 @@ function generateDataStoreAssignments(activity, collaborationId, multiInstance =
         if (value === null) return;
 
         if (coupledDataStore) {
-          const idArg = !multiInstance ? 'instanceId, ' : '';
-          lines.push(`I${dsContractName}(dataStoreAddress).set${capitalize(sel.varname)}(${idArg}${value});`);
+          const { addr, idArg } = dsCallParts(multiInstance, dsMultiInstance);
+          lines.push(`I${dsContractName}(${addr}).set${capitalize(sel.varname)}(${idArg}${value});`);
         } else if (!multiInstance) {
           lines.push(`instanceData[instanceId].${sel.varname} = ${value};`);
         } else {
@@ -253,7 +267,7 @@ function generateScriptFunction(activity, process, collaborationId) {
  * @param {string} collaborationId - The collaboration ID.
  * @returns {string} The logic for the entry function.
  */
-function generateEntryFunction(activity, process, roles, collaborationId, participantMultiplicities = {}, multiInstance = true, coupledDataStore = false, dsContractName = '') {
+function generateEntryFunction(activity, process, roles, collaborationId, participantMultiplicities = {}, multiInstance = true, coupledDataStore = false, dsContractName = '', dsMultiInstance = true) {
   const contractName = getContractNameForElement(activity, process, collaborationId);
   const senderRole = activity.bcsender?.replace(/\s+/g, '') || '';
 
@@ -379,8 +393,10 @@ function generateEntryFunction(activity, process, roles, collaborationId, partic
   // Helper: build the correct DataStore read expression for the current pool/DS mode
   const dsReadExpr = (varname) => {
     if (coupledDataStore) {
-      const idArg = !multiInstance ? 'instanceId' : '';
-      return `I${dsContractName}(dataStoreAddress).get${capitalize(varname)}(${idArg})`;
+      const { addr, idArg } = dsCallParts(multiInstance, dsMultiInstance);
+      // idArg is "instanceId, " — strip the trailing ", " for a single-arg getter
+      const idArgTrimmed = idArg.replace(/,\s*$/, '');
+      return `I${dsContractName}(${addr}).get${capitalize(varname)}(${idArgTrimmed})`;
     }
     if (!multiInstance) return `instanceData[instanceId].${varname}`;
     return `dataStore.${varname}`;
@@ -666,7 +682,7 @@ function generateEntryFunction(activity, process, roles, collaborationId, partic
   // Determine if the current activity loops back to itself
   const hasNextReceiveTask = proceedingElements.some(element => element.$type === 'bpmn:ReceiveTask' && element.id === activity.id);
 
-  const dataStoreAssignments = generateDataStoreAssignments(activity, collaborationId, multiInstance, coupledDataStore, dsContractName);
+  const dataStoreAssignments = generateDataStoreAssignments(activity, collaborationId, multiInstance, coupledDataStore, dsContractName, dsMultiInstance);
   const doStructCreationsCode = doStructCreations.join('\n        ');
 
   const payableModifier = (activity.bcpayable === true || activity.bcpayable === 'true') ? 'payable ' : '';
@@ -711,7 +727,7 @@ function generateEntryFunction(activity, process, roles, collaborationId, partic
  * @param {Array} activities - The list of activities.
  * @returns {Array} The list of generated Solidity functions.
  */
-function generateFunctions(activities, process, roles, collaborationId, participantMultiplicities = {}, multiInstance = true, coupledDataStore = false, dsContractName = '') {
+function generateFunctions(activities, process, roles, collaborationId, participantMultiplicities = {}, multiInstance = true, coupledDataStore = false, dsContractName = '', dsMultiInstance = true) {
   let functions = [];
 
   activities.forEach(activity => {
@@ -722,7 +738,7 @@ function generateFunctions(activities, process, roles, collaborationId, particip
         functionLogic = generateScriptFunction(activity, process, collaborationId);
         break;
       case 'bpmn:ReceiveTask':
-        functionLogic = generateEntryFunction(activity, process, roles, collaborationId, participantMultiplicities, multiInstance, coupledDataStore, dsContractName);
+        functionLogic = generateEntryFunction(activity, process, roles, collaborationId, participantMultiplicities, multiInstance, coupledDataStore, dsContractName, dsMultiInstance);
         break;
       default:
         throw new Error(`Activity "${activity.name || activity.id}" has an unsupported type: ${activity.$type}`);
