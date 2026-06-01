@@ -1,4 +1,4 @@
-import { getBusinessObject, is } from 'bpmn-js/lib/util/ModelUtil';
+import { getBusinessObject } from 'bpmn-js/lib/util/ModelUtil';
 import { without } from 'min-dash';
 
 import {
@@ -7,6 +7,7 @@ import {
   getDataStoreVariables,
   getDataStoreVariablesExtension,
   getDataStoreVarSelectionsExtension,
+  getSameNameDataStores,
   nextId
 } from '../util';
 
@@ -36,7 +37,7 @@ export default function DataStoreVariablesProps({ element, injector }) {
 
   return {
     items,
-    add: addFactory({ element, bpmnFactory, commandStack })
+    add: addFactory({ element, bpmnFactory, commandStack, elementRegistry })
   };
 }
 
@@ -47,119 +48,97 @@ function removeFactory({ commandStack, element, variable, elementRegistry }) {
     if (!extension) return;
 
     const removedName = variable.name;
-    const commands = [
-      {
+    const commands = [];
+
+    // Remove variable from THIS DS and all same-name DS siblings
+    const siblings = getSameNameDataStores(element, elementRegistry);
+    siblings.forEach(sibEl => {
+      const sibExt = getDataStoreVariablesExtension(sibEl);
+      if (!sibExt) return;
+      const sibVars = sibExt.get('values');
+      // Match by name for siblings; for the origin element match by identity
+      const toRemove = sibEl === element
+        ? variable
+        : sibVars.find(v => v.name === removedName);
+      if (!toRemove) return;
+      commands.push({
         cmd: 'element.updateModdleProperties',
         context: {
-          element,
-          moddleElement: extension,
-          properties: { values: without(extension.get('values'), variable) }
+          element: sibEl,
+          moddleElement: sibExt,
+          properties: { values: without(sibVars, toRemove) }
         }
-      }
-    ];
+      });
 
-    // Find all sibling DataStore shapes (same participant + same lane as element).
-    // Multiple DS shapes in the same lane share the same variable set, so all of
-    // their connections must be cleaned up — not just the one shape clicked.
-    const allElements = elementRegistry.getAll();
-
-    const getParticipant = (el) => {
-      let p = el.parent;
-      while (p) {
-        if (is(p.businessObject, 'bpmn:Participant')) return p;
-        p = p.parent;
-      }
-      return null;
-    };
-
-    const laneElements = allElements.filter(el => is(el.businessObject, 'bpmn:Lane'));
-    const getContainingLane = (el) => {
-      if (!laneElements.length) return null;
-      const cx = el.x + el.width / 2;
-      const cy = el.y + el.height / 2;
-      return laneElements.find(l =>
-        cx >= l.x && cx <= l.x + l.width &&
-        cy >= l.y && cy <= l.y + l.height
-      ) || null;
-    };
-
-    const myParticipant = getParticipant(element);
-    const myLane = getContainingLane(element);
-
-    const siblingShapes = new Set(
-      allElements.filter(el =>
-        is(el.businessObject, 'bpmn:DataStoreReference') &&
-        getParticipant(el) === myParticipant &&
-        getContainingLane(el) === myLane
-      )
-    );
-
-    // Cascade: remove selections referencing the deleted variable from every
-    // connection that touches any sibling DataStore shape.
-    allElements.forEach(connEl => {
-      if (!siblingShapes.has(connEl.source) && !siblingShapes.has(connEl.target)) return;
-      const selExt = getDataStoreVarSelectionsExtension(connEl);
-      if (!selExt) return;
-      const filtered = selExt.get('values').filter(sel => sel.varname !== removedName);
-      if (filtered.length !== selExt.get('values').length) {
-        commands.push({
-          cmd: 'element.updateModdleProperties',
-          context: { element: connEl, moddleElement: selExt, properties: { values: filtered } }
-        });
-      }
+      // Cascade: remove VarSelections referencing this variable from connections of this sibling
+      elementRegistry.getAll().forEach(connEl => {
+        if (connEl.source !== sibEl && connEl.target !== sibEl) return;
+        const selExt = getDataStoreVarSelectionsExtension(connEl);
+        if (!selExt) return;
+        const filtered = selExt.get('values').filter(sel => sel.varname !== removedName);
+        if (filtered.length !== selExt.get('values').length) {
+          commands.push({
+            cmd: 'element.updateModdleProperties',
+            context: { element: connEl, moddleElement: selExt, properties: { values: filtered } }
+          });
+        }
+      });
     });
 
     commandStack.execute('properties-panel.multi-command-executor', commands);
   };
 }
 
-function addFactory({ element, bpmnFactory, commandStack }) {
+function addFactory({ element, bpmnFactory, commandStack, elementRegistry }) {
   return function (event) {
     event.stopPropagation();
     const commands = [];
-    const businessObject = getBusinessObject(element);
 
-    let extensionElements = businessObject.get('extensionElements');
-    if (!extensionElements) {
-      extensionElements = createElement(
-        'bpmn:ExtensionElements',
-        { values: [] },
-        businessObject,
+    // Shared variable name so all siblings get the identical new variable name
+    const newVarName = nextId('Var_');
+
+    // Add the new variable to THIS DS and all same-name siblings
+    const siblings = getSameNameDataStores(element, elementRegistry);
+    siblings.forEach(sibEl => {
+      const sibBo = getBusinessObject(sibEl);
+
+      let sibExtElems = sibBo.get('extensionElements');
+      if (!sibExtElems) {
+        sibExtElems = createElement('bpmn:ExtensionElements', { values: [] }, sibBo, bpmnFactory);
+        commands.push({
+          cmd: 'element.updateModdleProperties',
+          context: { element: sibEl, moddleElement: sibBo, properties: { extensionElements: sibExtElems } }
+        });
+      }
+
+      let sibDsExt = getDataStoreVariablesExtension(sibEl);
+      if (!sibDsExt) {
+        sibDsExt = createDataStoreVariables({ values: [] }, sibExtElems, bpmnFactory);
+        commands.push({
+          cmd: 'element.updateModdleProperties',
+          context: {
+            element: sibEl,
+            moddleElement: sibExtElems,
+            properties: { values: [...sibExtElems.get('values'), sibDsExt] }
+          }
+        });
+      }
+
+      const newVariable = createElement(
+        'bpmnbc:DataStoreVariable',
+        { name: newVarName, type: 'uint' },
+        sibDsExt,
         bpmnFactory
       );
-      commands.push({
-        cmd: 'element.updateModdleProperties',
-        context: { element, moddleElement: businessObject, properties: { extensionElements } }
-      });
-    }
 
-    let extension = getDataStoreVariablesExtension(element);
-    if (!extension) {
-      extension = createDataStoreVariables({ values: [] }, extensionElements, bpmnFactory);
       commands.push({
         cmd: 'element.updateModdleProperties',
         context: {
-          element,
-          moddleElement: extensionElements,
-          properties: { values: [...extensionElements.get('values'), extension] }
+          element: sibEl,
+          moddleElement: sibDsExt,
+          properties: { values: [...sibDsExt.get('values'), newVariable] }
         }
       });
-    }
-
-    const newVariable = createElement(
-      'bpmnbc:DataStoreVariable',
-      { name: nextId('Var_'), type: 'uint' },
-      extension,
-      bpmnFactory
-    );
-
-    commands.push({
-      cmd: 'element.updateModdleProperties',
-      context: {
-        element,
-        moddleElement: extension,
-        properties: { values: [...extension.get('values'), newVariable] }
-      }
     });
 
     commandStack.execute('properties-panel.multi-command-executor', commands);

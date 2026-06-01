@@ -2,6 +2,7 @@ const {
   getProceedingElementsFromFlow,
   isValueType,
   getContractNameForElement,
+  isElementMultiInstance,
   getEntryFunctions,
   capitalize,
   generateExpression,
@@ -10,11 +11,14 @@ const {
   extractDataObjectVariables,
   getTaskDataObjectReads,
   getTaskDataStoreReadVars,
+  getTaskDataStoreMappingReads,
   getTaskDataObjectWrites,
   extractDataObjectVarSelections,
   extractOutputParameters,
   extractInputParameters,
-  parseReturnValues
+  parseReturnValues,
+  getDsKey,
+  dsCallParts
 } = require('./utils.js');
 
 /**
@@ -63,35 +67,29 @@ function generateFunctionSignatures(solidityCode) {
 
 /**
  * Generates DataStore write assignments for a task's outgoing DataOutputAssociations.
- * @param {Object}  activity        - The activity object.
- * @param {string}  collaborationId - The collaboration ID.
- * @param {boolean} [multiInstance=true]    - When false, use instanceData[instanceId].
- * @param {boolean} [coupledDataStore=false] - When true, use IDataStore interface calls.
- * @param {string}  [dsContractName='']     - Name of the DataStore contract (when coupled).
+ * Each target DS is handled independently with per-DS contract naming and addressing.
+ *
+ * @param {Object}  activity         - The activity object.
+ * @param {string}  collaborationId  - The collaboration ID.
+ * @param {boolean} multiInstance    - Pool multi-instance flag.
+ * @param {boolean} coupledDataStore - When true, use IDataStore interface calls (external DS contract).
+ * @param {string}  contractNameFull - Full lane contract name (with instance suffix if MI).
+ * @param {string}  canonicalBase    - Canonical lane contract name (no instance suffix).
  * @returns {string} Solidity assignment statements.
  */
-/**
- * Returns the DataStore contract address expression and the optional instanceId prefix
- * for external DataStore calls, based on the pool / DS multi-instance combination.
- *
- * Combinations:
- *   Pool MI + DS MI    → single address "dataStoreAddress", no instanceId to DS
- *   Pool MI + DS !MI   → single address "dataStoreAddress", pass instanceId to DS
- *   Pool !MI + DS MI   → per-instance mapping "dataStoreOf[instanceId]", no instanceId to DS
- *   Pool !MI + DS !MI  → single address "dataStoreAddress", pass instanceId to DS
- */
-function dsCallParts(multiInstance, dsMultiInstance) {
-  const addr  = (!multiInstance && dsMultiInstance) ? 'dataStoreOf[instanceId]' : 'dataStoreAddress';
-  const idArg = !dsMultiInstance ? 'instanceId, ' : '';
-  return { addr, idArg };
-}
-
-function generateDataStoreAssignments(activity, collaborationId, multiInstance = true, coupledDataStore = false, dsContractName = '', dsMultiInstance = true) {
+function generateDataStoreAssignments(activity, collaborationId, multiInstance = true, coupledDataStore = false, contractNameFull = '', canonicalBase = '', foreignInlineDsMap = {}) {
   if (!activity.dataOutputAssociations || activity.dataOutputAssociations.length === 0) return '';
   const lines = [];
   activity.dataOutputAssociations.forEach(conn => {
     const target = conn.targetRef;
     if (!target || target.$type !== 'bpmn:DataStoreReference') return;
+
+    // Per-DS settings
+    const dsKey = getDsKey(target);
+    const dsIsMultiInstance = target.bcmultiinstance !== false && target.bcmultiinstance !== 'false';
+    const dsShared = target.bcshared === true || target.bcshared === 'true';
+    const dsName = `DataStore_${collaborationId}_${dsKey}`;
+
     const dsVars = extractDataStoreVariables(target);
     const selections = extractDataStoreVarSelections(conn);
     selections.forEach(sel => {
@@ -118,13 +116,20 @@ function generateDataStoreAssignments(activity, collaborationId, multiInstance =
 
         if (!keyExpr || !valueExpr) return;
 
-        if (coupledDataStore) {
-          const { addr, idArg } = dsCallParts(multiInstance, dsMultiInstance);
-          lines.push(`I${dsContractName}(${addr}).set${capitalize(sel.varname)}(${idArg}${keyExpr}, ${valueExpr});`);
+        if (!(target.bccoupled === true || target.bccoupled === 'true')) {
+          // External DS (own contract) → interface call
+          const { addr, idArg } = dsCallParts(multiInstance, dsIsMultiInstance, dsKey, dsShared, '$.');
+          lines.push(`I${dsName}(${addr}).set${capitalize(sel.varname)}(${idArg}${keyExpr}, ${valueExpr});`);
+        } else if (foreignInlineDsMap[dsKey]) {
+          // Inline DS owned by another lane → cross-lane setter call
+          const ownerContractName = foreignInlineDsMap[dsKey];
+          const instanceKeyed = !dsIsMultiInstance && !dsShared;
+          const instArg = instanceKeyed ? (multiInstance ? '$.processInstanceId, ' : 'instanceId, ') : '';
+          lines.push(`I${ownerContractName}($.contracts["${ownerContractName}"]).set${capitalize(sel.varname)}_${dsKey}(${instArg}${keyExpr}, ${valueExpr});`);
         } else if (!multiInstance) {
-          lines.push(`${sel.varname}[instanceId][${keyExpr}] = ${valueExpr};`);
+          lines.push(`$.${sel.varname}_${dsKey}[instanceId][${keyExpr}] = ${valueExpr};`);
         } else {
-          lines.push(`${sel.varname}[${keyExpr}] = ${valueExpr};`);
+          lines.push(`$.${sel.varname}_${dsKey}[${keyExpr}] = ${valueExpr};`);
         }
       } else {
         // Regular DataStore struct var
@@ -135,13 +140,20 @@ function generateDataStoreAssignments(activity, collaborationId, multiInstance =
         })();
         if (value === null) return;
 
-        if (coupledDataStore) {
-          const { addr, idArg } = dsCallParts(multiInstance, dsMultiInstance);
-          lines.push(`I${dsContractName}(${addr}).set${capitalize(sel.varname)}(${idArg}${value});`);
+        if (!(target.bccoupled === true || target.bccoupled === 'true')) {
+          // External DS (own contract) → interface call
+          const { addr, idArg } = dsCallParts(multiInstance, dsIsMultiInstance, dsKey, dsShared, '$.');
+          lines.push(`I${dsName}(${addr}).set${capitalize(sel.varname)}(${idArg}${value});`);
+        } else if (foreignInlineDsMap[dsKey]) {
+          // Inline DS owned by another lane → cross-lane setter call
+          const ownerContractName = foreignInlineDsMap[dsKey];
+          const instanceKeyed = !dsIsMultiInstance && !dsShared;
+          const instArg = instanceKeyed ? (multiInstance ? '$.processInstanceId, ' : 'instanceId, ') : '';
+          lines.push(`I${ownerContractName}($.contracts["${ownerContractName}"]).set${capitalize(sel.varname)}_${dsKey}(${instArg}${value});`);
         } else if (!multiInstance) {
-          lines.push(`instanceData[instanceId].${sel.varname} = ${value};`);
+          lines.push(`$.instanceData_${dsKey}[instanceId].${sel.varname} = ${value};`);
         } else {
-          lines.push(`dataStore.${sel.varname} = ${value};`);
+          lines.push(`$.dataStore_${dsKey}.${sel.varname} = ${value};`);
         }
       }
     });
@@ -157,16 +169,35 @@ function generateDataStoreAssignments(activity, collaborationId, multiInstance =
  * @param {string} collaborationId - The collaboration ID.
  * @returns {string} The logic for the script function.
  */
-function generateScriptFunction(activity, process, collaborationId) {
+function generateScriptFunction(activity, process, collaborationId, multiInstance = true, coupledDataStore = false, instanceId = null, foreignInlineDsMap = {}) {
   const solidityScript = activity.solidityscript || '';
   const entryFunctions = getEntryFunctions(activity, process);
+  // Canonical name (no suffix) — used for same/different-contract comparisons and mapping keys
   const contractName = getContractNameForElement(activity, process, collaborationId);
+  // Full contract name (with instance suffix if MI lane) — used for DS contract naming
+  const contractNameFull = getContractNameForElement(activity, process, collaborationId, instanceId);
+  const canonicalBase = contractName; // canonical = no suffix
 
   const requireState = `require(${entryFunctions.map((entryFunction) => {
     const entryFunctionContractName = getContractNameForElement(entryFunction, process, collaborationId);
-    const entryFunctionState = entryFunctionContractName !== contractName
-      ? `I${entryFunctionContractName}(contracts["${entryFunctionContractName}"]).getState("${entryFunction.id}")`
-      : `state["${entryFunction.id}"]`;
+    let entryFunctionState;
+    if (entryFunctionContractName !== contractName) {
+      const targetIsShared = !isElementMultiInstance(entryFunction, process);
+      const callerInstanceId = !multiInstance ? 'instanceId' : '$.processInstanceId';
+      const getStateArgs = targetIsShared
+        ? `${callerInstanceId}, "${entryFunction.id}"`
+        : `"${entryFunction.id}"`;
+      // Shared-pool (MI=false) callers use an instance-keyed contracts map so that
+      // cross-contract getState always reads from the correct per-instance proxy.
+      const contractsAddrEntry = !multiInstance
+        ? `$.contracts[instanceId]["${entryFunctionContractName}"]`
+        : `$.contracts["${entryFunctionContractName}"]`;
+      entryFunctionState = `I${entryFunctionContractName}(${contractsAddrEntry}).getState(${getStateArgs})`;
+    } else {
+      entryFunctionState = !multiInstance
+        ? `$.state[instanceId]["${entryFunction.id}"]`
+        : `$.state["${entryFunction.id}"]`;
+    }
     return `uint256(${entryFunctionState}) == uint256(State.Open)`;
   }).join(' || ')});`;
 
@@ -191,7 +222,7 @@ function generateScriptFunction(activity, process, collaborationId) {
   });
   dsReadVars.forEach(({ varname, type }) => {
     const mem = isValueType(varname, type) ? '' : 'memory ';
-    inputParts.push(`${type} ${mem}${varname}`);
+    inputParts.push(`${type} ${mem}${varname}`); // Note: ds field now in tuple but not used here (signature only)
   });
   const inputTypes = inputParts.join(', ');
 
@@ -242,14 +273,85 @@ function generateScriptFunction(activity, process, collaborationId) {
   }
 
   const scriptWithoutReturn = solidityScript.replace(/return\s+.*?;/g, '').trim();
-  const dataStoreAssignments = generateDataStoreAssignments(activity, collaborationId);
+
+  // For shared-pool contracts (non-MI), instance-keyed state variables need an explicit
+  // instanceId outer key that a multi-instance contract doesn't need.
+  // Transform common patterns written by the modeler user so they compile correctly:
+  //   addressOf["role"]  → addressOf[instanceId]["role"]
+  //   state["taskId"]    → state[instanceId]["taskId"]
+  // The negative-lookahead (?!instanceId) prevents double-wrapping if the user already
+  // wrote the instanceId-qualified form.
+  // All generated function bodies start with: MainStorage storage $ = _getMainStorage();
+  // Transform custom Solidity scripts: state var accesses need the $. prefix.
+  let processedScript = scriptWithoutReturn;
+  // Non-MI: wrap unqualified state var accesses with instanceId first, then add $.
+  if (!multiInstance) {
+    processedScript = processedScript
+      .replace(/\baddressOf\[(?!\$|instanceId)/g, 'addressOf[instanceId][')
+      .replace(/\bstate\[(?!\$|instanceId)/g,      'state[instanceId][');
+  }
+  // Add $. prefix for all known state vars (both MI and non-MI)
+  processedScript = processedScript
+    .replace(/\bstate\[(?!\$)/g,          '$.state[')
+    .replace(/\baddressOf\[(?!\$)/g,      '$.addressOf[')
+    .replace(/\bcontracts\[(?!\$)/g,      '$.contracts[')
+    .replace(/\bprocessInstanceId\b/g,    '$.processInstanceId')
+    .replace(/\breceiveFunctionCount\b/g, '$.receiveFunctionCount')
+    .replace(/\bdataStore_/g,             '$.dataStore_')
+    .replace(/\binstanceData_/g,          '$.instanceData_');
+
+  const dataStoreAssignments = generateDataStoreAssignments(activity, collaborationId, multiInstance, coupledDataStore, contractNameFull, canonicalBase, foreignInlineDsMap);
 
   const bpmnName = (activity.name || activity.id).replace(/[\r\n\t\0]/g, ' ').replace(/"/g, '').trim();
+
+  // Shared-pool: prepend instanceId to the signature
+  const scriptSignatureParams = !multiInstance
+    ? `uint256 instanceId${inputTypes ? ', ' + inputTypes : ''}`
+    : inputTypes;
+
+  // Mapping reads: inline local-variable declarations so the script can reference them by name.
+  const dsReadExprMappingScript = (varname, ds, keyExpr) => {
+    const dKey = getDsKey(ds);
+    const dIsMultiInstance = ds.bcmultiinstance !== false && ds.bcmultiinstance !== 'false';
+    const dShared = ds.bcshared === true || ds.bcshared === 'true';
+    if (!(ds.bccoupled === true || ds.bccoupled === 'true')) {
+      // External DS (own contract) → interface call
+      const dName = `DataStore_${collaborationId}_${dKey}`;
+      const { addr, idArg } = dsCallParts(multiInstance, dIsMultiInstance, dKey, dShared, '$.');
+      return `I${dName}(${addr}).get${capitalize(varname)}(${idArg}${keyExpr})`;
+    }
+    // Inline DS — check ownership
+    const ownerContractName = foreignInlineDsMap[dKey];
+    if (ownerContractName) {
+      // Foreign inline DS: cross-lane getter call
+      const instanceKeyed = !dIsMultiInstance && !dShared;
+      const instArg = instanceKeyed ? (multiInstance ? '$.processInstanceId, ' : 'instanceId, ') : '';
+      return `I${ownerContractName}($.contracts["${ownerContractName}"]).get${capitalize(varname)}_${dKey}(${instArg}${keyExpr})`;
+    }
+    // Owned inline DS: direct MainStorage access
+    if (!multiInstance) return `$.${varname}_${dKey}[instanceId][${keyExpr}]`;
+    return `$.${varname}_${dKey}[${keyExpr}]`;
+  };
+
+  const dsMappingReads = getTaskDataStoreMappingReads(activity);
+  let mappingReadDecls = '';
+  dsMappingReads.forEach(({ varname, valueType, key, ds }) => {
+    const keyExpr = generateExpression(key, collaborationId);
+    if (!keyExpr) return;
+    const mem = isValueType(varname, valueType) ? '' : 'memory ';
+    mappingReadDecls += `${valueType} ${mem}${varname} = ${dsReadExprMappingScript(varname, ds, keyExpr)};\n`;
+  });
+
+  // ScriptTask body: require → mapping reads → script → DS writes → return.
+  // Proceeding logic (gateway calls, state transitions) is handled entirely by
+  // the calling ReceiveTask — it must not appear here.
   return `
     // @bpmn: ${activity.id} "${bpmnName}"
-    function ${activity.id.replace(/\s+/g, '')}(${inputTypes}) public payable ${returnClause} {
+    function ${activity.id.replace(/\s+/g, '')}(${scriptSignatureParams}) public payable ${returnClause} {
+        MainStorage storage $ = _getMainStorage();
         ${requireState}
-        ${scriptWithoutReturn}
+        ${mappingReadDecls}
+        ${processedScript}
         ${dataStoreAssignments}
         ${returnStatement}
     }
@@ -267,8 +369,12 @@ function generateScriptFunction(activity, process, collaborationId) {
  * @param {string} collaborationId - The collaboration ID.
  * @returns {string} The logic for the entry function.
  */
-function generateEntryFunction(activity, process, roles, collaborationId, participantMultiplicities = {}, multiInstance = true, coupledDataStore = false, dsContractName = '', dsMultiInstance = true) {
+function generateEntryFunction(activity, process, roles, collaborationId, participantMultiplicities = {}, multiInstance = true, coupledDataStore = false, instanceId = null, foreignInlineDsMap = {}) {
+  // Canonical name (no suffix) — used for same/different-contract comparisons and mapping keys
   const contractName = getContractNameForElement(activity, process, collaborationId);
+  // Full contract name (with instance suffix if MI lane) — used for DS contract naming
+  const contractNameFull = getContractNameForElement(activity, process, collaborationId, instanceId);
+  const canonicalBase = contractName; // canonical = no suffix
   const senderRole = activity.bcsender?.replace(/\s+/g, '') || '';
 
   if (!senderRole) {
@@ -375,31 +481,81 @@ function generateEntryFunction(activity, process, roles, collaborationId, partic
   const senderKey = (senderRole || '').replace(/\s+/g, '');
   const isMultiParticipant = (participantMultiplicities[senderKey] || 0) > 1;
 
-  // Helper: build a state reference appropriate for the pool mode
+  // Reads a specific mapping key from a DS (inline local var or interface call).
+  const dsReadExprMapping = (varname, ds, keyExpr) => {
+    const dKey = getDsKey(ds);
+    const dIsMultiInstance = ds.bcmultiinstance !== false && ds.bcmultiinstance !== 'false';
+    const dShared = ds.bcshared === true || ds.bcshared === 'true';
+    if (!(ds.bccoupled === true || ds.bccoupled === 'true')) {
+      // External DS (own contract) → interface call
+      const dName = `DataStore_${collaborationId}_${dKey}`;
+      const { addr, idArg } = dsCallParts(multiInstance, dIsMultiInstance, dKey, dShared, '$.');
+      return `I${dName}(${addr}).get${capitalize(varname)}(${idArg}${keyExpr})`;
+    }
+    // Inline DS — check ownership
+    const ownerContractName = foreignInlineDsMap[dKey];
+    if (ownerContractName) {
+      // Foreign inline DS: cross-lane getter call on the owning lane's contract
+      const instanceKeyed = !dIsMultiInstance && !dShared;
+      const instArg = instanceKeyed ? (multiInstance ? '$.processInstanceId, ' : 'instanceId, ') : '';
+      return `I${ownerContractName}($.contracts["${ownerContractName}"]).get${capitalize(varname)}_${dKey}(${instArg}${keyExpr})`;
+    }
+    // Owned inline DS: direct MainStorage access
+    if (!multiInstance) return `$.${varname}_${dKey}[instanceId][${keyExpr}]`;
+    return `$.${varname}_${dKey}[${keyExpr}]`;
+  };
+
+  // Inline local-variable declarations for mapping reads from this ReceiveTask's DS inputs.
+  const dsMappingReads = getTaskDataStoreMappingReads(activity);
+  let mappingReadDecls = '';
+  dsMappingReads.forEach(({ varname, valueType, key, ds }) => {
+    const keyExpr = generateExpression(key, collaborationId);
+    if (!keyExpr) return;
+    const mem = isValueType(varname, valueType) ? '' : 'memory ';
+    mappingReadDecls += `${valueType} ${mem}${varname} = ${dsReadExprMapping(varname, ds, keyExpr)};\n`;
+  });
+
+  // Helper: build a state reference appropriate for the pool mode.
+  // All function bodies start with: MainStorage storage $ = _getMainStorage();
   const stateRef = (id) => multiInstance
-    ? `state["${id}"]`
-    : `state[instanceId]["${id}"]`;
+    ? `$.state["${id}"]`
+    : `$.state[instanceId]["${id}"]`;
 
   const participationCountRef = (id) => multiInstance
-    ? `participationCount["${id}"]`
-    : `participationCount[instanceId]["${id}"]`;
+    ? `$.participationCount["${id}"]`
+    : `$.participationCount[instanceId]["${id}"]`;
 
   const hasParticipatedRef = (id) => multiInstance
-    ? `hasParticipated["${id}"][msg.sender]`
-    : `hasParticipated[instanceId]["${id}"][msg.sender]`;
+    ? `$.hasParticipated["${id}"][msg.sender]`
+    : `$.hasParticipated[instanceId]["${id}"][msg.sender]`;
 
-  const participationGate = `if (${participationCountRef(taskId)} >= requiredParticipants["${taskId}"])`;
+  const participationGate = `if (${participationCountRef(taskId)} >= $.requiredParticipants["${taskId}"])`;
 
-  // Helper: build the correct DataStore read expression for the current pool/DS mode
-  const dsReadExpr = (varname) => {
-    if (coupledDataStore) {
-      const { addr, idArg } = dsCallParts(multiInstance, dsMultiInstance);
-      // idArg is "instanceId, " — strip the trailing ", " for a single-arg getter
+  // Per-DS read expression: computes the correct Solidity expression to read a DS variable.
+  // All inline DS fields go through $ (the MainStorage storage pointer in scope).
+  const dsReadExpr = (varname, ds) => {
+    const dsKey = getDsKey(ds);
+    const dsIsMultiInstance = ds.bcmultiinstance !== false && ds.bcmultiinstance !== 'false';
+    const dsShared = ds.bcshared === true || ds.bcshared === 'true';
+    if (!(ds.bccoupled === true || ds.bccoupled === 'true')) {
+      // External DS (own contract) → interface call
+      const dsName = `DataStore_${collaborationId}_${dsKey}`;
+      // Pass '$.' as storePrefix so the DS address is read from MainStorage
+      const { addr, idArg } = dsCallParts(multiInstance, dsIsMultiInstance, dsKey, dsShared, '$.');
       const idArgTrimmed = idArg.replace(/,\s*$/, '');
-      return `I${dsContractName}(${addr}).get${capitalize(varname)}(${idArgTrimmed})`;
+      return `I${dsName}(${addr}).get${capitalize(varname)}(${idArgTrimmed})`;
     }
-    if (!multiInstance) return `instanceData[instanceId].${varname}`;
-    return `dataStore.${varname}`;
+    // Inline DS — check ownership
+    const ownerContractName = foreignInlineDsMap[dsKey];
+    if (ownerContractName) {
+      // Foreign inline DS: cross-lane getter call on the owning lane's contract
+      const instanceKeyed = !dsIsMultiInstance && !dsShared;
+      const instArg = instanceKeyed ? (multiInstance ? '$.processInstanceId' : 'instanceId') : '';
+      return `I${ownerContractName}($.contracts["${ownerContractName}"]).get${capitalize(varname)}_${dsKey}(${instArg})`;
+    }
+    // Owned inline DS: direct MainStorage access
+    if (!multiInstance) return `$.instanceData_${dsKey}[instanceId].${varname}`;
+    return `$.dataStore_${dsKey}.${varname}`;
   };
 
   let proceedingLogic = '';
@@ -418,15 +574,32 @@ function generateEntryFunction(activity, process, roles, collaborationId, partic
   // alreadyGated: true when we are already inside a gate block (e.g. inside an XOR branch
   // that is itself wrapped), so we must not double-wrap.
   function processElement(element, alreadyGated = false) {
+    // Canonical name (no suffix) — used for comparison, contracts[] mapping key,
+    // AND interface cast types (interfaces are written once per lane without instance suffix).
     const elementContractName = getContractNameForElement(element, process, collaborationId);
+    const isCrossContract = elementContractName !== contractName;
+    // Whether the TARGET element lives in a shared (MI=false) contract
+    const targetMI = isElementMultiInstance(element, process);
+    // The instanceId expression to forward when calling into a shared target:
+    //   MI=true  caller → uses $.processInstanceId (ERC-7201 MainStorage field)
+    //   MI=false caller → uses 'instanceId' (function parameter)
+    const callerInstanceId = !multiInstance ? 'instanceId' : '$.processInstanceId';
+    // Contracts lookup expression: shared-pool (MI=false) contracts use an instance-keyed
+    // mapping so each instance's per-instance sibling proxy address is stored independently.
+    //   MI=false caller → $.contracts[instanceId]["LaneName"]
+    //   MI=true  caller → $.contracts["LaneName"]  (flat, unchanged behaviour)
+    const contractsAddr = (name) => !multiInstance
+      ? `$.contracts[instanceId]["${name}"]`
+      : `$.contracts["${name}"]`;
 
     switch (element.$type) {
       case 'bpmn:ReceiveTask': {
-        if (elementContractName !== contractName) {
-          const setStateArgs = !multiInstance
-            ? `instanceId, "${element.id.replace(/\s+/g, '')}", 1`
+        if (isCrossContract) {
+          // Pass instanceId only when the target contract is shared (MI=false)
+          const setStateArgs = !targetMI
+            ? `${callerInstanceId}, "${element.id.replace(/\s+/g, '')}", 1`
             : `"${element.id.replace(/\s+/g, '')}", 1`;
-          appendState(`I${elementContractName}(contracts["${elementContractName}"]).setState(${setStateArgs});`, alreadyGated);
+          appendState(`I${elementContractName}(${contractsAddr(elementContractName)}).setState(${setStateArgs});`, alreadyGated);
         } else {
           appendState(`${stateRef(element.id.replace(/\s+/g, ''))} = State.Open;`, alreadyGated);
           if (element.id.replace(/\s+/g, '') == activity.id.replace(/\s+/g, '')) {
@@ -487,7 +660,7 @@ function generateEntryFunction(activity, process, roles, collaborationId, partic
           seenCallStructs.add(structName);
           inputArgParts.push(structName.charAt(0).toLowerCase() + structName.slice(1));
         });
-        dsReadVarsForCall.forEach(({ varname }) => inputArgParts.push(dsReadExpr(varname)));
+        dsReadVarsForCall.forEach(({ varname, ds }) => inputArgParts.push(dsReadExpr(varname, ds)));
         const inputs = inputArgParts.join(', ');
 
         // Build return assignment targets
@@ -497,28 +670,50 @@ function generateEntryFunction(activity, process, roles, collaborationId, partic
           return structName.charAt(0).toLowerCase() + structName.slice(1);
         }).join(', ');
 
-        if (elementContractName !== contractName) {
-          if (writeAssignments) {
-            proceedingLogic += `(${writeAssignments}) = I${elementContractName}(contracts["${elementContractName}"]).${element.id}(${inputs});\n`;
+        // Build call inputs, prepending instanceId when the target expects it.
+        // Cross-contract: instanceId is needed when the TARGET is a shared (MI=false) contract.
+        //   MI=true  caller → 'processInstanceId' (stored state var)
+        //   MI=false caller → 'instanceId'         (function param)
+        // Same-contract: instanceId is needed when the CALLER itself is MI=false.
+        let scriptCallInputs;
+        if (isCrossContract) {
+          if (!targetMI) {
+            scriptCallInputs = inputs ? `${callerInstanceId}, ${inputs}` : callerInstanceId;
           } else {
-            proceedingLogic += `I${elementContractName}(contracts["${elementContractName}"]).${element.id}(${inputs});\n`;
+            scriptCallInputs = inputs || '';
+          }
+        } else {
+          scriptCallInputs = !multiInstance
+            ? (inputs ? `instanceId, ${inputs}` : 'instanceId')
+            : inputs;
+        }
+
+        if (isCrossContract) {
+          if (writeAssignments) {
+            proceedingLogic += `(${writeAssignments}) = I${elementContractName}(${contractsAddr(elementContractName)}).${element.id}(${scriptCallInputs});\n`;
+          } else {
+            proceedingLogic += `I${elementContractName}(${contractsAddr(elementContractName)}).${element.id}(${scriptCallInputs});\n`;
           }
         } else {
           if (writeAssignments) {
-            proceedingLogic += `(${writeAssignments}) = ${element.id}(${inputs});\n`;
+            proceedingLogic += `(${writeAssignments}) = ${element.id}(${scriptCallInputs});\n`;
           } else {
-            proceedingLogic += `${element.id}(${inputs});\n`;
+            proceedingLogic += `${element.id}(${scriptCallInputs});\n`;
           }
         }
         break;
       }
       case 'bpmn:ParallelGateway': {
         if (element.incoming.length > 1) {
-          const gatewayFunctionName = elementContractName !== contractName
-            ? `I${elementContractName}(contracts["${elementContractName}"]).checkGateway_${element.id}`
+          const gatewayFunctionName = isCrossContract
+            ? `I${elementContractName}(${contractsAddr(elementContractName)}).checkGateway_${element.id}`
             : `checkGateway_${element.id}`;
 
-          const gwArgs = !multiInstance ? 'instanceId' : '';
+          // Cross-contract: forward instanceId only when target is shared (MI=false)
+          // Same-contract:  forward instanceId only when caller is shared (MI=false)
+          const gwArgs = isCrossContract
+            ? (!targetMI ? callerInstanceId : '')
+            : (!multiInstance ? 'instanceId' : '');
           const checkCode = `if (!${gatewayFunctionName}(${gwArgs})) { ${stateRef(activity.id.replace(/\s+/g, ''))} = State.Completed; return; }`;
           appendState(checkCode, alreadyGated);
         }
@@ -531,8 +726,8 @@ function generateEntryFunction(activity, process, roles, collaborationId, partic
           const branchProceedingElements = getProceedingElementsFromFlow(outgoingFlows[0], process);
           branchProceedingElements.forEach(branchElement => processElement(branchElement, alreadyGated));
         } else {
-          const xorFunctionName = elementContractName !== contractName
-            ? `I${elementContractName}(contracts["${elementContractName}"]).checkXOR_${element.id}`
+          const xorFunctionName = isCrossContract
+            ? `I${elementContractName}($.contracts["${elementContractName}"]).checkXOR_${element.id}`
             : `checkXOR_${element.id}`;
 
           // Build args: DO reads (structs) + selected DS read vars
@@ -574,11 +769,15 @@ function generateEntryFunction(activity, process, roles, collaborationId, partic
           });
           // DS reads → pass only the specifically selected read variables
           const dsReadVarsForXor = getTaskDataStoreReadVars(element);
-          dsReadVarsForXor.forEach(({ varname }) => argParts.push(dsReadExpr(varname)));
+          dsReadVarsForXor.forEach(({ varname, ds }) => argParts.push(dsReadExpr(varname, ds)));
 
           // Build the XOR block: condition + branches appended directly (no outer gate).
           // Individual state-changing lines inside each branch are wrapped by appendState as usual.
-          const xorCallArgs = !multiInstance ? ['instanceId', ...argParts] : argParts;
+          // Cross-contract: prepend instanceId when target is shared (MI=false)
+          // Same-contract:  prepend instanceId when caller is shared (MI=false)
+          const xorCallArgs = isCrossContract
+            ? (!targetMI ? [callerInstanceId, ...argParts] : argParts)
+            : (!multiInstance ? ['instanceId', ...argParts] : argParts);
           let xorBlock = `uint256 branch = ${xorFunctionName}(${xorCallArgs.join(', ')});\n`;
 
           element.outgoing.forEach((flow, index) => {
@@ -633,18 +832,29 @@ function generateEntryFunction(activity, process, roles, collaborationId, partic
                 argParts.push(`${instanceName}.${v.name}`);
               });
             } else if (source.$type === 'bpmn:DataStoreReference') {
+              const srcDsVars = extractDataStoreVariables(source);
               extractDataStoreVarSelections(conn).forEach(sel => {
                 if (!sel.varname || seenArgs.has(sel.varname)) return;
                 seenArgs.add(sel.varname);
-                argParts.push(dsReadExpr(sel.varname));
+                const srcDsVar = srcDsVars.find(v => v.name === sel.varname);
+                if (srcDsVar && (srcDsVar.type || 'uint') === 'mapping') {
+                  if (!sel.key) return; // skip mapping with no key
+                  argParts.push(dsReadExprMapping(sel.varname, source, generateExpression(sel.key, collaborationId)));
+                } else {
+                  argParts.push(dsReadExpr(sel.varname, source));
+                }
               });
             }
           });
         });
 
         const args = argParts.join(', ');
-        if (elementContractName !== contractName) {
-          proceedingLogic += `I${elementContractName}(contracts["${elementContractName}"]).emit_${eventName}(${args});\n`;
+        if (isCrossContract) {
+          // Prepend instanceId when calling into a shared (MI=false) target contract
+          const eventArgs = !targetMI
+            ? (args ? `${callerInstanceId}, ${args}` : callerInstanceId)
+            : args;
+          proceedingLogic += `I${elementContractName}($.contracts["${elementContractName}"]).emit_${eventName}(${eventArgs});\n`;
         } else {
           proceedingLogic += `emit_${eventName}(${args});\n`;
         }
@@ -682,7 +892,7 @@ function generateEntryFunction(activity, process, roles, collaborationId, partic
   // Determine if the current activity loops back to itself
   const hasNextReceiveTask = proceedingElements.some(element => element.$type === 'bpmn:ReceiveTask' && element.id === activity.id);
 
-  const dataStoreAssignments = generateDataStoreAssignments(activity, collaborationId, multiInstance, coupledDataStore, dsContractName, dsMultiInstance);
+  const dataStoreAssignments = generateDataStoreAssignments(activity, collaborationId, multiInstance, coupledDataStore, contractNameFull, canonicalBase, foreignInlineDsMap);
   const doStructCreationsCode = doStructCreations.join('\n        ');
 
   const payableModifier = (activity.bcpayable === true || activity.bcpayable === 'true') ? 'payable ' : '';
@@ -700,11 +910,13 @@ function generateEntryFunction(activity, process, roles, collaborationId, partic
     return `
     ${bpmnMarker}
     function ${taskId}(${signatureParams}) public ${payableModifier}${accessibleModifier} {
+        MainStorage storage $ = _getMainStorage();
         require(!${hasParticipatedRef(taskId)}, "Participated already called this activity");
         ${hasParticipatedRef(taskId)} = true;
         ${participationCountRef(taskId)}++;
-        ${dataStoreAssignments}
         ${doStructCreationsCode}
+        ${mappingReadDecls}
+        ${dataStoreAssignments}
         ${proceedingLogic}
         ${!hasNextReceiveTask && !hasLoop ? `${participationGate} { ${stateRef(taskId)} = State.Completed; }` : ''}
     }
@@ -714,7 +926,9 @@ function generateEntryFunction(activity, process, roles, collaborationId, partic
   return `
     ${bpmnMarker}
     function ${taskId}(${signatureParams}) public ${payableModifier}${accessibleModifier} {
+        MainStorage storage $ = _getMainStorage();
         ${doStructCreationsCode}
+        ${mappingReadDecls}
         ${dataStoreAssignments}
         ${proceedingLogic}
         ${!hasNextReceiveTask && !hasLoop ? `${stateRef(taskId)} = State.Completed;` : ''}
@@ -727,7 +941,7 @@ function generateEntryFunction(activity, process, roles, collaborationId, partic
  * @param {Array} activities - The list of activities.
  * @returns {Array} The list of generated Solidity functions.
  */
-function generateFunctions(activities, process, roles, collaborationId, participantMultiplicities = {}, multiInstance = true, coupledDataStore = false, dsContractName = '', dsMultiInstance = true) {
+function generateFunctions(activities, process, roles, collaborationId, participantMultiplicities = {}, multiInstance = true, coupledDataStore = false, instanceId = null, foreignInlineDsMap = {}) {
   let functions = [];
 
   activities.forEach(activity => {
@@ -735,10 +949,10 @@ function generateFunctions(activities, process, roles, collaborationId, particip
 
     switch (activity.$type) {
       case 'bpmn:ScriptTask':
-        functionLogic = generateScriptFunction(activity, process, collaborationId);
+        functionLogic = generateScriptFunction(activity, process, collaborationId, multiInstance, coupledDataStore, instanceId, foreignInlineDsMap);
         break;
       case 'bpmn:ReceiveTask':
-        functionLogic = generateEntryFunction(activity, process, roles, collaborationId, participantMultiplicities, multiInstance, coupledDataStore, dsContractName, dsMultiInstance);
+        functionLogic = generateEntryFunction(activity, process, roles, collaborationId, participantMultiplicities, multiInstance, coupledDataStore, instanceId, foreignInlineDsMap);
         break;
       default:
         throw new Error(`Activity "${activity.name || activity.id}" has an unsupported type: ${activity.$type}`);

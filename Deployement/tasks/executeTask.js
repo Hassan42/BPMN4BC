@@ -29,8 +29,8 @@ task('execute-task', 'Execute a contracts task')
 
     console.log(`Interacting with ${contractName} at address ${contractAddress}`);
 
-    // Retrieve the contract factory based on the contract name
-    const contractFactory = await ethers.getContractFactory(contractName);
+    const factoryName = contract.canonicalContractName || contractName;
+    const contractFactory = await ethers.getContractFactory(factoryName);
 
     // Attach to the contract
     const contractInstance = contractFactory.attach(contractAddress);

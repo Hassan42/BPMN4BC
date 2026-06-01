@@ -8,6 +8,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="./model-detail.js" defer></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <style>
     html, body { height: 100%; overflow: hidden; }
   </style>
@@ -26,10 +27,28 @@
         <h1 id="model-name" class="text-lg font-bold text-gray-800 truncate max-w-xs"></h1>
         <span id="model-date" class="text-xs text-gray-400"></span>
       </div>
-      <button id="deploy-btn"
-        class="px-4 py-2 text-sm rounded bg-blue-600 text-white hover:bg-blue-700 font-semibold">
-        Start New Instance
-      </button>
+      <div class="flex gap-2">
+        <button id="download-contracts-btn"
+          class="px-4 py-2 text-sm rounded bg-gray-700 text-white hover:bg-gray-800 font-semibold">
+          Download Contracts
+        </button>
+        <button id="export-btn"
+          class="px-4 py-2 text-sm rounded bg-gray-700 text-white hover:bg-gray-800 font-semibold">
+          Export Report
+        </button>
+        <button id="auto-run-btn"
+          class="px-4 py-2 text-sm rounded bg-purple-600 text-white hover:bg-purple-700 font-semibold">
+          Auto-Run All
+        </button>
+        <button id="bulk-deploy-btn"
+          class="px-4 py-2 text-sm rounded bg-green-600 text-white hover:bg-green-700 font-semibold">
+          Deploy N Instances
+        </button>
+        <button id="deploy-btn"
+          class="px-4 py-2 text-sm rounded bg-blue-600 text-white hover:bg-blue-700 font-semibold">
+          Start New Instance
+        </button>
+      </div>
     </div>
 
     <!-- Body: diagram left, instances right -->
@@ -70,6 +89,9 @@
       <div class="w-96 flex-shrink-0 overflow-y-auto bg-white p-5">
         <h2 class="text-base font-bold text-gray-800 mb-4">Deployed Instances</h2>
 
+        <!-- Experiment totals (rendered by JS) -->
+        <div id="totals-section" class="hidden mb-4"></div>
+
         <!-- Loading -->
         <div id="instances-spinner" class="flex justify-center py-8 hidden">
           <svg class="animate-spin h-6 w-6 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none"
@@ -88,6 +110,97 @@
 
     </div>
 
+  </div>
+
+  <!-- Auto-Run config modal -->
+  <div id="auto-run-modal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 hidden">
+    <div class="bg-white p-6 rounded-lg shadow-lg w-96">
+      <h2 class="text-lg font-bold mb-1">Auto-Run Configuration</h2>
+      <p class="text-xs text-gray-400 mb-4">Configure how random values are generated for external task parameters.</p>
+
+      <!-- uint range -->
+      <div class="mb-3">
+        <label class="block text-sm font-semibold text-gray-700 mb-1">uint parameters — range</label>
+        <div class="flex gap-3 items-center">
+          <div class="flex-1">
+            <label class="text-xs text-gray-500 block mb-0.5">Min</label>
+            <input id="ar-uint-min" type="number" min="0" value="1"
+              class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400" />
+          </div>
+          <div class="flex-1">
+            <label class="text-xs text-gray-500 block mb-0.5">Max</label>
+            <input id="ar-uint-max" type="number" min="0" value="100"
+              class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400" />
+          </div>
+        </div>
+      </div>
+
+      <!-- bool probability -->
+      <div class="mb-3">
+        <label class="block text-sm font-semibold text-gray-700 mb-1">bool parameters — probability of true</label>
+        <div class="flex items-center gap-2">
+          <input id="ar-bool-prob" type="number" min="0" max="100" value="50"
+            class="w-20 border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400" />
+          <span class="text-sm text-gray-500">% chance of <code class="bg-gray-100 px-1 rounded">true</code></span>
+        </div>
+      </div>
+
+      <!-- string values -->
+      <div class="mb-3">
+        <label class="block text-sm font-semibold text-gray-700 mb-1">string parameters — value list</label>
+        <input id="ar-string-values" type="text" placeholder="foo, bar, baz" value="foo, bar, baz"
+          class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400" />
+        <p class="text-xs text-gray-400 mt-1">Comma-separated — one value is picked at random per execution</p>
+      </div>
+
+      <!-- ETH value for payable tasks -->
+      <div class="mb-3">
+        <label class="block text-sm font-semibold text-gray-700 mb-1">payable tasks — ETH to send per call</label>
+        <div class="flex items-center gap-2">
+          <input id="ar-eth-value" type="number" min="0" step="0.01" value="0.5"
+            class="w-28 border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400" />
+          <span class="text-sm text-gray-500">ETH</span>
+        </div>
+        <p class="text-xs text-gray-400 mt-1">Sent as <code class="bg-gray-100 px-1 rounded">msg.value</code> for tasks marked payable</p>
+      </div>
+
+      <!-- Random seed -->
+      <div class="mb-5">
+        <label class="block text-sm font-semibold text-gray-700 mb-1">Random seed <span class="font-normal text-gray-400">(optional)</span></label>
+        <input id="ar-seed" type="number" min="0" placeholder="leave empty for a random seed"
+          class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400" />
+        <p class="text-xs text-gray-400 mt-1">
+          Set the same seed on both configurations to generate identical parameter sequences — useful for fair comparisons.
+          The seed used is shown during the run so you can copy it.
+        </p>
+      </div>
+
+      <div class="flex justify-end gap-2">
+        <button id="ar-cancel"
+          class="px-4 py-2 text-sm rounded border border-gray-300 hover:bg-gray-100">Cancel</button>
+        <button id="ar-confirm"
+          class="px-4 py-2 text-sm rounded bg-purple-600 text-white hover:bg-purple-700 font-semibold">Run All</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bulk deploy modal -->
+  <div id="bulk-deploy-modal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 hidden">
+    <div class="bg-white p-6 rounded-lg shadow-lg w-80">
+      <h2 class="text-lg font-bold mb-3">Deploy Experiment</h2>
+      <label class="block text-sm text-gray-600 mb-1">Base Name</label>
+      <input id="bulk-deploy-name" type="text" placeholder="e.g. Instance"
+        class="w-full border border-gray-300 rounded px-3 py-2 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-green-400" />
+      <label class="block text-sm text-gray-600 mb-1">Number of Instances</label>
+      <input id="bulk-deploy-count" type="number" min="1" max="50" value="3"
+        class="w-full border border-gray-300 rounded px-3 py-2 text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-green-400" />
+      <div class="flex justify-end gap-2">
+        <button id="bulk-deploy-cancel"
+          class="px-4 py-2 text-sm rounded border border-gray-300 hover:bg-gray-100">Cancel</button>
+        <button id="bulk-deploy-confirm"
+          class="px-4 py-2 text-sm rounded bg-green-500 text-white hover:bg-green-600 font-semibold">Deploy All</button>
+      </div>
+    </div>
   </div>
 
   <!-- Deploy modal -->

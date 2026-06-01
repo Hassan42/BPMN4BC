@@ -246,18 +246,35 @@ const createContractManager = (instanceId) => {
         return match ? match.privateKey : undefined;
     };
 
+    const updateImplementationAddress = (contractName, implAddress, networkId) => {
+        const contracts = readContracts();
+        const contract = contracts.find(c => c.contractName === contractName && c.networkId === networkId);
+        if (!contract) throw new Error(`Contract "${contractName}" not found.`);
+        contract.implementationAddress = implAddress;
+        writeContracts(contracts);
+    };
+
     const getContractsState = (network) => {
         const contracts = readContracts();
         const networkContracts = contracts.filter(c => c.networkId === network);
         // All open tasks in this instance share the same caller pool
         const callerAddresses = readInstanceOpenCallers().map(c => c.address);
         return networkContracts.reduce((acc, contract) => {
-            const { contractName, contractRoles, contractText, balance, receiveTasks, dataStore, mappingVars } = contract;
+            const { contractName, contractRoles, contractText, balance, receiveTasks, dataStore, mappingVars, address, implementationAddress } = contract;
             // Inject the full instance-level caller list into every open task
             const tasksWithCallers = (receiveTasks || []).map(task =>
                 task.open ? { ...task, callers: callerAddresses } : task
             );
-            acc[contractName] = { contractText, receiveTasks: tasksWithCallers, dataStore, mappingVars: mappingVars || [], contractRoles, balance };
+            acc[contractName] = {
+                contractText,
+                receiveTasks: tasksWithCallers,
+                dataStore,
+                mappingVars: mappingVars || [],
+                contractRoles,
+                balance,
+                address,                  // proxy address
+                implementationAddress,    // implementation address
+            };
             return acc;
         }, {});
     };
@@ -376,6 +393,7 @@ const createContractManager = (instanceId) => {
         updateRoleBalance,
         updateRoleEscrow,
         updateContractBalance,
+        updateImplementationAddress,
         getTransactions,
         appendTransaction,
         addInstanceCaller,

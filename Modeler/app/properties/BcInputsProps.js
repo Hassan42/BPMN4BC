@@ -19,6 +19,57 @@ import InputParameterProps from './BcInputProp';
 
 import { without } from 'min-dash';
 
+import { html } from 'htm/preact';
+import { TextFieldEntry, isTextFieldEntryEdited } from '@bpmn-io/properties-panel';
+import { useService } from 'bpmn-js-properties-panel';
+import { validateSolidityExpression } from '../scripts/solidityValidator.js';
+
+// Shared syntax-error display (matches the one in BcOutputsProps)
+function ValError({ err }) {
+  if (!err) return null;
+  const msg = err.line ? `Line ${err.line}: ${err.message}` : err.message;
+  return html`<div style="
+    margin-top:3px; padding:4px 6px;
+    background:#fff5f5; border:1px solid #fca5a5; border-radius:3px;
+    color:#dc2626; font-size:11px;
+    font-family:Consolas,'Courier New',monospace;
+  ">⚠ ${msg}</div>`;
+}
+
+/**
+ * Key expression field for a mapping-type DS variable read.
+ * Stores the value in DataStoreVarSelection.key so the compiler can emit
+ * IDS(addr).getVar(key) or varName_dsKey[key] in the generated Solidity.
+ */
+function DsReadMappingKey({ id, element, selection }) {
+  const commandStack = useService('commandStack');
+  const translate    = useService('translate');
+  const debounce     = useService('debounceInput');
+
+  const getValue = () => selection.key || '';
+  const setValue = value => commandStack.execute('element.updateModdleProperties', {
+    element,
+    moddleElement: selection,
+    properties: { key: value }
+  });
+
+  const syntaxError = validateSolidityExpression(getValue());
+
+  return html`
+    <div>
+      <${TextFieldEntry}
+        id=${id}
+        element=${selection}
+        label=${translate('Key')}
+        getValue=${getValue}
+        setValue=${setValue}
+        debounce=${debounce}
+      />
+      <${ValError} err=${syntaxError} />
+    </div>
+  `;
+}
+
 
 export default function InputParametersProps({ element, injector }) {
 
@@ -74,12 +125,27 @@ export default function InputParametersProps({ element, injector }) {
     const dsVars = getDataStoreVariables(conn.source) || [];
     selections.forEach((sel, idx) => {
       if (!sel.varname) return;
-      const varType = (dsVars.find(v => v.name === sel.varname) || {}).type || 'uint';
-      items.push({
-        id: `ds-read-${conn.id}-${idx}`,
-        label: `${sel.varname} : ${varType} [DS]`,
-        entries: [],
-      });
+      const dsVar   = dsVars.find(v => v.name === sel.varname);
+      const varType = (dsVar || {}).type || 'uint';
+      const isMapping = varType === 'mapping';
+
+      const label = isMapping
+        ? `${sel.varname} : mapping(${dsVar?.keyType || 'uint'} => ${dsVar?.valueType || 'uint'}) [DS]`
+        : `${sel.varname} : ${varType} [DS]`;
+
+      // Mapping reads need a key expression so the compiler can emit get(key).
+      // Non-mapping reads are passed as function parameters — no extra UI needed.
+      const entries = isMapping
+        ? [{
+            id: `ds-read-${conn.id}-${idx}-key`,
+            element: conn,
+            selection: sel,
+            component: DsReadMappingKey,
+            isEdited: isTextFieldEntryEdited,
+          }]
+        : [];
+
+      items.push({ id: `ds-read-${conn.id}-${idx}`, label, entries });
     });
   });
 

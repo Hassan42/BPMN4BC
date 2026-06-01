@@ -1,4 +1,4 @@
-import { renderContract, renderRoleBalances, renderSenderTasks, renderDataStores } from './renderer.js';
+import { renderContract, renderRoleBalances, renderSenderTasks, renderDataStores, renderContractAddresses } from './renderer.js';
 import { gasToCHF, formatCHF } from '../pricing.js';
 
 export function renderTabs(networks, instanceId, ethChfRate) {
@@ -97,6 +97,8 @@ function renderSenderTabs(networkData, networkKey, instanceId, contentContainer,
     renderSenderTasks(entries, instanceId, contentContainer);
     // DataStore sections for all contracts in this network
     renderDataStores(networkData, networkKey, instanceId, contentContainer);
+    // Proxy + implementation addresses for every contract in this network
+    renderContractAddresses(networkData, contentContainer);
     // Balances scoped to this network only
     renderRoleBalances({ [networkKey]: networkData }, ethChfRate, instanceId);
   }

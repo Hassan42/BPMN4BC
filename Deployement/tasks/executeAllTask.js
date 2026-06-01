@@ -25,8 +25,10 @@ task('execute-all', 'Execute all contracts tasks until all are completed')
             } 
 
             const contractAddress = contractManager.getContractAddressByName(contractName);
+            const contractInfo = contractManager.getContractByName(contractName);
+            const factoryName = contractInfo.canonicalContractName || contractName;
 
-            const contractFactory = await ethers.getContractFactory(contractName);
+            const contractFactory = await ethers.getContractFactory(factoryName);
 
             // Get contract instance
             const contractInstance = contractFactory.attach(contractAddress);

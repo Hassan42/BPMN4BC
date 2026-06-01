@@ -247,15 +247,35 @@ function createTaskCard(network, contractName, task, instanceId, overrideSender)
         label.appendChild(hint);
       }
 
-      const input = document.createElement('input');
-      input.type = 'text';
-      input.name = param.name;
-      input.placeholder = `Enter ${param.type}`;
-      input.className = 'w-full p-2 border border-gray-300 rounded text-sm';
-      input.disabled = isClosed;
-
-      paramDiv.appendChild(label);
-      paramDiv.appendChild(input);
+      let input;
+      if (param.type === 'bool') {
+        // Checkbox so the user gets a real true/false toggle, not a text field
+        // where any non-empty string (including "false") coerces to true in ethers.js.
+        const checkRow = document.createElement('div');
+        checkRow.className = 'flex items-center gap-2';
+        input = document.createElement('input');
+        input.type = 'checkbox';
+        input.name = param.name;
+        input.disabled = isClosed;
+        input.className = 'w-4 h-4 accent-blue-500';
+        const checkLabel = document.createElement('span');
+        checkLabel.className = 'text-sm text-gray-600';
+        checkLabel.textContent = 'true';
+        input.addEventListener('change', () => { checkLabel.textContent = input.checked ? 'true' : 'false'; });
+        checkRow.appendChild(input);
+        checkRow.appendChild(checkLabel);
+        paramDiv.appendChild(label);
+        paramDiv.appendChild(checkRow);
+      } else {
+        input = document.createElement('input');
+        input.type = 'text';
+        input.name = param.name;
+        input.placeholder = `Enter ${param.type}`;
+        input.className = 'w-full p-2 border border-gray-300 rounded text-sm';
+        input.disabled = isClosed;
+        paramDiv.appendChild(label);
+        paramDiv.appendChild(input);
+      }
       form.appendChild(paramDiv);
     });
   }
@@ -632,11 +652,14 @@ function createDataStoreSection(dataArray, mappingVars, contractName, networkKey
         resultEl.className = 'mt-2 text-sm';
         resultEl.textContent = 'Looking up…';
         try {
+          // For inline-DS mappings the Solidity state variable is named varName_dsKey.
+          // For external-DS contracts (isDataStore) the variable is just varName.
+          const solVarName = mv.dsKey ? `${mv.name}_${mv.dsKey}` : mv.name;
           const { value } = await queryMapping({
             instanceId,
             contractName,
             networkId: networkKey,
-            varName: mv.name,
+            varName: solVarName,
             key
           });
           resultEl.className = 'mt-2 text-sm text-gray-700 font-mono bg-white border border-gray-300 rounded px-2 py-1';
@@ -659,6 +682,57 @@ function createDataStoreSection(dataArray, mappingVars, contractName, networkKey
   }
 
   return sectionDiv;
+}
+
+/**
+ * Renders a collapsible "Contract Addresses" section listing every contract's
+ * proxy address and implementation address for the given network.
+ */
+export function renderContractAddresses(networkData, container) {
+  const entries = Object.entries(networkData).filter(
+    ([, c]) => c.address || c.implementationAddress
+  );
+  if (entries.length === 0) return;
+
+  const grid = document.createElement('div');
+  grid.className = 'space-y-2';
+
+  entries.forEach(([contractKey, contract]) => {
+    const label = (contract.contractText && contract.contractText.trim())
+      ? contract.contractText
+      : contractKey;
+
+    const row = document.createElement('div');
+    row.className = 'p-3 bg-gray-50 border border-gray-200 rounded text-xs font-mono';
+
+    const title = document.createElement('div');
+    title.className = 'font-semibold text-gray-700 text-sm font-sans mb-1';
+    title.textContent = label;
+
+    const mkLine = (tag, val) => {
+      const line = document.createElement('div');
+      line.className = 'flex gap-2 items-center mt-0.5';
+      const tagEl = document.createElement('span');
+      tagEl.className = 'text-gray-400 w-24 shrink-0';
+      tagEl.textContent = tag;
+      const addrEl = document.createElement('span');
+      addrEl.className = 'text-gray-800 break-all';
+      addrEl.textContent = val || '—';
+      line.appendChild(tagEl);
+      line.appendChild(addrEl);
+      return line;
+    };
+
+    row.appendChild(title);
+    row.appendChild(mkLine('Proxy:', contract.address));
+    row.appendChild(mkLine('Implementation:', contract.implementationAddress));
+    grid.appendChild(row);
+  });
+
+  const wrapper = document.createElement('div');
+  wrapper.className = 'mt-4';
+  wrapper.appendChild(createCollapsibleSection('Contract Addresses', grid));
+  container.appendChild(wrapper);
 }
 
 export function renderRoleBalances(networks, ethChfRate, instanceId) {

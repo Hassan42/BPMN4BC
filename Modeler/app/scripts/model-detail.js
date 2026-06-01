@@ -13,6 +13,56 @@ function highlightSolidity(code) {
   }
 }
 
+/**
+ * Normalises Solidity source for display.
+ *
+ * The server already runs prettier on compiled output, so this is a lightweight
+ * safety net that runs synchronously and always succeeds:
+ *  - Collapses consecutive blank lines to at most one
+ *  - Re-indents every line using brace depth (4 spaces per level)
+ *
+ * Braces inside string literals are rare in generated code and their impact is
+ * limited to a single line; the formatter recovers naturally on the next `}`.
+ */
+function normalizeSolidity(raw) {
+  if (!raw) return raw;
+  try {
+    const INDENT = '    ';
+    const lines = raw.split('\n');
+    const out = [];
+    let depth = 0;
+    let prevBlank = false;
+
+    for (const line of lines) {
+      const t = line.trim();
+
+      // Collapse consecutive blank lines to one
+      if (!t) {
+        if (!prevBlank && out.length) out.push('');
+        prevBlank = true;
+        continue;
+      }
+      prevBlank = false;
+
+      const opens        = (t.match(/\{/g) || []).length;
+      const closes       = (t.match(/\}/g) || []).length;
+      // Leading `}` chars dedent before the line is printed (e.g. closing braces, `} else {`)
+      const leadingClose = (t.match(/^}+/) || [''])[0].length;
+
+      depth = Math.max(0, depth - leadingClose);
+      out.push(INDENT.repeat(depth) + t);
+      // Net brace change for subsequent lines
+      depth = Math.max(0, depth + opens - closes + leadingClose);
+    }
+
+    // Drop trailing blank lines
+    while (out.length && !out[out.length - 1]) out.pop();
+    return out.join('\n');
+  } catch (_) {
+    return raw; // never crash the viewer
+  }
+}
+
 function getBaseUrl() {
   const origin   = window.location.origin;
   const hostname = window.location.hostname;
@@ -86,16 +136,10 @@ function buildSourceTabs(bpmn) {
   ensureCompiled(bpmn).then(contracts => {
     if (!contracts || contracts.length === 0) return;
 
-    const networkIds = [...new Set(contracts.map(c => c.networkId))];
-    const multiNetwork = networkIds.length > 1;
-
     contracts.forEach(contract => {
-      const label = (contract.contractText && contract.contractText.trim())
+      const tabLabel = (contract.contractText && contract.contractText.trim())
         ? contract.contractText
         : contract.contractName;
-      const tabLabel = multiNetwork
-        ? `${label} (${contract.networkId})`
-        : label;
 
       const tab = document.createElement('button');
       tab.className = TAB_INACTIVE;
@@ -111,7 +155,8 @@ function buildSourceTabs(bpmn) {
           // contracts are already compiled at this point (ensureCompiled ran above)
           const fresh = await ensureCompiled(bpmn);
           const match = fresh.find(c => c.contractName === contract.contractName && c.networkId === contract.networkId);
-          const code = (match && match.contractCode) || '// Source code not available.';
+          const rawCode = (match && match.contractCode) || '// Source code not available.';
+          const code = normalizeSolidity(rawCode);
           sourceCodeEl.innerHTML = highlightSolidity(code);
         } catch (err) {
           sourceCodeEl.innerHTML = highlightSolidity(`// Error: ${err.message}`);
@@ -135,6 +180,39 @@ const deployConfirmBtn = document.getElementById('deploy-modal-confirm');
 const deployProgress   = document.getElementById('deploy-progress');
 const deployProgressLabel = document.getElementById('deploy-progress-label');
 
+const autoRunBtn    = document.getElementById('auto-run-btn');
+const autoRunModal  = document.getElementById('auto-run-modal');
+const arUintMin     = document.getElementById('ar-uint-min');
+const arUintMax     = document.getElementById('ar-uint-max');
+const arBoolProb    = document.getElementById('ar-bool-prob');
+const arStringVals  = document.getElementById('ar-string-values');
+const arEthValue    = document.getElementById('ar-eth-value');
+const arSeedInput   = document.getElementById('ar-seed');
+const arCancelBtn   = document.getElementById('ar-cancel');
+const arConfirmBtn  = document.getElementById('ar-confirm');
+
+// ── Seeded PRNG (mulberry32) ───────────────────────────────────────────────────
+// Returns a function that produces the next pseudo-random float in [0, 1).
+// Two runs with the same seed produce the exact same sequence of values.
+function makePrng(seed) {
+  let s = seed >>> 0;
+  return function () {
+    s = (s + 0x6D2B79F5) >>> 0;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+const bulkDeployBtn        = document.getElementById('bulk-deploy-btn');
+const bulkDeployModal      = document.getElementById('bulk-deploy-modal');
+const bulkDeployNameInput  = document.getElementById('bulk-deploy-name');
+const bulkDeployCountInput = document.getElementById('bulk-deploy-count');
+const bulkDeployCancelBtn  = document.getElementById('bulk-deploy-cancel');
+const bulkDeployConfirmBtn = document.getElementById('bulk-deploy-confirm');
+
+const totalsSectionEl = document.getElementById('totals-section');
+
 const errorModal      = document.getElementById('error-modal');
 const errorTitle      = document.getElementById('error-modal-title');
 const errorBody       = document.getElementById('error-modal-body');
@@ -152,9 +230,189 @@ function showError(title, message) {
   btn.addEventListener('click', () => errorModal.classList.add('hidden'))
 );
 
+// ── Module-level state (set once on init, used by export / totals) ───────────
+let _ethChfRate = null;
+let _instances  = [];
+
+// ── Experiment totals ─────────────────────────────────────────────────────────
+function renderTotals(instances) {
+  totalsSectionEl.innerHTML = '';
+  if (instances.length === 0) { totalsSectionEl.classList.add('hidden'); return; }
+
+  // Sum deployGas per friendly contract label (contractText) across all instances.
+  // For non-MI contracts every instance uses the same contractText so costs accumulate naturally.
+  const byLabel = {};
+  instances.forEach(inst => {
+    (inst.contracts || []).forEach(c => {
+      const label = (c.contractText && c.contractText.trim()) ? c.contractText : c.contractName;
+      if (!(label in byLabel)) byLabel[label] = 0;
+      byLabel[label] += Number(c.deployGas) || 0;
+    });
+  });
+
+  const grandTotal = Object.values(byLabel).reduce((a, b) => a + b, 0);
+  if (grandTotal === 0) { totalsSectionEl.classList.add('hidden'); return; }
+
+  totalsSectionEl.classList.remove('hidden');
+
+  const heading = document.createElement('div');
+  heading.className = 'flex items-center justify-between mb-2';
+  heading.innerHTML = `
+    <span class="text-sm font-bold text-gray-700">Experiment Totals</span>
+    <span class="text-xs text-gray-400">${instances.length} instance${instances.length !== 1 ? 's' : ''}</span>
+  `;
+  totalsSectionEl.appendChild(heading);
+
+  const table = document.createElement('div');
+  table.className = 'space-y-1 text-xs';
+
+  const n = instances.length;
+  const showAvg = n > 1;
+
+  const fmtGasAvg = (gas) => {
+    const avg = Math.round(gas / n);
+    const avgChf = gasToCHF(avg, _ethChfRate);
+    return `avg ${avg.toLocaleString()} gas${avgChf !== null ? ` · ${formatCHF(avgChf)}` : ''} / inst`;
+  };
+
+  Object.entries(byLabel).forEach(([label, gas]) => {
+    if (!gas) return;
+    const chf = gasToCHF(gas, _ethChfRate);
+    const row = document.createElement('div');
+    row.className = 'bg-gray-50 border border-gray-100 rounded px-2 py-1';
+    row.innerHTML = `
+      <div class="flex items-center justify-between">
+        <span class="text-gray-600 truncate mr-2">${label}</span>
+        <span class="font-mono text-gray-700 flex-shrink-0">${gas.toLocaleString()} gas${chf !== null ? ` · ${formatCHF(chf)}` : ''}</span>
+      </div>
+      ${showAvg ? `<div class="text-right text-gray-400 mt-0.5">${fmtGasAvg(gas)}</div>` : ''}
+    `;
+    table.appendChild(row);
+  });
+
+  // Grand total row
+  const totalChf = gasToCHF(grandTotal, _ethChfRate);
+  const totalRow = document.createElement('div');
+  totalRow.className = 'bg-blue-50 border border-blue-200 rounded px-2 py-1.5 mt-1 font-semibold';
+  totalRow.innerHTML = `
+    <div class="flex items-center justify-between">
+      <span class="text-blue-700">Total (all contracts)</span>
+      <span class="font-mono text-blue-800 flex-shrink-0">${grandTotal.toLocaleString()} gas${totalChf !== null ? ` · ${formatCHF(totalChf)}` : ''}</span>
+    </div>
+    ${showAvg ? `<div class="text-right text-blue-400 font-normal mt-0.5">${fmtGasAvg(grandTotal)}</div>` : ''}
+  `;
+  table.appendChild(totalRow);
+
+  totalsSectionEl.appendChild(table);
+
+  // ── Execution statistics (shown when any instance has run transactions) ───
+  const allTx = instances.flatMap(inst => (inst.transactions || []));
+  if (allTx.length > 0) {
+    const statsDivider = document.createElement('hr');
+    statsDivider.className = 'border-gray-200 mt-3 mb-3';
+    totalsSectionEl.appendChild(statsDivider);
+
+    const statsHeading = document.createElement('div');
+    statsHeading.className = 'flex items-center justify-between mb-2';
+    const successCount = allTx.filter(tx => tx.status === 'success').length;
+    const failCount    = allTx.length - successCount;
+    statsHeading.innerHTML = `
+      <span class="text-sm font-bold text-gray-700">Execution Statistics</span>
+      <span class="text-xs text-gray-400">${allTx.length} tx${allTx.length !== 1 ? 's' : ''}${failCount > 0 ? ` · <span class="text-red-400">${failCount} failed</span>` : ''}</span>
+    `;
+    totalsSectionEl.appendChild(statsHeading);
+
+    // Build taskId → taskName lookup from receiveTasks stored on every contract
+    const taskNameMap = new Map();
+    instances.forEach(inst => {
+      (inst.contracts || []).forEach(c => {
+        (c.receiveTasks || []).forEach(t => {
+          if (t.id && t.name && !taskNameMap.has(t.id)) {
+            taskNameMap.set(t.id, t.name);
+          }
+        });
+      });
+    });
+
+    // Group by task id
+    const byTask = new Map();
+    allTx.forEach(tx => {
+      const key = tx.task || 'unknown';
+      if (!byTask.has(key)) byTask.set(key, { count: 0, totalGas: 0, minGas: Infinity, maxGas: -Infinity, failed: 0 });
+      const s = byTask.get(key);
+      s.count++;
+      if (tx.status !== 'success') {
+        s.failed++;
+      } else {
+        const gas = Number(tx.gasUsed) || 0;
+        s.totalGas += gas;
+        if (gas < s.minGas) s.minGas = gas;
+        if (gas > s.maxGas) s.maxGas = gas;
+      }
+    });
+
+    const statsTable = document.createElement('div');
+    statsTable.className = 'space-y-1 text-xs';
+
+    let totalExecGas = 0;
+
+    byTask.forEach((stat, taskId) => {
+      const successRuns = stat.count - stat.failed;
+      totalExecGas += stat.totalGas;
+
+      const avgGas = successRuns > 0 ? Math.round(stat.totalGas / successRuns) : 0;
+      const avgChf = gasToCHF(avgGas, _ethChfRate);
+
+      const displayName = taskNameMap.get(taskId) || taskId;
+
+      const row = document.createElement('div');
+      row.className = 'bg-gray-50 border border-gray-100 rounded px-2 py-1';
+      row.innerHTML = `
+        <div class="flex items-center justify-between">
+          <span class="font-medium text-gray-700 truncate mr-2">${displayName}</span>
+          <span class="flex-shrink-0 text-gray-400">${stat.count}×${stat.failed ? ` <span class="text-red-400">(${stat.failed} failed)</span>` : ''}</span>
+        </div>
+        ${successRuns > 0 ? `
+        <div class="text-gray-500 mt-0.5">
+          total ${stat.totalGas.toLocaleString()} gas
+          &nbsp;·&nbsp; avg ${avgGas.toLocaleString()}${avgChf !== null ? ` · ${formatCHF(avgChf)}` : ''}
+          &nbsp;·&nbsp; min ${stat.minGas.toLocaleString()} &nbsp;·&nbsp; max ${stat.maxGas.toLocaleString()}
+        </div>` : ''}
+      `;
+      statsTable.appendChild(row);
+    });
+
+    // Total execution gas
+    if (totalExecGas > 0) {
+      const totalExecChf = gasToCHF(totalExecGas, _ethChfRate);
+      const totalExecRow = document.createElement('div');
+      totalExecRow.className = 'bg-purple-50 border border-purple-200 rounded px-2 py-1.5 mt-1 font-semibold';
+      totalExecRow.innerHTML = `
+        <div class="flex items-center justify-between">
+          <span class="text-purple-700">Total execution gas</span>
+          <span class="font-mono text-purple-800 flex-shrink-0">${totalExecGas.toLocaleString()} gas${totalExecChf !== null ? ` · ${formatCHF(totalExecChf)}` : ''}</span>
+        </div>
+        ${showAvg ? `<div class="text-right text-purple-400 font-normal mt-0.5">${fmtGasAvg(totalExecGas)}</div>` : ''}
+      `;
+      statsTable.appendChild(totalExecRow);
+    }
+
+    totalsSectionEl.appendChild(statsTable);
+  }
+
+  // Separator before instance list
+  const sep = document.createElement('hr');
+  sep.className = 'border-gray-200 mt-3';
+  totalsSectionEl.appendChild(sep);
+}
+
 // ── Instances rendering ───────────────────────────────────────────────────────
 function renderInstances(instances, ethChfRate) {
   instancesSpinner.classList.add('hidden');
+  _ethChfRate = ethChfRate;
+  _instances  = instances; // keep for export/publish
+
+  renderTotals(instances);
 
   if (instances.length === 0) {
     instancesEmpty.classList.remove('hidden');
@@ -221,13 +479,762 @@ function renderInstances(instances, ethChfRate) {
 
     row.appendChild(header);
     row.appendChild(meta);
+
+    // ── Cost breakdown (collapsible) ────────────────────────────────────────
+    const contractsWithData = (instance.contracts || []).filter(c => c.address);
+    if (contractsWithData.length > 0) {
+      const costSection = document.createElement('div');
+      costSection.className = 'mb-3';
+
+      const costToggle = document.createElement('button');
+      costToggle.className = 'text-xs text-gray-500 hover:text-gray-700 font-medium flex items-center gap-1 mb-1';
+      costToggle.innerHTML = '<span>▶</span>&nbsp;Cost Breakdown';
+
+      const costContent = document.createElement('div');
+      costContent.className = 'hidden mt-1 space-y-1';
+
+      costToggle.onclick = () => {
+        const nowHidden = costContent.classList.toggle('hidden');
+        costToggle.querySelector('span').textContent = nowHidden ? '▶' : '▼';
+      };
+
+      contractsWithData.forEach(c => {
+        const label = (c.contractText && c.contractText.trim()) ? c.contractText : c.contractName;
+        const gas   = Number(c.deployGas) || 0;
+        const isShared = !gas && c.multiInstance === false;
+
+        const entry = document.createElement('div');
+        entry.className = 'flex items-center justify-between text-xs bg-white border border-gray-100 rounded px-2 py-1';
+
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'text-gray-600 truncate mr-2';
+        nameSpan.textContent = label;
+
+        const costSpan = document.createElement('span');
+        costSpan.className = 'flex-shrink-0';
+
+        if (isShared) {
+          costSpan.innerHTML = '<span class="px-1.5 py-0.5 rounded text-[10px] bg-gray-100 text-gray-500 font-medium">shared</span>';
+        } else if (gas > 0) {
+          const chf = gasToCHF(gas, ethChfRate);
+          costSpan.className += ' text-gray-700 font-mono';
+          costSpan.textContent = `${gas.toLocaleString()} gas${chf !== null ? ` · ${formatCHF(chf)}` : ''}`;
+        } else {
+          costSpan.className += ' text-gray-400 italic';
+          costSpan.textContent = 'no data';
+        }
+
+        entry.appendChild(nameSpan);
+        entry.appendChild(costSpan);
+        costContent.appendChild(entry);
+      });
+
+      costSection.appendChild(costToggle);
+      costSection.appendChild(costContent);
+      row.appendChild(costSection);
+    }
+
+    // ── Contract addresses (collapsible) ────────────────────────────────────
+    const deployedContracts = (instance.contracts || []).filter(c => c.address);
+    if (deployedContracts.length > 0) {
+      const addrSection = document.createElement('div');
+      addrSection.className = 'mb-3';
+
+      const addrToggle = document.createElement('button');
+      addrToggle.className = 'text-xs text-gray-500 hover:text-gray-700 font-medium flex items-center gap-1 mb-1';
+      addrToggle.innerHTML = '<span>▶</span>&nbsp;Contract Addresses';
+
+      const addrContent = document.createElement('div');
+      addrContent.className = 'hidden mt-1 space-y-2';
+
+      addrToggle.onclick = () => {
+        const nowHidden = addrContent.classList.toggle('hidden');
+        addrToggle.querySelector('span').textContent = nowHidden ? '▶' : '▼';
+      };
+
+      deployedContracts.forEach(c => {
+        const label = (c.contractText && c.contractText.trim()) ? c.contractText : c.contractName;
+        const typeTag = c.isDataStore ? 'Data' : 'Logic';
+
+        const entry = document.createElement('div');
+        entry.className = 'text-xs bg-white border border-gray-100 rounded p-2 space-y-0.5';
+        entry.innerHTML = `
+          <div class="font-medium text-gray-700">${typeTag}: ${label}</div>
+          <div><span class="text-gray-400">Proxy:&nbsp;</span><code class="break-all text-gray-700">${c.address}</code></div>
+          ${c.implementationAddress
+            ? `<div><span class="text-gray-400">Impl:&nbsp;&nbsp;</span><code class="break-all text-gray-600">${c.implementationAddress}</code></div>`
+            : ''}
+        `;
+        addrContent.appendChild(entry);
+      });
+
+      addrSection.appendChild(addrToggle);
+      addrSection.appendChild(addrContent);
+      row.appendChild(addrSection);
+    }
+
     row.appendChild(actions);
     instancesList.appendChild(row);
   });
 }
 
+// ── Auto-run helpers ──────────────────────────────────────────────────────────
+
+/**
+ * Generates a random value for a Solidity parameter type based on user config.
+ * @param {string} type - Solidity type string, e.g. 'uint256', 'bool', 'string', 'address'
+ * @param {{ uintMin, uintMax, boolProb, stringValues }} config
+ */
+// rand defaults to Math.random so callers that don't care about seeding work unchanged.
+function generateParamValue(type, config, rand = Math.random) {
+  const t = type.toLowerCase();
+  // uint / int family
+  if (t.startsWith('uint') || t.startsWith('int')) {
+    const min = Number(config.uintMin ?? 1);
+    const max = Number(config.uintMax ?? 100);
+    return String(Math.floor(rand() * (max - min + 1)) + min);
+  }
+  // bool
+  if (t === 'bool') {
+    return rand() * 100 < Number(config.boolProb ?? 50);
+  }
+  // bytes32 / string
+  if (t === 'string' || t.startsWith('bytes')) {
+    const vals = (config.stringValues || []).filter(v => v.trim());
+    if (vals.length === 0) return 'value';
+    return vals[Math.floor(rand() * vals.length)];
+  }
+  // address — derive 20 bytes from the seeded stream so addresses are also reproducible
+  if (t === 'address') {
+    const hex = Array.from({ length: 20 }, () =>
+      Math.floor(rand() * 256).toString(16).padStart(2, '0')
+    ).join('');
+    return '0x' + hex;
+  }
+  return '0';
+}
+
+/**
+ * Repeatedly queries and executes open tasks for one instance until none remain.
+ * Updates deployProgressLabel with live status.
+ * @param {number} instanceId
+ * @param {object} config - param generation config
+ * @param {number} instanceIndex - 1-based index for display
+ * @param {number} totalInstances - total count for display
+ */
+/**
+ * Repeatedly queries and executes open tasks for one instance until none remain.
+ * Tracks consecutive failures per task and throws after MAX_TASK_FAILURES to prevent
+ * infinite loops when a task always reverts (e.g. wrong gateway condition or missing
+ * DataStore setup).
+ */
+async function runInstance(instanceId, config, instanceIndex, totalInstances, rand = Math.random) {
+  const baseUrl = getBaseUrl();
+  const MAX_ROUNDS = 200;       // hard cap on query-execute cycles
+  const MAX_TASK_FAILURES = 3;  // consecutive on-chain failures before aborting
+
+  // Track consecutive on-chain failures per task id.
+  // A success on any task resets only that task's counter.
+  const taskFailures = {};
+
+  for (let round = 0; round < MAX_ROUNDS; round++) {
+    // ── 1. Query current on-chain state ─────────────────────────────────────
+    const queryRes = await fetch(`${baseUrl}/api/query?instanceId=${instanceId}`);
+    if (!queryRes.ok) throw new Error(`Query failed for instance ${instanceId}`);
+    const data = await queryRes.json();
+
+    // ── 2. Collect open tasks across all networks / contracts ────────────────
+    const openTasks = [];
+    for (const [networkKey, networkData] of Object.entries(data.result || {})) {
+      for (const [contractKey, contractData] of Object.entries(networkData || {})) {
+        for (const task of (contractData.receiveTasks || [])) {
+          if (task.state === 'Open') {
+            openTasks.push({ networkKey, contractKey, task });
+          }
+        }
+      }
+    }
+
+    if (openTasks.length === 0) break; // all tasks complete — instance done
+
+    // ── 3. Execute each open task ────────────────────────────────────────────
+    for (const { networkKey, contractKey, task } of openTasks) {
+      // Determine sender: always create a fresh funded wallet for open tasks so
+      // that msg.sender-keyed mappings (e.g. has_voted) never block a re-execution.
+      let sender = task.sender;
+      if (task.open) {
+        const callerRes = await fetch(`${baseUrl}/api/createOpenCaller`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ instanceId, networkId: networkKey })
+        });
+        if (!callerRes.ok) throw new Error(`Failed to create open caller for instance ${instanceId}`);
+        sender = (await callerRes.json()).address;
+      }
+
+      // Generate random inputs from config ranges (using the shared seeded PRNG)
+      const inputs = (task.externalParams || []).map(p => generateParamValue(p.type, config, rand));
+
+      deployProgressLabel.textContent =
+        `Auto-running ${instanceIndex}/${totalInstances} · ${task.name || task.id}…`;
+
+      // ── Execute and inspect result ─────────────────────────────────────────
+      let txSucceeded = false;
+      let txError = 'Unknown error';
+
+      try {
+        const execRes = await fetch(`${baseUrl}/api/executeTask`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            network: networkKey,
+            contractName: contractKey,
+            taskId: task.id,
+            sender,
+            inputs,
+            value: task.payable ? String(config.ethValue) : undefined,
+            instanceId
+          })
+        });
+
+        if (execRes.ok) {
+          const resData = await execRes.json().catch(() => ({}));
+          // The server returns ALL transactions; the last one is the just-executed tx.
+          const lastTx = (resData.transactions || []).slice(-1)[0];
+          txSucceeded = lastTx?.status === 'success';
+          if (!txSucceeded && lastTx) {
+            txError = lastTx.error || 'Transaction reverted';
+          }
+        } else {
+          txError = `HTTP ${execRes.status}`;
+        }
+      } catch (_) {
+        txError = 'Network error';
+      }
+
+      // ── Consecutive failure tracking ────────────────────────────────────────
+      if (txSucceeded) {
+        taskFailures[task.id] = 0; // reset on success
+      } else {
+        taskFailures[task.id] = (taskFailures[task.id] || 0) + 1;
+        if (taskFailures[task.id] >= MAX_TASK_FAILURES) {
+          throw new Error(
+            `"${task.name || task.id}" failed ${MAX_TASK_FAILURES} times in a row.\n\nLast error:\n${txError}`
+          );
+        }
+      }
+    }
+  }
+}
+
+// ── Auto-run button & modal ───────────────────────────────────────────────────
+autoRunBtn.addEventListener('click', () => {
+  autoRunModal.classList.remove('hidden');
+});
+
+arCancelBtn.addEventListener('click', () => {
+  autoRunModal.classList.add('hidden');
+});
+
+arConfirmBtn.addEventListener('click', async () => {
+  // Read config
+  const config = {
+    uintMin:      parseInt(arUintMin.value)    || 1,
+    uintMax:      parseInt(arUintMax.value)    || 100,
+    boolProb:     parseFloat(arBoolProb.value) ?? 50,
+    stringValues: arStringVals.value.split(',').map(v => v.trim()).filter(Boolean),
+    ethValue:     arEthValue.value.trim() || '0'
+  };
+
+  // Resolve seed: use the entered value or pick a random one so it can be reported
+  const seedRaw  = arSeedInput.value.trim();
+  const seed     = seedRaw !== '' ? (parseInt(seedRaw) >>> 0) : (Math.random() * 0xFFFFFFFF) >>> 0;
+  const rand     = makePrng(seed);
+
+  autoRunModal.classList.add('hidden');
+  deployProgress.classList.remove('hidden');
+  deployProgressLabel.textContent = `Preparing auto-run… (seed: ${seed})`;
+
+  // Snapshot the current instance list (already in memory from last render)
+  const baseUrl = getBaseUrl();
+  let instances = [];
+  try {
+    const res = await fetch(`${baseUrl}/api/instances?modelId=${modelId}`);
+    if (res.ok) instances = await res.json();
+  } catch (_) { /* ignore */ }
+
+  if (instances.length === 0) {
+    deployProgress.classList.add('hidden');
+    showError('Auto-Run', 'No deployed instances found for this model.');
+    return;
+  }
+
+  let anyError = false;
+  for (let i = 0; i < instances.length; i++) {
+    try {
+      await runInstance(instances[i].id, config, i + 1, instances.length, rand);
+    } catch (err) {
+      deployProgress.classList.add('hidden');
+      showError(`Auto-Run Failed (instance ${i + 1} of ${instances.length})`, err.message);
+      anyError = true;
+      break;
+    }
+  }
+
+  deployProgress.classList.add('hidden');
+  if (!anyError) window.location.reload();
+});
+
+// ── Proof Report generation ───────────────────────────────────────────────────
+
+/**
+ * Generates a fully self-contained HTML proof report from the current model
+ * + its deployed instances.  No external dependencies; suitable for download
+ * and for hosting on GitHub Pages.
+ */
+/**
+ * @param {object}   model            - from fetchModel()
+ * @param {object[]} instances        - from fetchInstances()
+ * @param {number|null} ethChfRate    - current ETH/CHF rate or null
+ * @param {object[]|null} compiledContracts - output of ensureCompiled(); null = omit source section
+ */
+function generateReport(model, instances, ethChfRate, compiledContracts = null) {
+  // Escape HTML special chars
+  const esc = s => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const fmt = n  => Number(n).toLocaleString();
+  const fmtGasChf = () => '';
+
+  // taskId → human name lookup
+  const taskNameMap = new Map();
+  instances.forEach(inst =>
+    (inst.contracts || []).forEach(c =>
+      (c.receiveTasks || []).forEach(t => {
+        if (t.id && t.name && !taskNameMap.has(t.id)) taskNameMap.set(t.id, t.name);
+      })
+    )
+  );
+
+  // Deployment gas totals per contract label
+  const byLabel = {};
+  instances.forEach(inst =>
+    (inst.contracts || []).forEach(c => {
+      const lbl = (c.contractText && c.contractText.trim()) ? c.contractText : c.contractName;
+      byLabel[lbl] = (byLabel[lbl] || 0) + (Number(c.deployGas) || 0);
+    })
+  );
+  const grandDeployGas = Object.values(byLabel).reduce((a, b) => a + b, 0);
+
+  // Execution stats per task
+  const allTx = instances.flatMap(inst => inst.transactions || []);
+  const byTask = new Map();
+  allTx.forEach(tx => {
+    const key = tx.task || 'unknown';
+    if (!byTask.has(key)) byTask.set(key, { count: 0, totalGas: 0, minGas: Infinity, maxGas: -Infinity, failed: 0 });
+    const s = byTask.get(key);
+    s.count++;
+    if (tx.status !== 'success') s.failed++;
+    else { const g = Number(tx.gasUsed) || 0; s.totalGas += g; if (g < s.minGas) s.minGas = g; if (g > s.maxGas) s.maxGas = g; }
+  });
+  const totalExecGas = [...byTask.values()].reduce((s, v) => s + v.totalGas, 0);
+
+  const networks = [...new Set(instances.flatMap(inst =>
+    (inst.contracts || []).map(c => c.networkId).filter(Boolean)
+  ))];
+  const n = instances.length;
+
+  // ── Table rows ───────────────────────────────────────────────────────────────
+  const deployRows = Object.entries(byLabel).filter(([, g]) => g > 0).map(([lbl, gas]) => `
+    <tr>
+      <td>${esc(lbl)}</td>
+      <td class="num">${fmt(gas)}${fmtGasChf(gas)}</td>
+      ${n > 1 ? `<td class="num gray">${fmt(Math.round(gas / n))}</td>` : ''}
+    </tr>`).join('');
+
+  const execRows = [...byTask.entries()].map(([taskId, s]) => {
+    const name = taskNameMap.get(taskId) || taskId;
+    const ok = s.count - s.failed;
+    const avg = ok > 0 ? Math.round(s.totalGas / ok) : 0;
+    return `
+    <tr>
+      <td>${esc(name)}</td>
+      <td class="num">${s.count}${s.failed ? ` <span class="red">(${s.failed} failed)</span>` : ''}</td>
+      <td class="num">${ok > 0 ? fmt(s.totalGas) : '–'}</td>
+      <td class="num">${avg ? fmt(avg) : '–'}</td>
+      <td class="num gray">${s.minGas !== Infinity ? fmt(s.minGas) : '–'}</td>
+      <td class="num gray">${s.maxGas !== -Infinity ? fmt(s.maxGas) : '–'}</td>
+    </tr>`;
+  }).join('');
+
+  const instSections = instances.map((inst, ii) => {
+    const deplGas = (inst.contracts || []).reduce((s, c) => s + (Number(c.deployGas) || 0), 0);
+    const instBodyId = `inst-${ii}`;
+
+    const addrRows = (inst.contracts || []).filter(c => c.address).map(c => {
+      const lbl = (c.contractText && c.contractText.trim()) ? c.contractText : c.contractName;
+      return `<tr>
+        <td>${esc(lbl)}</td>
+        <td class="mono small">${esc(c.address)}</td>
+        <td class="mono small gray">${esc(c.implementationAddress || '')}</td>
+      </tr>`;
+    }).join('');
+
+    const txRows = (inst.transactions || []).map(tx => {
+      const name = taskNameMap.get(tx.task) || tx.task || '–';
+      const gas  = tx.gasUsed ? fmt(tx.gasUsed) : '–';
+      const ts   = tx.timestamp ? new Date(tx.timestamp).toLocaleString() : '–';
+      return `<tr>
+        <td class="small gray">${esc(ts)}</td>
+        <td>${esc(name)}</td>
+        <td class="num small mono">${gas}</td>
+      </tr>`;
+    }).join('');
+
+    const instLabel = esc(inst.name || `Instance #${inst.id}`);
+    const instMeta  = `#${inst.id} · ${new Date(inst.createdAt).toLocaleString()}${deplGas ? ` · ${fmt(deplGas)} gas deploy` : ''}`;
+
+    return `
+    <div class="inst-block">
+      <button class="toggle-btn inst-toggle" onclick="toggle('${instBodyId}',this)" aria-expanded="false">
+        <span class="toggle-icon">▶</span>
+        <span class="inst-name">${instLabel}</span>
+        <span class="inst-meta">${instMeta}</span>
+      </button>
+      <div id="${instBodyId}" class="toggle-body" hidden>
+        ${addrRows ? `
+        <div class="sub-sec">
+          <div class="sub-lbl">Contract Addresses</div>
+          <table><thead><tr><th>Contract</th><th>Proxy Address</th><th>Implementation</th></tr></thead>
+          <tbody>${addrRows}</tbody></table>
+        </div>` : ''}
+        <div class="sub-sec">
+          <div class="sub-lbl">Transaction Log</div>
+          ${txRows
+            ? `<table><thead><tr><th>Timestamp</th><th>Task</th><th>Gas Used</th></tr></thead><tbody>${txRows}</tbody></table>`
+            : '<p class="no-data">No transactions recorded.</p>'}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  const svgContent = (model.svg || '').trim();
+
+  // ── Contract source code section (collapsible per contract) ──────────────────
+  const contractCodeSection = (() => {
+    if (!compiledContracts || compiledContracts.length === 0) return '';
+    const blocks = compiledContracts.map((c, i) => {
+      if (!c.contractCode) return '';
+      const label = (c.contractText && c.contractText.trim())
+        ? c.contractText
+        : (c.canonicalContractName || c.contractName);
+      const code = normalizeSolidity(c.contractCode);
+      const highlighted = highlightSolidity(code);
+      const bodyId = `cc-${i}`;
+      return `
+      <div class="code-block">
+        <button class="toggle-btn" onclick="toggle('${bodyId}',this)" aria-expanded="false">
+          <span class="toggle-icon">▶</span> ${esc(label)}
+        </button>
+        <div id="${bodyId}" class="toggle-body" hidden>
+          <pre class="hljs"><code>${highlighted}</code></pre>
+        </div>
+      </div>`;
+    }).filter(Boolean).join('');
+    if (!blocks) return '';
+    return `
+  <div class="card">
+    <h2>Smart Contract Source</h2>
+    ${blocks}
+  </div>`;
+  })();
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>${esc(model.name)} – BPMN4BC Proof Report</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:13px;line-height:1.5;color:#111827;background:#f3f4f6}
+.page{max-width:1100px;margin:0 auto;padding:28px 20px 48px}
+.card{background:white;border:1px solid #e5e7eb;border-radius:10px;padding:20px 24px;margin-bottom:16px}
+.card h2{font-size:11px;font-weight:700;color:#6b7280;border-bottom:1px solid #e5e7eb;padding-bottom:8px;margin-bottom:14px;letter-spacing:.6px;text-transform:uppercase}
+.svg-wrap{background:#fafafa;border:1px solid #e5e7eb;border-radius:8px;padding:16px;overflow:auto;max-height:420px;text-align:center}
+.svg-wrap svg{max-width:100%;height:auto}
+table{width:100%;border-collapse:collapse;font-size:12px}
+thead tr{background:#f9fafb}
+th{padding:8px 12px;text-align:left;font-weight:600;color:#6b7280;font-size:11px;text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid #e5e7eb}
+td{padding:7px 12px;border-bottom:1px solid #f3f4f6;vertical-align:top}
+tr:last-child td{border-bottom:none}
+.num{text-align:right;font-family:'SFMono-Regular',Consolas,monospace}
+.mono{font-family:'SFMono-Regular',Consolas,monospace;word-break:break-all}
+.small{font-size:11px}.gray{color:#6b7280}
+.total-row td{font-weight:700}
+.exec-total td{font-weight:700}
+.inst-block{border:1px solid #e5e7eb;border-radius:8px;padding:10px 16px;margin-bottom:10px}
+.inst-toggle{font-size:14px!important;padding:4px 0!important;flex-wrap:wrap}
+.inst-name{font-weight:700;color:#111827}
+.inst-meta{font-size:11px;color:#6b7280;font-weight:400;margin-left:auto}
+.sub-sec{margin-top:10px}
+.sub-lbl{font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px}
+.no-data{font-size:12px;color:#9ca3af;font-style:italic;margin-top:4px}
+.footer{text-align:center;font-size:11px;color:#9ca3af;padding-top:16px}
+.footer a{color:#6b7280}
+/* Toggle buttons */
+.toggle-btn{display:flex;align-items:baseline;gap:8px;width:100%;background:none;border:none;cursor:pointer;padding:6px 0;text-align:left;font-size:13px;color:#374151}
+.toggle-btn:hover{color:#111827}
+.toggle-icon{font-size:10px;flex-shrink:0;transition:transform .15s}
+/* Code blocks */
+.code-block{margin-bottom:10px}
+.code-block:last-child{margin-bottom:0}
+.toggle-body{margin-top:6px}
+pre.hljs{background:#f6f8fa;border:1px solid #e5e7eb;border-radius:6px;padding:14px 16px;overflow-x:auto;font-size:11px;line-height:1.55;margin:0}
+pre.hljs code{font-family:'SFMono-Regular',Consolas,'Liberation Mono',Menlo,monospace;background:none;padding:0}
+/* highlight.js github theme */
+.hljs{color:#24292e}.hljs-doctag,.hljs-keyword,.hljs-meta .hljs-keyword,.hljs-template-tag,.hljs-template-variable,.hljs-type,.hljs-variable.language_{color:#d73a49}
+.hljs-title,.hljs-title.class_,.hljs-title.class_.inherited__,.hljs-title.function_{color:#6f42c1}
+.hljs-attr,.hljs-attribute,.hljs-literal,.hljs-meta,.hljs-number,.hljs-operator,.hljs-selector-attr,.hljs-selector-class,.hljs-selector-id,.hljs-variable{color:#005cc5}
+.hljs-meta .hljs-string,.hljs-regexp,.hljs-string{color:#032f62}
+.hljs-built_in,.hljs-symbol{color:#e36209}
+.hljs-code,.hljs-comment,.hljs-formula{color:#6a737d;font-style:italic}
+.hljs-name,.hljs-quote,.hljs-selector-pseudo,.hljs-selector-tag{color:#22863a}
+.hljs-section{color:#005cc5;font-weight:700}
+.hljs-emphasis{font-style:italic}.hljs-strong{font-weight:700}
+@media print{
+  body{background:white;font-size:11px}
+  .page{padding:0;max-width:100%}
+  .card{break-inside:avoid;border:1px solid #ccc;margin-bottom:12px}
+  .svg-wrap{max-height:280px}
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="card" style="margin-bottom:16px">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap">
+      <div>
+        <div style="font-size:20px;font-weight:800;color:#111827;margin-bottom:2px">${esc(model.name)}</div>
+        <div style="font-size:12px;color:#6b7280">Model created ${new Date(model.createdAt).toLocaleString()}</div>
+      </div>
+      <div style="text-align:right;font-size:12px;color:#6b7280;line-height:1.9;flex-shrink:0">
+        <div>Generated: ${new Date().toLocaleString()}</div>
+        <div>${n} instance${n !== 1 ? 's' : ''}</div>
+        ${networks.length ? `<div>Network${networks.length > 1 ? 's' : ''}: ${networks.map(esc).join(', ')}</div>` : ''}
+        ${grandDeployGas ? `<div>Deploy gas: ${fmt(grandDeployGas)}${fmtGasChf(grandDeployGas)}</div>` : ''}
+        ${totalExecGas   ? `<div>Exec gas: ${fmt(totalExecGas)}${fmtGasChf(totalExecGas)}</div>`     : ''}
+      </div>
+    </div>
+  </div>
+
+  ${svgContent ? `
+  <div class="card">
+    <h2>Process Diagram</h2>
+    <div class="svg-wrap">${svgContent}</div>
+  </div>` : ''}
+
+  ${deployRows ? `
+  <div class="card">
+    <h2>Deployment Gas Cost</h2>
+    <table>
+      <thead><tr>
+        <th>Contract</th>
+        <th style="text-align:right">Total Gas (${n} inst.)${ethChfRate ? ' / CHF' : ''}</th>
+        ${n > 1 ? '<th style="text-align:right">Avg / Instance</th>' : ''}
+      </tr></thead>
+      <tbody>
+        ${deployRows}
+        <tr class="total-row">
+          <td>Total</td>
+          <td class="num">${fmt(grandDeployGas)}${fmtGasChf(grandDeployGas)}</td>
+          ${n > 1 ? `<td class="num">${fmt(Math.round(grandDeployGas / n))}</td>` : ''}
+        </tr>
+      </tbody>
+    </table>
+  </div>` : ''}
+
+  ${execRows ? `
+  <div class="card">
+    <h2>Execution Statistics <span style="font-size:11px;font-weight:400;color:#9ca3af;text-transform:none;letter-spacing:0">${allTx.length} transaction${allTx.length !== 1 ? 's' : ''}</span></h2>
+    <table>
+      <thead><tr>
+        <th>Task</th>
+        <th style="text-align:right">Executions</th>
+        <th style="text-align:right">Total Gas</th>
+        <th style="text-align:right">Avg Gas</th>
+        <th style="text-align:right">Min Gas</th>
+        <th style="text-align:right">Max Gas</th>
+      </tr></thead>
+      <tbody>
+        ${execRows}
+        <tr class="exec-total">
+          <td>Total execution gas</td>
+          <td class="num">${allTx.length}</td>
+          <td class="num">${fmt(totalExecGas)}</td>
+          <td></td><td></td><td></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>` : ''}
+
+  ${contractCodeSection}
+
+  <div class="card">
+    <h2>Instance Details</h2>
+    ${instSections || '<p class="no-data" style="padding:4px 0">No instances deployed.</p>'}
+  </div>
+
+  <div class="footer">
+    Generated by <strong>BPMN4BC</strong> ·
+    <a href="https://github.com/Hassan42/BPMN4BC" target="_blank">github.com/Hassan42/BPMN4BC</a>
+  </div>
+
+</div>
+<script>
+function toggle(id, btn) {
+  var el   = document.getElementById(id);
+  var icon = btn.querySelector('.toggle-icon');
+  var open = el.hasAttribute('hidden');
+  if (open) { el.removeAttribute('hidden'); icon.textContent = '▼'; btn.setAttribute('aria-expanded','true'); }
+  else       { el.setAttribute('hidden',''); icon.textContent = '▶'; btn.setAttribute('aria-expanded','false'); }
+}
+</script>
+</body>
+</html>`;
+}
+
+// ── Download Contracts button ─────────────────────────────────────────────────
+const downloadContractsBtn = document.getElementById('download-contracts-btn');
+
+downloadContractsBtn.addEventListener('click', async () => {
+  if (!currentModel) { showError('Download', 'Model not loaded yet.'); return; }
+
+  deployProgress.classList.remove('hidden');
+  deployProgressLabel.textContent = 'Compiling contracts…';
+
+  let compiled = null;
+  try {
+    compiled = await ensureCompiled(currentModel.bpmn);
+  } catch (err) {
+    deployProgress.classList.add('hidden');
+    showError('Download Failed', 'Could not compile: ' + err.message);
+    return;
+  }
+
+  deployProgress.classList.add('hidden');
+
+  if (!compiled || compiled.length === 0) {
+    showError('Download', 'No contracts found.');
+    return;
+  }
+
+  const zip = new window.JSZip();
+  compiled.forEach(c => {
+    if (c.contractCode) {
+      zip.file(`${c.canonicalContractName || c.contractName}.sol`, c.contractCode);
+    }
+  });
+
+  const slug = (currentModel.name || 'contracts')
+    .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+
+  const blob = await zip.generateAsync({ type: 'blob' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${slug}-contracts.zip`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(a.href);
+});
+
+// ── Export button ─────────────────────────────────────────────────────────────
+const exportBtn = document.getElementById('export-btn');
+
+exportBtn.addEventListener('click', async () => {
+  if (!currentModel) { showError('Export', 'Model not loaded yet.'); return; }
+
+  // Compile to get contract source — show the progress overlay while waiting
+  deployProgress.classList.remove('hidden');
+  deployProgressLabel.textContent = 'Preparing report…';
+
+  let compiled = null;
+  try {
+    compiled = await ensureCompiled(currentModel.bpmn);
+  } catch (_) {
+    // Compiler unavailable — report will just omit the source section
+  }
+
+  deployProgress.classList.add('hidden');
+
+  const html = generateReport(currentModel, _instances, _ethChfRate, compiled);
+  const slug = (currentModel.name || 'report').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const blob = new Blob([html], { type: 'text/html' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${slug}-proof.html`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(a.href);
+});
+
 // ── Deploy flow ───────────────────────────────────────────────────────────────
 let currentModel = null;
+
+// ── Bulk deploy flow ──────────────────────────────────────────────────────────
+
+bulkDeployBtn.addEventListener('click', () => {
+  bulkDeployNameInput.value = 'Instance';
+  bulkDeployCountInput.value = '3';
+  bulkDeployModal.classList.remove('hidden');
+  bulkDeployCountInput.focus();
+  bulkDeployCountInput.select();
+});
+
+bulkDeployCancelBtn.addEventListener('click', () => {
+  bulkDeployModal.classList.add('hidden');
+});
+
+bulkDeployConfirmBtn.addEventListener('click', async () => {
+  const baseName = bulkDeployNameInput.value.trim() || 'Instance';
+  const n = Math.max(1, Math.min(50, parseInt(bulkDeployCountInput.value) || 1));
+  bulkDeployModal.classList.add('hidden');
+  deployProgress.classList.remove('hidden');
+
+  const baseUrl = getBaseUrl();
+  let anyFailed = false;
+
+  for (let i = 1; i <= n; i++) {
+    deployProgressLabel.textContent = `Deploying instance ${i} of ${n}…`;
+    try {
+      const res = await fetch(`${baseUrl}/api/deploy`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          xml: currentModel.bpmn,
+          name: `${baseName} ${i}`,
+          modelId: currentModel.id
+        })
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        deployProgress.classList.add('hidden');
+        showError(`Deployment Failed (instance ${i} of ${n})`, data.error || 'Unknown error');
+        anyFailed = true;
+        break;
+      }
+    } catch (err) {
+      deployProgress.classList.add('hidden');
+      showError('Unexpected Error', err.message);
+      anyFailed = true;
+      break;
+    }
+  }
+
+  deployProgress.classList.add('hidden');
+  if (!anyFailed) window.location.reload();
+});
 
 deployBtn.addEventListener('click', () => {
   deployNameInput.value = '';

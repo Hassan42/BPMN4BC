@@ -1,20 +1,34 @@
 // const { ethers } = require("hardhat");
 
-const setContracts = async (contractManager, network, contractName, contractInstance, contractNames) => {
+const setContracts = async (contractManager, network, contractName, contractInstance, contractNames, instanceId) => {
 
     const contractInfo = contractManager.getContractByName(contractName);
-    const addresses = contractNames.map(name => contractManager.getContractAddressByName(name));
 
+    // Only pass LANE contract addresses to setContracts — DataStore contracts are not lanes
+    // and must not be included in the addresses array.  The Solidity setContracts function
+    // maps addresses[index] by the order of nonEmptyLanes, so any extra (non-lane) entry
+    // shifts all subsequent lane addresses and wires wrong contracts to the mapping keys.
+    const laneContractNames = contractNames.filter(name => {
+        const info = contractManager.getContractByName(name);
+        return info && !info.isDataStore;
+    });
+    const addresses = laneContractNames.map(name => contractManager.getContractAddressByName(name));
+
+    // MI=true contracts store their processInstanceId via setContracts so that
+    // cross-contract calls to shared (MI=false) targets can forward the correct instance.
+    // MI=false (shared pool) contracts also receive instanceId so that their instance-keyed
+    // contracts map ($.contracts[instanceId][...]) stores the correct per-instance sibling
+    // proxy address — preventing cross-instance contamination when a shared pool has
+    // per-instance sibling lanes.
+    const isMultiInstance = contractInfo.multiInstance !== false;
 
     try {
-        // Call setContracts function
-        const tx = await contractInstance.setContracts(addresses);
-        const receipt = await tx.wait();
-        // Get the current deploy gas for the contract and increment it
-        const currentDeployGas = contractInfo.deployGas || 0;
-        const incrementedDeployGas = currentDeployGas + Number(receipt.gasUsed);
-        // Update the gas used in the contract manager
-        contractManager.updateDeployGas(contractName, incrementedDeployGas, network);
+        // Call setContracts function.
+        // Both MI=true and MI=false contracts now accept instanceId when one is available.
+        const tx = (instanceId != null)
+            ? await contractInstance.setContracts(addresses, instanceId)
+            : await contractInstance.setContracts(addresses);
+        await tx.wait();
         console.log(`Contracts addresses successfully set in ${contractName}.`);
     } catch (error) {
         console.error(`Error setting contracts addresses in ${contractName}:`, error);
@@ -62,14 +76,7 @@ const setResources = async (contractManager, network, contractName, contractInst
         } else {
             tx = await contractInstance.setResources(roleArray, addressArray);
         }
-        const receipt = await tx.wait();
-
-        // Get the current deploy gas for the contract and increment it
-        const currentDeployGas = contractInfo.deployGas || 0;
-        const incrementedDeployGas = currentDeployGas + Number(receipt.gasUsed);
-        // Update the gas used in the contract manager
-        contractManager.updateDeployGas(contractName, incrementedDeployGas, network);
-
+        await tx.wait();
         console.log(`Roles and addresses successfully set in ${contractName}.`);
     } catch (error) {
         console.error(`Error setting roles and addresses in ${contractName}:`, error);
@@ -82,10 +89,7 @@ const setResources = async (contractManager, network, contractName, contractInst
 const initInstance = async (contractManager, network, contractName, contractInstance, instanceId) => {
     try {
         const tx = await contractInstance.initInstance(instanceId);
-        const receipt = await tx.wait();
-        const contractInfo = contractManager.getContractByName(contractName);
-        const currentDeployGas = contractInfo.deployGas || 0;
-        contractManager.updateDeployGas(contractName, currentDeployGas + Number(receipt.gasUsed), network);
+        await tx.wait();
         console.log(`initInstance(${instanceId}) called on ${contractName}.`);
     } catch (error) {
         console.error(`Error calling initInstance on ${contractName}:`, error.message);
@@ -93,21 +97,21 @@ const initInstance = async (contractManager, network, contractName, contractInst
 };
 
 /**
- * Calls setDataStoreAddress on a process contract to wire up the coupled DataStore.
+ * Calls setDataStoreAddress_${dsKey} on a process contract to wire up the coupled DataStore.
+ * When dsKey is provided (multi-DS per lane), uses the per-DS function name.
  * When instanceId is provided (shared pool + per-instance DS), calls the two-arg form:
- *   setDataStoreAddress(instanceId, dsAddress)
+ *   setDataStoreAddress_Key(instanceId, dsAddress)
  * Otherwise the one-arg form:
- *   setDataStoreAddress(dsAddress)
+ *   setDataStoreAddress_Key(dsAddress)
  */
-const setDataStoreAddress = async (contractManager, network, contractName, contractInstance, dsAddress, instanceId) => {
+const setDataStoreAddress = async (contractManager, network, contractName, contractInstance, dsAddress, instanceId, dsKey = null) => {
     try {
+        // Per-DS: function is setDataStoreAddress_${dsKey}; fallback to setDataStoreAddress for legacy
+        const fnName = dsKey ? `setDataStoreAddress_${dsKey}` : 'setDataStoreAddress';
         const tx = instanceId != null
-            ? await contractInstance.setDataStoreAddress(instanceId, dsAddress)
-            : await contractInstance.setDataStoreAddress(dsAddress);
-        const receipt = await tx.wait();
-        const contractInfo = contractManager.getContractByName(contractName);
-        const currentDeployGas = contractInfo.deployGas || 0;
-        contractManager.updateDeployGas(contractName, currentDeployGas + Number(receipt.gasUsed), network);
+            ? await contractInstance[fnName](instanceId, dsAddress)
+            : await contractInstance[fnName](dsAddress);
+        await tx.wait();
         console.log(`DataStore address set to ${dsAddress} in ${contractName}.`);
     } catch (error) {
         console.error(`Error setting DataStore address in ${contractName}:`, error.message);
@@ -134,21 +138,36 @@ const queryContract = async (contractManager, contractName, contractInstance, in
     const contractInfo = contractManager.getContractByName(contractName);
     const isShared = contractInfo.multiInstance === false;
 
-    // Update dataStore — shared pool uses instanceData(instanceId), per-instance uses dataStore()
-    if (isShared) {
-        if (typeof contractInstance.instanceData === 'function' && instanceId != null) {
-            try {
-                const newData = await contractInstance.instanceData(instanceId);
-                const newDataArray = Array.isArray(newData) ? newData : [newData];
-                contractManager.updateDataStore(contractName, newDataArray);
-            } catch (_) { /* instanceData may not exist if no DataStore */ }
-        }
-    } else if (typeof contractInstance.dataStore === 'function') {
+    // Update inline DataStore variable values.
+    // Each variable in contractInfo.dataStore carries a dsKey (set by the compiler) which forms
+    // the per-variable getter name: get${VarName}_${dsKey}(). Variables in a shared pool (non-MI)
+    // whose DS is NOT globally-shared also take an instanceId parameter.
+    // External DS contracts are queried separately via queryContractsTask (isDataStore branch).
+    const dataStoreVars = contractInfo.dataStore || [];
+    const hasTaggedVars = dataStoreVars.length > 0 && dataStoreVars.every(v => v.dsKey);
+    if (hasTaggedVars) {
         try {
-            const newData = await contractInstance.dataStore();
-            const newDataArray = Array.isArray(newData) ? newData : [newData];
-            contractManager.updateDataStore(contractName, newDataArray);
-        } catch (_) { /* dataStore may not exist on contracts without one */ }
+            const values = [];
+            for (const v of dataStoreVars) {
+                // instanceKeyed = shared pool AND this particular DS does not use flat storage
+                const instanceKeyed = isShared && v.dsShared !== true;
+                const cap = v.name.charAt(0).toUpperCase() + v.name.slice(1);
+                const getter = `get${cap}_${v.dsKey}`;
+                if (typeof contractInstance[getter] === 'function') {
+                    const val = (instanceKeyed && instanceId != null)
+                        ? await contractInstance[getter](instanceId)
+                        : await contractInstance[getter]();
+                    values.push(val);
+                } else {
+                    // Getter not found — abort update for this contract
+                    values.length = 0;
+                    break;
+                }
+            }
+            if (values.length === dataStoreVars.length) {
+                contractManager.updateDataStore(contractName, values);
+            }
+        } catch (_) { /* getter may not be deployed yet */ }
     }
 
     // Update task states
@@ -180,9 +199,8 @@ const queryContract = async (contractManager, contractName, contractInstance, in
             const escrowWei = await contractInstance.escrowOf(role.address);
             const escrowEth = ethers.formatEther(escrowWei);
             contractManager.updateRoleEscrow(contractName, role.role, escrowEth);
-        } catch (err) {
-            // escrowOf may not exist on older contracts — silently ignore
-            console.warn(`Could not fetch escrow for role ${role.role}: ${err.message}`);
+        } catch (_) {
+            // escrowOf may not exist on contracts that don't use escrow — silently ignore
         }
     }
     try {
@@ -210,8 +228,8 @@ const queryContracts = async (contractManager) => {
 
         console.log(`Querying ${contractName} at address ${contractAddress}`);
 
-        // Retrieve the contract factory based on the contract name
-        const contractFactory = await ethers.getContractFactory(contractName);
+        const factoryName = contract.canonicalContractName || contractName;
+        const contractFactory = await ethers.getContractFactory(factoryName);
 
         // Attach to the contract
         const contractInstance = contractFactory.attach(contractAddress);

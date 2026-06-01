@@ -5,6 +5,7 @@ import { useService } from 'bpmn-js-properties-panel';
 import { is } from 'bpmn-js/lib/util/ModelUtil';
 import { openScriptEditorWindow } from '../scripts/ui/scriptEditorWindow';
 import { validateSoliditySnippet } from '../scripts/solidityValidator.js';
+import { getSameNameDataStores } from '../util';
 export default function (element) {
 
   // Initialize props array with the bcId object
@@ -45,15 +46,9 @@ export default function (element) {
       isEdited: isTextFieldEntryEdited
     }
   );
-  } else if (is(element, 'bpmn:Lane') || (is(element, 'bpmn:Participant') && element.businessObject.bc === 'true')) {
-    // BC pool / lane: show network ID, solidity script, and multi-instance toggle
+  } else if (is(element, 'bpmn:Lane')) {
+    // Lane inside a BC pool: each lane is its own smart contract
     props.push(
-      {
-        id: 'bcId',
-        element,
-        component: bcId,
-        isEdited: isTextFieldEntryEdited
-      },
       {
         id: 'script',
         element,
@@ -66,14 +61,53 @@ export default function (element) {
         component: PoolMultiInstanceCheckbox
       }
     );
+  } else if (is(element, 'bpmn:Participant') && element.businessObject.bc === 'true') {
+    // BC pool header: network ID + optional pool-level script
+    props.push(
+      {
+        id: 'bcId',
+        element,
+        component: bcId,
+        isEdited: isTextFieldEntryEdited
+      },
+      {
+        id: 'script',
+        element,
+        component: Script,
+        isEdited: isTextFieldEntryEdited
+      }
+    );
+    // Show Multi-instance only when the pool has no lanes yet.
+    // A lane-less pool acts as a single contract, so the checkbox lives here.
+    // Once the user adds lanes, each lane gets its own checkbox instead.
+    const hasLanes = (element.children || []).some(
+      child => child.businessObject && is(child.businessObject, 'bpmn:Lane')
+    );
+    if (!hasLanes) {
+      props.push({
+        id: 'multiinstance',
+        element,
+        component: PoolMultiInstanceCheckbox
+      });
+    }
   } else if (is(element, 'bpmn:DataStoreReference')) {
     props.push({ id: 'coupled', element, component: DataStoreCoupledCheckbox });
-    // DS Multi-instance only makes sense when the DataStore is a separate contract (Coupled = OFF).
-    // When Coupled is checked (inline), the DataStore is embedded in the pool and its MI setting
-    // must match the pool — showing the checkbox would allow an invalid combination.
     const isInline = element.businessObject.bccoupled === true || element.businessObject.bccoupled === 'true';
     if (!isInline) {
+      // Decoupled DS (its own contract): show Multi-instance and conditionally Shared.
       props.push({ id: 'dsmultiinstance', element, component: DataStoreMultiInstanceCheckbox });
+      // "Shared" only appears when Multi-instance is unchecked (DS is non-MI).
+      const isDsMI = element.businessObject.bcmultiinstance !== false;
+      if (!isDsMI) {
+        props.push({ id: 'dsshared', element, component: DataStoreSharedCheckbox });
+      }
+    } else {
+      // Inline (coupled) DS: embedded in the process contract.
+      // "Shared" means all instances use the same flat struct (no per-instance mapping).
+      // Only meaningful when the pool is non-MI, but we show it always so the user can
+      // opt in — the compiler silently ignores it for MI pools (each instance already gets
+      // its own contract, so there is only one flat struct anyway).
+      props.push({ id: 'dsshared', element, component: DataStoreSharedCheckbox });
     }
   } else if (is(element, 'bpmn:Participant') && element.businessObject.bc !== 'true') {
     // Non-BC participant: always show Open checkbox; show instance count only when not open
@@ -417,13 +451,18 @@ function PoolMultiInstanceCheckbox(props) {
 
 function DataStoreCoupledCheckbox(props) {
   const { element, id } = props;
-  const modeling  = useService('modeling');
-  const translate = useService('translate');
+  const commandStack    = useService('commandStack');
+  const elementRegistry = useService('elementRegistry');
+  const translate       = useService('translate');
 
   const getValue = () => element.businessObject.bccoupled === true || element.businessObject.bccoupled === 'true';
 
   const setValue = value => {
-    modeling.updateProperties(element, { bccoupled: value });
+    const commands = getSameNameDataStores(element, elementRegistry).map(sibEl => ({
+      cmd: 'element.updateModdleProperties',
+      context: { element: sibEl, moddleElement: sibEl.businessObject, properties: { bccoupled: value } }
+    }));
+    commandStack.execute('properties-panel.multi-command-executor', commands);
   };
 
   return html`<${CheckboxEntry}
@@ -438,14 +477,19 @@ function DataStoreCoupledCheckbox(props) {
 
 function DataStoreMultiInstanceCheckbox(props) {
   const { element, id } = props;
-  const modeling  = useService('modeling');
-  const translate = useService('translate');
+  const commandStack    = useService('commandStack');
+  const elementRegistry = useService('elementRegistry');
+  const translate       = useService('translate');
 
   // Default is true (new DataStore contract per instance when coupled).
   const getValue = () => element.businessObject.bcmultiinstance !== false;
 
   const setValue = value => {
-    modeling.updateProperties(element, { bcmultiinstance: value });
+    const commands = getSameNameDataStores(element, elementRegistry).map(sibEl => ({
+      cmd: 'element.updateModdleProperties',
+      context: { element: sibEl, moddleElement: sibEl.businessObject, properties: { bcmultiinstance: value } }
+    }));
+    commandStack.execute('properties-panel.multi-command-executor', commands);
   };
 
   return html`<${CheckboxEntry}
@@ -453,6 +497,32 @@ function DataStoreMultiInstanceCheckbox(props) {
     element=${element}
     label=${translate('Multi-instance')}
     description=${translate('Deploy a new data store contract per process instance (only relevant when Coupled is enabled). Uncheck to share one data store contract across all instances.')}
+    getValue=${getValue}
+    setValue=${setValue}
+  />`;
+}
+
+function DataStoreSharedCheckbox(props) {
+  const { element, id } = props;
+  const commandStack    = useService('commandStack');
+  const elementRegistry = useService('elementRegistry');
+  const translate       = useService('translate');
+
+  const getValue = () => element.businessObject.bcshared === true || element.businessObject.bcshared === 'true';
+
+  const setValue = value => {
+    const commands = getSameNameDataStores(element, elementRegistry).map(sibEl => ({
+      cmd: 'element.updateModdleProperties',
+      context: { element: sibEl, moddleElement: sibEl.businessObject, properties: { bcshared: value } }
+    }));
+    commandStack.execute('properties-panel.multi-command-executor', commands);
+  };
+
+  return html`<${CheckboxEntry}
+    id=${id}
+    element=${element}
+    label=${translate('Shared')}
+    description=${translate('When checked, all process instances share the same flat data store storage (no per-instance mapping). Only valid when Multi-instance is unchecked.')}
     getValue=${getValue}
     setValue=${setValue}
   />`;

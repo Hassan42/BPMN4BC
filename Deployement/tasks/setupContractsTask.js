@@ -47,15 +47,16 @@ task('setup-contracts', 'Execute the contracts setup')
 
       console.log(`Interacting with ${contractName} at address ${contractAddress}`);
 
-      // Retrieve the contract factory based on the contract name
-      const contractFactory = await ethers.getContractFactory(contractName);
+      // The Solidity class name is the canonical name (no instance suffix) — use it for the factory.
+      const factoryName = contract.canonicalContractName || contractName;
+      const contractFactory = await ethers.getContractFactory(factoryName);
 
       // Attach to the contract
       const contractInstance = contractFactory.attach(contractAddress);
 
       try {
-        // 1. Register sub-contract addresses
-        await setContracts(contractManager, network, contractName, contractInstance, contractNames);
+        // 1. Register sub-contract addresses (MI contracts also store their processInstanceId)
+        await setContracts(contractManager, network, contractName, contractInstance, contractNames, numericInstanceId);
 
         // 2. Assign role wallets (shared-pool: scoped to this instanceId)
         await setResources(contractManager, network, contractName, contractInstance, numericInstanceId);
@@ -65,20 +66,26 @@ task('setup-contracts', 'Execute the contracts setup')
           await initInstance(contractManager, network, contractName, contractInstance, numericInstanceId);
         }
 
-        // 4. Coupled DataStore: tell the process contract where its DataStore lives
-        if (contract.coupledDataStore && contract.dataStoreContractName) {
+        // 4. Coupled DataStore: tell the process contract where each DS lives.
+        // dataStoreContracts is the new array; dataStoreContractName is the legacy scalar (first DS).
+        // Support both forms for backward compatibility.
+        const dsEntries = (contract.dataStoreContracts && contract.dataStoreContracts.length > 0)
+          ? contract.dataStoreContracts
+          : (contract.coupledDataStore && contract.dataStoreContractName
+              ? [{ contractName: contract.dataStoreContractName, dsKey: null, needsInstanceId: contract.multiInstance === false && contract.dsMultiInstance !== false }]
+              : []);
+        for (const dsEntry of dsEntries) {
           const dsContract = contracts.find(
-            c => c.contractName === contract.dataStoreContractName && c.networkId === network
+            c => c.contractName === dsEntry.contractName && c.networkId === network
           );
           if (dsContract && dsContract.address) {
-            // Shared pool + per-instance DS: setDataStoreAddress(instanceId, dsAddr)
-            const needsInstanceId = contract.multiInstance === false && contract.dsMultiInstance !== false;
             await setDataStoreAddress(
               contractManager, network, contractName, contractInstance, dsContract.address,
-              needsInstanceId ? numericInstanceId : undefined
+              dsEntry.needsInstanceId ? numericInstanceId : undefined,
+              dsEntry.dsKey  // per-DS function name suffix
             );
           } else {
-            console.warn(`DataStore contract "${contract.dataStoreContractName}" not found or has no address yet.`);
+            console.warn(`DataStore contract "${dsEntry.contractName}" not found or has no address yet.`);
           }
         }
       } catch (error) {

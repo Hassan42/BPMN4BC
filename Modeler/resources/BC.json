@@ -96,6 +96,11 @@
             "name": "bccoupled",
             "isAttr": true,
             "type": "Boolean"
+          },
+          {
+            "name": "bcshared",
+            "isAttr": true,
+            "type": "Boolean"
           }
         ]
       },
@@ -182,6 +187,26 @@
           },
           {
             "name": "valueType",
+            "isAttr": true,
+            "type": "String"
+          },
+          {
+            "name": "entries",
+            "isMany": true,
+            "type": "MappingEntry"
+          }
+        ]
+      },
+      {
+        "name": "MappingEntry",
+        "properties": [
+          {
+            "name": "key",
+            "isAttr": true,
+            "type": "String"
+          },
+          {
+            "name": "value",
             "isAttr": true,
             "type": "String"
           }

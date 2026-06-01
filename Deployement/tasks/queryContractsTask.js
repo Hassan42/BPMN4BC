@@ -29,15 +29,68 @@ task('query-contracts', 'query all contracts and updates contracts.json')
         const contractAddress = contract.address;
         const contractName = contract.contractName;
 
+        if (contract.isDataStore) {
+            // DataStore contracts have no tasks or roles, but do have data variables.
+            // Query each regular (non-mapping) variable via its individual getter and
+            // update contracts.json so the execution panel shows current on-chain values.
+            if (!contractAddress) {
+                console.warn(`Skipping DataStore ${contractName}: no address set.`);
+                continue;
+            }
+            console.log(`Querying DataStore contract ${contractName} at address ${contractAddress}`);
+            try {
+                const dsFactory  = await ethers.getContractFactory(contract.canonicalContractName || contractName);
+                const dsInstance = dsFactory.attach(contractAddress);
+
+                const isDsMI       = contract.multiInstance !== false;
+                const dsShared     = contract.dsShared === true;
+                // instanceKeyed: non-MI DS without flat-storage flag → getters take instanceId
+                const instanceKeyed = !isDsMI && !dsShared;
+
+                const dataStoreVars = contract.dataStore || [];
+                if (dataStoreVars.length > 0) {
+                    const values = [];
+                    for (const v of dataStoreVars) {
+                        const cap    = v.name.charAt(0).toUpperCase() + v.name.slice(1);
+                        const getter = `get${cap}`;
+                        if (typeof dsInstance[getter] === 'function') {
+                            const val = (instanceKeyed && instanceId != null)
+                                ? await dsInstance[getter](parseInt(instanceId))
+                                : await dsInstance[getter]();
+                            values.push(val);
+                        } else {
+                            values.length = 0; // abort — getter missing
+                            break;
+                        }
+                    }
+                    if (values.length === dataStoreVars.length) {
+                        contractManager.updateDataStore(contractName, values);
+                        console.log(`Updated DataStore values for ${contractName}`);
+                    }
+                }
+            } catch (err) {
+                console.error(`Error querying DataStore ${contractName}:`, err.message);
+            }
+            continue;
+        }
+
+        if (!contractAddress) {
+            console.warn(`Skipping ${contractName}: no address set.`);
+            continue;
+        }
+
         console.log(`Querying ${contractName} at address ${contractAddress}`);
 
-        // Retrieve the contract factory based on the contract name
-        const contractFactory = await ethers.getContractFactory(contractName);
+        try {
+            const contractFactory = await ethers.getContractFactory(contract.canonicalContractName || contractName);
 
-        // Attach to the contract
-        const contractInstance = contractFactory.attach(contractAddress);
+            // Attach to the contract
+            const contractInstance = contractFactory.attach(contractAddress);
 
-        await queryContract(contractManager, contractName, contractInstance, parseInt(instanceId));
+            await queryContract(contractManager, contractName, contractInstance, parseInt(instanceId));
+        } catch (err) {
+            console.error(`Error querying ${contractName}:`, err.message);
+        }
     }
 });
 

@@ -73,6 +73,14 @@ export function getSameNameDataObjects(element, elementRegistry) {
     .filter(el => is(el.businessObject, 'bpmn:DataObjectReference') && el.businessObject.name === name);
 }
 
+export function getSameNameDataStores(element, elementRegistry) {
+  const bo = getBusinessObject(element);
+  const name = bo.name;
+  if (!name) return [element];
+  return elementRegistry.getAll()
+    .filter(el => is(el.businessObject, 'bpmn:DataStoreReference') && el.businessObject.name === name);
+}
+
 export function getDataObjectVariablesExtension(element) {
   const businessObject = getBusinessObject(element);
   return getExtension(businessObject, 'bpmnbc:DataObjectVariables');

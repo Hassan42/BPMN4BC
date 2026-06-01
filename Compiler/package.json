@@ -13,7 +13,8 @@
     "bpmn-moddle": "^9.0.1",
     "cors": "^2.8.5",
     "express": "^4.19.2",
-    "fs-extra": "^11.2.0"
+    "fs-extra": "^11.2.0",
+    "js-sha3": "^0.9.3"
   },
   "devDependencies": {
     "prettier": "^3.3.2",

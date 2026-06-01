@@ -131,7 +131,7 @@ export async function queryMapping({ instanceId, contractName, networkId, varNam
 export async function executeTask(network, contractName, task, form, sender, ethAmount, instanceId) {
   const inputs = Array.from(form.elements)
     .filter(input => input.name)
-    .map(input => input.value);
+    .map(input => input.type === 'checkbox' ? input.checked : input.value);
 
   const payload = {
     network: network,

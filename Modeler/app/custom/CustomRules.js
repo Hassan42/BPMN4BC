@@ -115,26 +115,14 @@ CustomRules.prototype.init = function () {
       return null;
     }
 
-    // Returns all DataStoreReference shapes that share the same logical DataStore as `dsShape`
-    // (same participant + same containing lane). Includes dsShape itself.
+    // Returns all DataStoreReference shapes that share the same name as `dsShape`.
+    // Two DS shapes with the same name represent the same logical DataStore contract.
     const getSiblingDataStores = (dsShape) => {
-      const allElements = this._elementRegistry.getAll();
-      const laneElements = allElements.filter(el => is(el.businessObject, 'bpmn:Lane'));
-      const getContainingLane = (el) => {
-        if (!laneElements.length) return null;
-        const cx = el.x + el.width / 2;
-        const cy = el.y + el.height / 2;
-        return laneElements.find(l =>
-          cx >= l.x && cx <= l.x + l.width &&
-          cy >= l.y && cy <= l.y + l.height
-        ) || null;
-      };
-      const myParticipant = getPool(dsShape);
-      const myLane = getContainingLane(dsShape);
-      return allElements.filter(el =>
+      const name = dsShape.businessObject && dsShape.businessObject.name;
+      if (!name) return [dsShape]; // unnamed DS is unique unto itself
+      return this._elementRegistry.getAll().filter(el =>
         is(el.businessObject, 'bpmn:DataStoreReference') &&
-        getPool(el) === myParticipant &&
-        getContainingLane(el) === myLane
+        el.businessObject.name === name
       );
     };
 
@@ -401,7 +389,7 @@ CustomRules.prototype.init = function () {
       return false;
     }
 
-    // DataStore → Task: enforce read-once rule (across all sibling shapes)
+    // DataStore → Task: enforce read-once rule (across all same-name DS shapes)
     if (is(sourceBo, 'bpmn:DataStoreReference') && !is(targetBo, 'bpmn:ExclusiveGateway')) {
       const siblingIds = new Set(getSiblingDataStores(source).map(s => s.id));
       const alreadyReads = (target.incoming || []).some(
@@ -414,7 +402,7 @@ CustomRules.prototype.init = function () {
       }
     }
 
-    // Task → DataStore: enforce write-once rule (across all sibling shapes)
+    // Task → DataStore: enforce write-once rule (across all same-name DS shapes)
     if (is(targetBo, 'bpmn:DataStoreReference')) {
       const siblingIds = new Set(getSiblingDataStores(target).map(s => s.id));
       const alreadyWrites = (source.outgoing || []).some(

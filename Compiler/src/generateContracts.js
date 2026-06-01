@@ -1,6 +1,6 @@
-const { getParentLaneOrPool, generateContractConfig, findCollaboration, findProcessForParticipant, findLanesForProcess, findActivitiesForLane, findActivitiesForProcess, findGatewaysForProcess, findGatewaysForLane, formatSolidityCode, findEventsForProcess, findEventsForLane, extractRolesFromCollaboration, extractParticipantMultiplicities, findReceiveTask, findDataStoreReferencesForProcess } = require('./utils.js');
+const { getParentLaneOrPool, generateContractConfig, findCollaboration, findProcessForParticipant, findLanesForProcess, findActivitiesForLane, findActivitiesForProcess, findGatewaysForProcess, findGatewaysForLane, formatSolidityCode, findEventsForProcess, findEventsForLane, extractRolesFromCollaboration, extractParticipantMultiplicities, findReceiveTask, findDataStoreReferencesForProcess, findDataStoresForLane, getDsKey, deduplicateDataStoresByKey, extractDataStoreVariables, erc7201Slot } = require('./utils.js');
 const { generateFunctions, generateFunctionSignatures } = require('./generateFunctions.js');
-const { generateDataStoreStructs, generateDataObjectStructs, generateDataStoreContract } = require('./generateStorage.js');
+const { generateDataStoreStructs, generateDataObjectStructs, generateDataStoreContract, generateDataObjectsFile } = require('./generateStorage.js');
 const { generateGateways } = require('./generateGateways.js');
 const { generateEvents, generateEmitFunctions } = require('./generateEvents.js');
 const fs = require('fs');
@@ -31,7 +31,10 @@ async function generateContract(contractParams) {
     contractText,
     multiInstance,      // default true — per-instance contract
     coupledDataStore,   // default true — DataStore has its own contract (external calls)
-    dsMultiInstance     // default true — new DataStore per instance
+    dsMultiInstance,    // default true — new DataStore per instance
+    ownedInlineDsKeys,  // Set<string> | undefined — dsKeys this lane owns (undefined = all owned)
+    foreignInlineDsMap, // { [dsKey]: ownerContractName } | undefined — foreign inline DSes
+    dataObjectsFileName // 'DataObjects_${collaborationId}' or null — shared struct file name
   } = contractParams;
 
   // Resolve flags with defaults
@@ -39,10 +42,42 @@ async function generateContract(contractParams) {
   const isCoupled         = coupledDataStore === true;
   const isDsMultiInstance = dsMultiInstance  !== false;
 
-  const { dataStoreStructs, dataStoreInitCode, dataStoreReadFunctions } = generateDataStoreStructs(process, lane, isCoupled, isMultiInstance);
-  const dataObjectStructs = generateDataObjectStructs(process);
-  const functions = generateFunctions(activities, process, roles, collaborationId, participantMultiplicities, isMultiInstance, isCoupled, `DataStore_${contractName}`, isDsMultiInstance).join('\n');
-  const gatewayFunctions = generateGateways(gateways, process, collaborationId, isMultiInstance);
+  // ── DataStore list and per-DS naming ──────────────────────────────────────
+  // Canonical base for non-MI DS (strips instance suffix so all instances share the same DS contract).
+  const canonicalBase = (isMultiInstance && instanceId != null)
+    ? contractName.slice(0, -('_' + instanceId).length)
+    : contractName;
+
+  // Collect all DataStores referenced by this lane (or process if no lane)
+  const allLaneDsRefs = deduplicateDataStoresByKey(lane
+    ? findDataStoresForLane(lane, process)
+    : findDataStoreReferencesForProcess(process));
+
+  // Per-DS metadata: dsKey, contract name, MI flag, shared flag, coupled flag
+  const dsList = allLaneDsRefs.map(ds => {
+    const dsKey = getDsKey(ds);
+    const isDsMI   = ds.bcmultiinstance !== false && ds.bcmultiinstance !== 'false';
+    const dsShared = ds.bcshared === true || ds.bcshared === 'true';
+    // dsIsCoupled = true  → DS has its OWN separate contract (bccoupled absent or false)
+    // dsIsCoupled = false → DS is INLINE in the process contract (bccoupled = true)
+    const dsIsCoupled = !(ds.bccoupled === true || ds.bccoupled === 'true');
+    // Both MI and non-MI external DSes use the collaborationId as prefix so that the same
+    // logical DS referenced by multiple lanes always resolves to the same contract name.
+    // MI status controls deploy-time lifecycle (new deployment per instance vs. shared), not naming.
+    const dsName = `DataStore_${collaborationId}_${dsKey}`;
+    return { ds, dsKey, isDsMI, dsShared, dsName, dsIsCoupled };
+  });
+
+  // Resolve ownership maps with safe defaults (null / empty object for no-lane / single-lane models)
+  const effectiveOwnedInlineDsKeys = ownedInlineDsKeys !== undefined ? ownedInlineDsKeys : null;
+  const effectiveForeignInlineDsMap = foreignInlineDsMap !== undefined ? foreignInlineDsMap : {};
+
+  const { dataStoreStructDefs, dataStoreStateVars, dataStoreInitCode, dataStoreReadFunctions } = generateDataStoreStructs(process, lane, isCoupled, isMultiInstance, effectiveOwnedInlineDsKeys);
+  // DataObject structs live in a shared file (DataObjects_${collaborationId}.sol) imported by
+  // both contracts and interfaces — this ensures cross-lane parameters resolve to the same type.
+  const doImport = dataObjectsFileName ? `import './${dataObjectsFileName}.sol';` : '';
+  const functions = generateFunctions(activities, process, roles, collaborationId, participantMultiplicities, isMultiInstance, isCoupled, instanceId, effectiveForeignInlineDsMap).join('\n');
+  const gatewayFunctions = generateGateways(gateways, process, collaborationId, isMultiInstance, isCoupled, contractName, canonicalBase, effectiveForeignInlineDsMap);
   const solidityEvents = generateEvents(events);
   const emitFunctions = generateEmitFunctions(events);
 
@@ -53,9 +88,18 @@ async function generateContract(contractParams) {
     customScript = lane.solidityscript || '';
   }
 
-  // Identify activities connected to a start event
-  const startReceiveTaskIds = process.flowElements
-    .filter(element => element.$type === 'bpmn:StartEvent') // Get start events
+  // Identify activities connected to a start event.
+  // When generating a lane-specific contract, only start events within THIS lane
+  // can seed an initial Open state.  Start events in sibling lanes open tasks in
+  // those lanes — cross-lane transitions are fired at runtime by sequence-flow
+  // handlers, not baked into the constructor/initInstance.
+  // For no-lane (single-process) contracts, search the whole process as before.
+  const startEventSource = lane
+    ? (lane.flowNodeRef || [])
+    : process.flowElements;
+
+  const startReceiveTaskIds = startEventSource
+    .filter(element => element.$type === 'bpmn:StartEvent') // Get start events in scope
     .map(startEvent => startEvent.outgoing
       .map(flow => findReceiveTask(flow.targetRef)) // Recursively search for ReceiveTasks
       .flat()
@@ -98,17 +142,19 @@ async function generateContract(contractParams) {
       });
 
       const participantsString = expandedParticipants.map(p => `"${p}"`).join(', ');
-      return `activitytoRole["${activity.id}"] = [${participantsString}];`;
+      // Use $.activitytoRole because initialize() opens with: MainStorage storage $ = _getMainStorage();
+      return `$.activitytoRole["${activity.id}"] = [${participantsString}];`;
     }
   ).join('\n');
 
-  // ── State-mapping init lines (used in constructor or initInstance) ──────────
+  // ── State-mapping init lines (used in initialize() or initInstance()) ──────
+  // All functions that use these lines open with: MainStorage storage $ = _getMainStorage();
   const stateMappingsPerInstance = receiveFunctionNames.map(name => {
     const isOpen = startReceiveTaskIds.includes(name);
     if (isMultiInstance) {
-      return isOpen ? `state["${name}"] = State.Open;` : `state["${name}"] = State.Closed;`;
+      return isOpen ? `$.state["${name}"] = State.Open;` : `$.state["${name}"] = State.Closed;`;
     } else {
-      return isOpen ? `state[instanceId]["${name}"] = State.Open;` : `state[instanceId]["${name}"] = State.Closed;`;
+      return isOpen ? `$.state[instanceId]["${name}"] = State.Open;` : `$.state[instanceId]["${name}"] = State.Closed;`;
     }
   }).join('\n');
 
@@ -121,7 +167,7 @@ async function generateContract(contractParams) {
     .map(task => {
       const key = (task.bcsender || '').replace(/\s+/g, '');
       const count = participantMultiplicities[key];
-      return `requiredParticipants["${task.id.replace(/\s+/g, '')}"] = ${count};`;
+      return `$.requiredParticipants["${task.id.replace(/\s+/g, '')}"] = ${count};`;
     })
     .join('\n');
 
@@ -131,275 +177,377 @@ async function generateContract(contractParams) {
   });
 
   // ── Per-instance-mode specific blocks ───────────────────────────────────────
-  const instanceSuffix = (isMultiInstance && instanceId != null) ? '_' + instanceId : '';
+  // Each sibling lane may have its own multi-instance setting, so compute the
+  // instance suffix per-lane rather than using the current contract's own flag.
+  const _laneInstanceSuffix = (otherLane) => {
+    const otherMI = otherLane.bcmultiinstance === false || otherLane.bcmultiinstance === 'false'
+      ? false
+      : otherLane.bcmultiinstance === true || otherLane.bcmultiinstance === 'true'
+        ? true
+        : isMultiInstance; // not set on the lane → inherit current contract's flag
+    return (otherMI && instanceId != null) ? '_' + instanceId : '';
+  };
 
-  const contractsMapping = lanes.map((lane, index) => {
-    return `contracts["${lane.id.replace(/\s+/g, '')}_Contract_${collaborationId}${instanceSuffix}"] = addresses[${index}];`;
+  // contractsMapping and contractsImports both use the canonical (no-suffix) contract name.
+  // The contracts[] mapping key is canonical so cross-contract helpers can resolve it at
+  // compile time without knowing the instance suffix.
+  // The interface import path is also canonical: an interface is pure ABI — its function
+  // signatures are the same for every instance of the same lane (MI=true lanes generate the
+  // same interface regardless of which instance ID was used).  One file is written per lane,
+  // reused across all instances, so import paths must not include the instance suffix.
+  // setContracts() opens with: MainStorage storage $ = _getMainStorage();
+  // MI=true (per-instance) contracts: flat mapping(string=>address) — same address for all instances.
+  const contractsMapping = lanes.map((siblingLane, index) => {
+    return `$.contracts["${siblingLane.id.replace(/\s+/g, '')}_Contract_${collaborationId}"] = addresses[${index}];`;
+  }).join('\n');
+  // MI=false (shared pool) contracts: instance-keyed mapping(uint256=>mapping(string=>address)).
+  // Each instance's deployment calls setContracts(addresses, instanceId), storing the
+  // per-instance campaign proxy address so that cross-contract setState calls always
+  // target the correct proxy and never overwrite a previous instance's entry.
+  const contractsMappingShared = lanes.map((siblingLane, index) => {
+    return `$.contracts[instanceId]["${siblingLane.id.replace(/\s+/g, '')}_Contract_${collaborationId}"] = addresses[${index}];`;
   }).join('\n');
 
-  const contractsImports = lanes.map((lane) => {
-    return `import './I${lane.id.replace(/\s+/g, '')}_Contract_${collaborationId}${instanceSuffix}.sol';`;
+  const contractsImports = lanes.map((siblingLane) => {
+    return `import './I${siblingLane.id.replace(/\s+/g, '')}_Contract_${collaborationId}.sol';`;
   }).join('\n');
 
-  // ── Coupled DataStore import ────────────────────────────────────────────────
-  const dsContractName = `DataStore_${contractName}`;
-  const dsImport = isCoupled ? `import './I${dsContractName}.sol';` : '';
+  // ── Per-DS interface imports, address vars (in MainStorage), and setter functions ──────────
+  // Each DataStore in the lane gets its own import, address variable inside MainStorage,
+  // and explicit public getter+setter (replacing the removed auto-generated public getter).
+  let dsImports        = '';
+  let dsAddrStructVars = '';   // declarations that go INSIDE the MainStorage struct
+  let dsAddrFns        = '';   // public setter + getter functions (outside MainStorage)
+  dsList.filter(d => d.dsIsCoupled).forEach(({ dsKey, isDsMI, dsName }) => {
+    dsImports += `import './I${dsName}.sol';\n`;
 
-  // Shared pool + per-instance DS (pool MI=false, DS MI=true):
-  //   The pool contract can't store a single dataStoreAddress — each instance gets its own DS.
-  //   Use a mapping(instanceId → dsAddress) and a two-arg setter.
-  // All other coupled cases: single dataStoreAddress + one-arg setter.
-  const sharedPoolPerInstanceDs = isCoupled && !isMultiInstance && isDsMultiInstance;
-  const dsAddrVar = isCoupled
-    ? (sharedPoolPerInstanceDs
-        ? `mapping(uint256 => address) public dataStoreOf;`
-        : `address public dataStoreAddress;`)
-    : '';
-  const dsAddrFn = isCoupled
-    ? (sharedPoolPerInstanceDs
-        ? `function setDataStoreAddress(uint256 instanceId, address _addr) public { dataStoreOf[instanceId] = _addr; }`
-        : `function setDataStoreAddress(address _addr) public { dataStoreAddress = _addr; }`)
-    : '';
+    const sharedPoolPerInstanceDs = !isMultiInstance && isDsMI;
+    if (sharedPoolPerInstanceDs) {
+      // Pool MI=false + DS MI=true → each instance has its own DS address
+      dsAddrStructVars += `    mapping(uint256 => address) dataStoreOf_${dsKey};\n`;
+      dsAddrFns += `function setDataStoreAddress_${dsKey}(uint256 instanceId, address _addr) public { _getMainStorage().dataStoreOf_${dsKey}[instanceId] = _addr; }\n`;
+      dsAddrFns += `function getDataStoreAddress_${dsKey}(uint256 instanceId) public view returns (address) { return _getMainStorage().dataStoreOf_${dsKey}[instanceId]; }\n`;
+    } else {
+      dsAddrStructVars += `    address dataStoreAddress_${dsKey};\n`;
+      dsAddrFns += `function setDataStoreAddress_${dsKey}(address _addr) public { _getMainStorage().dataStoreAddress_${dsKey} = _addr; }\n`;
+      dsAddrFns += `function getDataStoreAddress_${dsKey}() public view returns (address) { return _getMainStorage().dataStoreAddress_${dsKey}; }\n`;
+    }
+  });
 
   // ── Build Solidity template ─────────────────────────────────────────────────
   let solidityCode;
+
+  // ── ERC-7201 slot (computed from CANONICAL name so all instances of the same
+  //    model share an identical implementation binary.  Each instance gets its own
+  //    proxy with independent storage, so the same slot key is safe.) ───────────
+  const mainStorageNamespace = `bpmn4bc.storage.${canonicalBase}`;
+  const mainStorageSlot      = erc7201Slot(mainStorageNamespace);
 
   if (isMultiInstance) {
     // ═══════════════════════════════════════════════
     // STANDARD per-instance contract (existing behaviour)
     // ═══════════════════════════════════════════════
-    const multiParticipantVars = hasMultiParticipant ? `
-      mapping(string => mapping(address => bool)) public hasParticipated;
-      mapping(string => uint) public participationCount;
-      mapping(string => uint) public requiredParticipants;
-    ` : '';
+    const multiParticipantStructVars = hasMultiParticipant ? `
+    mapping(string => mapping(address => bool)) hasParticipated;
+    mapping(string => uint) participationCount;
+    mapping(string => uint) requiredParticipants;` : '';
 
-    solidityCode = `
-  // SPDX-License-Identifier: MIT
-  pragma solidity ^0.8.0;
-  ${contractsImports}
-  ${dsImport}
-  contract ${contractName} {
-      enum State { Closed, Open, Completed }
+    solidityCode = `// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+${contractsImports}
+${dsImports}
+${doImport}
 
-      mapping(string => State) public state;
-      uint receiveFunctionCount = ${receiveFunctionCount};
-      mapping(string => address) public contracts;
-      mapping(address => string) public addressToRole;
-      mapping(string => address) public addressOf;
-      mapping(string => string[]) public activitytoRole;
-      mapping(address => uint) public escrowOf;
-      ${dsAddrVar}
-      ${multiParticipantVars}
+contract ${canonicalBase} is Initializable, UUPSUpgradeable, OwnableUpgradeable {
+    enum State { Closed, Open, Completed }
 
-      modifier isAccessible(string memory _activity) {
-          require(state[_activity] == State.Open, "Activity is not open");
-          string memory userRole = addressToRole[msg.sender];
-          bool hasRequiredRole = false;
-          if (activitytoRole[_activity].length == 0) {
-              hasRequiredRole = true;
-          } else {
-              for (uint256 i = 0; i < activitytoRole[_activity].length; i++) {
-                  if (bytes(activitytoRole[_activity][i]).length == 0 || compareStrings(userRole, activitytoRole[_activity][i])) {
-                      hasRequiredRole = true;
-                      break;
-                  }
-              }
-          }
-          require(hasRequiredRole, "Caller does not have the required role");
-          _;
-      }
+    ${dataStoreStructDefs}
 
-      ${customScript}
-      ${solidityEvents}
-      ${dataObjectStructs}
-      ${dataStoreStructs}
+    // ── ERC-7201 namespaced storage ───────────────────────────────────────────
+    // slot = keccak256(abi.encode(uint256(keccak256("${mainStorageNamespace}")) - 1)) & ~bytes32(uint256(0xff))
+    /// @custom:storage-location erc7201:${mainStorageNamespace}
+    struct MainStorage {
+        mapping(string => State) state;
+        uint receiveFunctionCount;
+        uint256 processInstanceId;
+        mapping(string => address) contracts;
+        mapping(string => address) addressOf;
+        mapping(string => string[]) activitytoRole;
+        mapping(string => uint256) gwCounts;
+        ${dsAddrStructVars}
+        ${multiParticipantStructVars}
+        ${dataStoreStateVars}
+    }
 
-      constructor() {
-          ${stateMappingsPerInstance}
-          ${activityToRoleMappings}
-          ${dataStoreInitCode}
-          ${multiParticipantInits}
-      }
+    bytes32 private constant MAIN_STORAGE_LOCATION = ${mainStorageSlot};
 
-      function setContracts(address[] memory addresses) public {
-          ${contractsMapping}
-      }
+    function _getMainStorage() private pure returns (MainStorage storage $) {
+        // solhint-disable-next-line no-inline-assembly
+        assembly { $.slot := MAIN_STORAGE_LOCATION }
+    }
 
-      ${dsAddrFn}
-      ${emitFunctions}
-      ${dataStoreReadFunctions}
+    modifier isAccessible(string memory _activity) {
+        MainStorage storage $ = _getMainStorage();
+        require($.state[_activity] == State.Open, "Activity is not open");
+        bool hasRequiredRole = false;
+        if ($.activitytoRole[_activity].length == 0) {
+            hasRequiredRole = true;
+        } else {
+            for (uint256 i = 0; i < $.activitytoRole[_activity].length; i++) {
+                string memory allowedRole = $.activitytoRole[_activity][i];
+                if (bytes(allowedRole).length == 0 || $.addressOf[allowedRole] == msg.sender) {
+                    hasRequiredRole = true;
+                    break;
+                }
+            }
+        }
+        require(hasRequiredRole, "Caller does not have the required role");
+        _;
+    }
 
-      function setResources(string[] memory _roles, address[] memory _addresses) public {
-          require(_roles.length == _addresses.length, "Roles and addresses arrays must be of the same length");
-          for (uint i = 0; i < _addresses.length; i++) {
-              addressToRole[_addresses[i]] = _roles[i];
-              addressOf[_roles[i]] = _addresses[i];
-          }
-      }
+    ${customScript}
+    ${solidityEvents}
 
-      function setResource(string memory _role, address _address) public {
-          addressToRole[_address] = _role;
-          addressOf[_role] = _address;
-      }
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() { _disableInitializers(); }
 
-      function setState(string memory _activity, uint8 _state) public {
-          require(_state <= 3, "Not Valid State");
-          state[_activity] = State(_state);
-      }
+    function initialize() public initializer {
+        __Ownable_init(msg.sender);
+        MainStorage storage $ = _getMainStorage();
+        $.receiveFunctionCount = ${receiveFunctionCount};
+        ${stateMappingsPerInstance}
+        ${activityToRoleMappings}
+        ${dataStoreInitCode}
+        ${multiParticipantInits}
+    }
 
-      function getState(string memory _activity) public view returns (State) {
-          return state[_activity];
-      }
+    // solhint-disable-next-line no-empty-blocks
+    function _authorizeUpgrade(address) internal override onlyOwner {}
 
-      function compareStrings(string memory a, string memory b) internal pure returns (bool) {
-          return keccak256(abi.encodePacked(a)) == keccak256(abi.encodePacked(b));
-      }
+    function setContracts(address[] memory addresses, uint256 _instanceId) public {
+        MainStorage storage $ = _getMainStorage();
+        $.processInstanceId = _instanceId;
+        ${contractsMapping}
+    }
 
-      ${functions}
-      ${gatewayFunctions}
-  }
-  `;
+    ${dsAddrFns}
+    ${emitFunctions}
+    ${dataStoreReadFunctions}
+
+    function setResources(string[] memory _roles, address[] memory _addresses) public {
+        MainStorage storage $ = _getMainStorage();
+        require(_roles.length == _addresses.length, "Roles and addresses arrays must be of the same length");
+        for (uint i = 0; i < _addresses.length; i++) {
+            $.addressOf[_roles[i]] = _addresses[i];
+        }
+    }
+
+    function setResource(string memory _role, address _address) public {
+        MainStorage storage $ = _getMainStorage();
+        $.addressOf[_role] = _address;
+    }
+
+    function setState(string memory _activity, uint8 _state) public {
+        MainStorage storage $ = _getMainStorage();
+        require(_state <= 3, "Not Valid State");
+        $.state[_activity] = State(_state);
+    }
+
+    function getState(string memory _activity) public view returns (State) {
+        return _getMainStorage().state[_activity];
+    }
+
+    ${functions}
+    ${gatewayFunctions}
+}
+`;
 
   } else {
     // ═══════════════════════════════════════════════
     // SHARED contract — one deployment, all instances via mapping(instanceId→…)
     // ═══════════════════════════════════════════════
-    const sharedMultiParticipantVars = hasMultiParticipant ? `
-      mapping(uint256 => mapping(string => mapping(address => bool))) public hasParticipated;
-      mapping(uint256 => mapping(string => uint)) public participationCount;
-      mapping(string => uint) public requiredParticipants;
-    ` : '';
+    const sharedMultiParticipantStructVars = hasMultiParticipant ? `
+    mapping(uint256 => mapping(string => mapping(address => bool))) hasParticipated;
+    mapping(uint256 => mapping(string => uint)) participationCount;
+    mapping(string => uint) requiredParticipants;` : '';
 
-    solidityCode = `
-  // SPDX-License-Identifier: MIT
-  pragma solidity ^0.8.0;
-  ${contractsImports}
-  ${dsImport}
-  contract ${contractName} {
-      enum State { Closed, Open, Completed }
+    solidityCode = `// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+${contractsImports}
+${dsImports}
+${doImport}
 
-      mapping(uint256 => mapping(string => State)) public state;
-      mapping(uint256 => bool) public initialized;
-      uint receiveFunctionCount = ${receiveFunctionCount};
-      mapping(string => address) public contracts;
-      mapping(uint256 => mapping(address => string)) public addressToRole;
-      mapping(uint256 => mapping(string => address)) public addressOf;
-      mapping(string => string[]) public activitytoRole;
-      mapping(address => uint) public escrowOf;
-      ${dsAddrVar}
-      ${sharedMultiParticipantVars}
+contract ${canonicalBase} is Initializable, UUPSUpgradeable, OwnableUpgradeable {
+    enum State { Closed, Open, Completed }
 
-      ${dataObjectStructs}
-      ${dataStoreStructs}
+    ${dataStoreStructDefs}
 
-      modifier isAccessible(uint256 instanceId, string memory _activity) {
-          require(initialized[instanceId], "Instance not initialized");
-          require(state[instanceId][_activity] == State.Open, "Activity is not open");
-          string memory userRole = addressToRole[instanceId][msg.sender];
-          bool hasRequiredRole = false;
-          if (activitytoRole[_activity].length == 0) {
-              hasRequiredRole = true;
-          } else {
-              for (uint256 i = 0; i < activitytoRole[_activity].length; i++) {
-                  if (bytes(activitytoRole[_activity][i]).length == 0 || compareStrings(userRole, activitytoRole[_activity][i])) {
-                      hasRequiredRole = true;
-                      break;
-                  }
-              }
-          }
-          require(hasRequiredRole, "Caller does not have the required role");
-          _;
-      }
+    // ── ERC-7201 namespaced storage ───────────────────────────────────────────
+    // slot = keccak256(abi.encode(uint256(keccak256("${mainStorageNamespace}")) - 1)) & ~bytes32(uint256(0xff))
+    /// @custom:storage-location erc7201:${mainStorageNamespace}
+    struct MainStorage {
+        mapping(uint256 => mapping(string => State)) state;
+        mapping(uint256 => bool) initialized;
+        uint receiveFunctionCount;
+        // Instance-keyed contracts map: contracts[instanceId]["LaneName"] = proxyAddress.
+        // Using per-instance keying ensures that when a shared pool has per-instance sibling
+        // lanes (MI=true), each instance's setContracts call stores its own proxy address
+        // independently — so cross-contract setState calls always target the correct proxy.
+        mapping(uint256 => mapping(string => address)) contracts;
+        mapping(uint256 => mapping(string => address)) addressOf;
+        mapping(string => string[]) activitytoRole;
+        mapping(uint256 => mapping(string => uint256)) gwCountsById;
+        ${dsAddrStructVars}
+        ${sharedMultiParticipantStructVars}
+        ${dataStoreStateVars}
+    }
 
-      ${customScript}
-      ${solidityEvents}
+    bytes32 private constant MAIN_STORAGE_LOCATION = ${mainStorageSlot};
 
-      constructor() {
-          ${activityToRoleMappings}
-          ${multiParticipantInits}
-      }
+    function _getMainStorage() private pure returns (MainStorage storage $) {
+        // solhint-disable-next-line no-inline-assembly
+        assembly { $.slot := MAIN_STORAGE_LOCATION }
+    }
 
-      function initInstance(uint256 instanceId) public {
-          require(!initialized[instanceId], "Already initialized");
-          ${stateMappingsPerInstance}
-          ${dataStoreInitCode}
-          initialized[instanceId] = true;
-      }
+    modifier isAccessible(uint256 instanceId, string memory _activity) {
+        MainStorage storage $ = _getMainStorage();
+        require($.initialized[instanceId], "Instance not initialized");
+        require($.state[instanceId][_activity] == State.Open, "Activity is not open");
+        bool hasRequiredRole = false;
+        if ($.activitytoRole[_activity].length == 0) {
+            hasRequiredRole = true;
+        } else {
+            for (uint256 i = 0; i < $.activitytoRole[_activity].length; i++) {
+                string memory allowedRole = $.activitytoRole[_activity][i];
+                if (bytes(allowedRole).length == 0 || $.addressOf[instanceId][allowedRole] == msg.sender) {
+                    hasRequiredRole = true;
+                    break;
+                }
+            }
+        }
+        require(hasRequiredRole, "Caller does not have the required role");
+        _;
+    }
 
-      function setContracts(address[] memory addresses) public {
-          ${contractsMapping}
-      }
+    ${customScript}
+    ${solidityEvents}
 
-      ${dsAddrFn}
-      ${emitFunctions}
-      ${dataStoreReadFunctions}
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() { _disableInitializers(); }
 
-      function setResources(uint256 instanceId, string[] memory _roles, address[] memory _addresses) public {
-          require(_roles.length == _addresses.length, "Roles and addresses arrays must be of the same length");
-          for (uint i = 0; i < _addresses.length; i++) {
-              addressToRole[instanceId][_addresses[i]] = _roles[i];
-              addressOf[instanceId][_roles[i]] = _addresses[i];
-          }
-      }
+    function initialize() public initializer {
+        __Ownable_init(msg.sender);
+        MainStorage storage $ = _getMainStorage();
+        $.receiveFunctionCount = ${receiveFunctionCount};
+        ${activityToRoleMappings}
+        ${multiParticipantInits}
+    }
 
-      function setResource(uint256 instanceId, string memory _role, address _address) public {
-          addressToRole[instanceId][_address] = _role;
-          addressOf[instanceId][_role] = _address;
-      }
+    // solhint-disable-next-line no-empty-blocks
+    function _authorizeUpgrade(address) internal override onlyOwner {}
 
-      function setState(uint256 instanceId, string memory _activity, uint8 _state) public {
-          require(_state <= 3, "Not Valid State");
-          state[instanceId][_activity] = State(_state);
-      }
+    function initInstance(uint256 instanceId) public {
+        MainStorage storage $ = _getMainStorage();
+        require(!$.initialized[instanceId], "Already initialized");
+        ${stateMappingsPerInstance}
+        ${dataStoreInitCode}
+        $.initialized[instanceId] = true;
+    }
 
-      function getState(uint256 instanceId, string memory _activity) public view returns (State) {
-          return state[instanceId][_activity];
-      }
+    function setContracts(address[] memory addresses, uint256 instanceId) public {
+        MainStorage storage $ = _getMainStorage();
+        ${contractsMappingShared}
+    }
 
-      function compareStrings(string memory a, string memory b) internal pure returns (bool) {
-          return keccak256(abi.encodePacked(a)) == keccak256(abi.encodePacked(b));
-      }
+    ${dsAddrFns}
+    ${emitFunctions}
+    ${dataStoreReadFunctions}
 
-      ${functions}
-      ${gatewayFunctions}
-  }
-  `;
+    function setResources(uint256 instanceId, string[] memory _roles, address[] memory _addresses) public {
+        MainStorage storage $ = _getMainStorage();
+        require(_roles.length == _addresses.length, "Roles and addresses arrays must be of the same length");
+        for (uint i = 0; i < _addresses.length; i++) {
+            $.addressOf[instanceId][_roles[i]] = _addresses[i];
+        }
+    }
+
+    function setResource(uint256 instanceId, string memory _role, address _address) public {
+        MainStorage storage $ = _getMainStorage();
+        $.addressOf[instanceId][_role] = _address;
+    }
+
+    function setState(uint256 instanceId, string memory _activity, uint8 _state) public {
+        MainStorage storage $ = _getMainStorage();
+        require(_state <= 3, "Not Valid State");
+        $.state[instanceId][_activity] = State(_state);
+    }
+
+    function getState(uint256 instanceId, string memory _activity) public view returns (State) {
+        return _getMainStorage().state[instanceId][_activity];
+    }
+
+    ${functions}
+    ${gatewayFunctions}
+}
+`;
   }
 
   try {
     const formattedSolidityCode = await formatSolidityCode(solidityCode);
-    const formattedSolidityInterface = await generateInterfaceFromCode(contractName, formattedSolidityCode, dataObjectStructs);
+    // Interface files use the canonical (no-instance-suffix) name so that every instance
+    // of a lane imports the same ILane_X.sol file.  The ABI is identical across instances.
+    const canonicalContractName = (isMultiInstance && instanceId != null)
+      ? contractName.slice(0, -('_' + instanceId).length)
+      : contractName;
+    const formattedSolidityInterface = await generateInterfaceFromCode(canonicalContractName, formattedSolidityCode, dataObjectsFileName);
     const outputPath = path.resolve('./output/contracts', `${contractName}.sol`);
     fs.writeFileSync(outputPath, formattedSolidityCode, 'utf8');
     console.log(`Generated Solidity contract: ${contractName}`);
 
-    // ── Coupled DataStore: generate the separate DS contract ────────────────
-    let dsContractConfig = null;
-    if (isCoupled) {
-      const dataStoreRefs = findDataStoreReferencesForProcess(process);
-      const firstDs = dataStoreRefs[0];
-      if (firstDs) {
-        const { dsContractName: dsName, dsContractCode, dsInterfaceCode } = await generateDataStoreContract(
-          firstDs, contractName, isDsMultiInstance, formatSolidityCode
-        );
-        dsContractConfig = {
-          contractName:  dsName,
-          networkId,
-          contractRoles: [],
-          receiveTasks:  [],
-          contractCode:  dsContractCode,
-          contractInterface: dsInterfaceCode,
-          dataStore:     [],
-          mappingVars:   [],
-          contractText:  `DataStore for ${contractText || contractName}`,
-          multiInstance: isDsMultiInstance,
-          coupledDataStore: false,
-          dsMultiInstance: true,
-          dataStoreContractName: null,
-          isDataStore: true
-        };
-      }
+    // ── External DataStore contracts: generate one per DS that has its own contract ──
+    // Each DS is checked independently via dsIsCoupled (bccoupled absent/false = own contract).
+    const dsContractConfigs = [];
+    for (const { ds, dsName, isDsMI, dsShared, dsIsCoupled } of dsList) {
+      if (!dsIsCoupled) continue; // inline DS — no separate contract needed
+      const { dsContractCode, dsInterfaceCode } = await generateDataStoreContract(
+        ds, dsName, isDsMI, formatSolidityCode, dsShared
+      );
+      // Extract variables from the DS element so the execution panel can display them.
+      // These are split into regular vars (dataStore array) and mapping vars (mappingVars array).
+      // dsShared is stored so the query layer knows whether instanceId is needed for getters.
+      const dsAllVars = extractDataStoreVariables(ds);
+      const dsDataStore = dsAllVars
+        .filter(v => (v.type || 'uint') !== 'mapping')
+        .map(v => ({ name: v.name, type: v.type || 'uint' }));
+      const dsMappingVars = dsAllVars
+        .filter(v => (v.type || 'uint') === 'mapping')
+        .map(v => ({ name: v.name, keyType: v.keyType || 'uint', valueType: v.valueType || 'uint' }));
+
+      dsContractConfigs.push({
+        contractName:  dsName,
+        canonicalContractName: dsName,
+        networkId,
+        contractRoles: [],
+        receiveTasks:  [],
+        contractCode:  dsContractCode,
+        contractInterface: dsInterfaceCode,
+        dataStore:     dsDataStore,
+        mappingVars:   dsMappingVars,
+        contractText:  `Data: ${ds.name || getDsKey(ds)}`,
+        multiInstance: isDsMI,
+        dsShared,                        // flat (shared) DS storage — no instanceId getter arg
+        coupledDataStore: false,
+        dsMultiInstance: true,
+        dataStoreContractName: null,
+        dataStoreContracts: [],
+        isDataStore: true
+      });
     }
 
     // Expand roles for multi-participant: Customer(N=3) → Customer_1, Customer_2, Customer_3
@@ -414,6 +562,7 @@ async function generateContract(contractParams) {
 
     const contractConfig = generateContractConfig({
       contractName,
+      canonicalContractName,  // no-suffix name for interface file
       networkId,
       activities,
       roles: expandedRoles,
@@ -424,9 +573,11 @@ async function generateContract(contractParams) {
       formattedSolidityCode,
       formattedSolidityInterface,
       contractText,
-      multiInstance: isMultiInstance
+      multiInstance: isMultiInstance,
+      collaborationId,
+      foreignInlineDsMap: effectiveForeignInlineDsMap  // exclude foreign inline DS vars from this lane's config
     });
-    return { contractConfig, dsContractConfig };
+    return { contractConfig, dsContractConfigs };
   } catch (error) {
     console.log(solidityCode);
     throw new Error('Error formatting or writing Solidity code: ' + error.message);
@@ -439,18 +590,20 @@ async function generateContract(contractParams) {
  * @param {string} solidityCode - The Solidity code of the contract.
  * @returns - The generated contract interface.
  */
-async function generateInterfaceFromCode(contractName, solidityCode, dataObjectStructs = '') {
+async function generateInterfaceFromCode(contractName, solidityCode, dataObjectsFileName = null) {
   const functionSignatures = generateFunctionSignatures(solidityCode);
-  const solidityInterface = `
-  // SPDX-License-Identifier: MIT
-  pragma solidity ^0.8.0;
+  // Import the shared DataObjects file (same directory as interfaces) so cross-lane struct
+  // parameters in the interface signatures resolve to the same type as in the contracts.
+  const doImport = dataObjectsFileName ? `import './${dataObjectsFileName}.sol';` : '';
+  const solidityInterface = `// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+${doImport}
 
-  interface I${contractName} {
-      enum State { Closed, Open, Completed }
-      ${dataObjectStructs}
-      ${functionSignatures}
-  }
-  `;
+interface I${contractName} {
+    enum State { Closed, Open, Completed }
+    ${functionSignatures}
+}
+`;
 
   const formattedsolidityInterface = await formatSolidityCode(solidityInterface);
   const outputPath = path.resolve('./output/interfaces', `I${contractName}.sol`);
@@ -471,6 +624,16 @@ async function generateContracts(definitions, instanceId) {
   const contracts = [];
   // Filter blockchain pools/participants
   const participants = collaboration.participants.filter((participant) => participant.bc === "true");
+
+  // ── Shared DataObjects file ───────────────────────────────────────────────────
+  // Generate ONE shared top-level struct file for all DataObjects across all BC processes.
+  // Both contracts and interfaces import it so cross-lane DataObject parameters resolve to
+  // the same Solidity type everywhere, avoiding implicit-conversion type errors.
+  const allBcProcesses = participants
+    .map(p => findProcessForParticipant(definitions, p))
+    .filter(Boolean);
+  const doFileResult = await generateDataObjectsFile(allBcProcesses, collaboration.id, formatSolidityCode);
+  const dataObjectsFileName = doFileResult ? doFileResult.fileName : null;
   if (participants.length === 0) {
     console.log('No blockchain participant found in BPMN XML.');
   } else {
@@ -490,21 +653,20 @@ async function generateContracts(definitions, instanceId) {
         // Shared-pool contracts do not embed instanceId in their name
         const effectiveInstanceSuffix = multiInstance && instanceId != null ? '_' + instanceId : '';
 
-        // Read DataStore architecture flags from the process's DataStore elements.
-        // Semantics: bccoupled = true  → DataStore is EMBEDDED (inline) in the process contract.
-        //            bccoupled = false (default/unchecked) → DataStore is a SEPARATE contract
-        //            with its own getter/setter functions; the process contract calls it externally.
-        const dsRefs = findDataStoreReferencesForProcess(process);
-        const firstDs = dsRefs[0] || null;
-        const coupledDataStore = firstDs
-          ? !(firstDs.bccoupled === true || firstDs.bccoupled === 'true')
-          : false;
-        const dsMultiInstance = firstDs
-          ? (firstDs.bcmultiinstance !== false && firstDs.bcmultiinstance !== 'false')
-          : true;
-
         const lanes = findLanesForProcess(process);
         if (lanes.length === 0) {
+          // No lanes: read DS flags from the whole process's DataStore elements.
+          // Semantics: bccoupled = true  → DataStore is EMBEDDED (inline) in the process contract.
+          //            bccoupled = false (default/unchecked) → DataStore is a SEPARATE contract.
+          const dsRefs = findDataStoreReferencesForProcess(process);
+          const firstDs = dsRefs[0] || null;
+          const coupledDataStore = firstDs
+            ? !(firstDs.bccoupled === true || firstDs.bccoupled === 'true')
+            : false;
+          const dsMultiInstance = firstDs
+            ? (firstDs.bcmultiinstance !== false && firstDs.bcmultiinstance !== 'false')
+            : true;
+
           const contractParams = {
             contractName: `${process.id.replace(/\s+/g, '')}_DefaultContract_${participant.id}_${collaboration.id}${effectiveInstanceSuffix}`,
             networkId,
@@ -518,14 +680,21 @@ async function generateContracts(definitions, instanceId) {
             collaborationId: collaboration.id,
             instanceId,
             participantMultiplicities,
-            contractText: participant.name,
+            contractText: participant.name ? `Logic: ${participant.name}` : null,
             multiInstance,
             coupledDataStore,
             dsMultiInstance,
+            dataObjectsFileName,
           };
-          const { contractConfig, dsContractConfig } = await generateContract(contractParams);
+          const { contractConfig, dsContractConfigs } = await generateContract(contractParams);
           contracts.push(contractConfig);
-          if (dsContractConfig) contracts.push(dsContractConfig);
+          // Deduplicate: a shared (non-MI) DS may be referenced by multiple lanes;
+          // only push its contract config the first time we see that contractName.
+          dsContractConfigs.forEach(c => {
+            if (!contracts.some(existing => existing.contractName === c.contractName)) {
+              contracts.push(c);
+            }
+          });
         } else {
           // Skip empty lanes so no contract/interface/import is generated for them
           const nonEmptyLanes = lanes.filter(lane =>
@@ -533,9 +702,68 @@ async function generateContracts(definitions, instanceId) {
             findGatewaysForLane(lane).length > 0 ||
             findEventsForLane(lane).length > 0
           );
+
+          // ── Inline DS ownership map ───────────────────────────────────────────
+          // For each inline (bccoupled=true) DS, the FIRST non-empty lane to reference it
+          // is its owner and embeds the storage.  All subsequent lanes call the owner's
+          // interface for reads and writes instead of duplicating the storage.
+          // Key: dsKey (stable identifier from DS name).  Value: canonical owner contract name.
+          const sharedInlineDsOwnerMap = {}; // dsKey → canonical owner contract name (no suffix)
+          for (const ownerLane of nonEmptyLanes) {
+            const ownerDsRefs = deduplicateDataStoresByKey(findDataStoresForLane(ownerLane, process));
+            for (const ds of ownerDsRefs) {
+              const isInline = ds.bccoupled === true || ds.bccoupled === 'true';
+              if (!isInline) continue;
+              const dsKey = getDsKey(ds);
+              if (!(dsKey in sharedInlineDsOwnerMap)) {
+                sharedInlineDsOwnerMap[dsKey] = ownerLane.id.replace(/\s+/g, '') + '_Contract_' + collaboration.id;
+              }
+            }
+          }
+
           for (const lane of nonEmptyLanes) {
+            // Per-lane multi-instance: honour the lane's own bcmultiinstance attribute.
+            // If not explicitly set on the lane, inherit the participant-level flag.
+            const laneMIFromAttr = lane.bcmultiinstance === false || lane.bcmultiinstance === 'false'
+              ? false
+              : lane.bcmultiinstance === true || lane.bcmultiinstance === 'true'
+                ? true
+                : multiInstance;  // not set on the lane → inherit from participant
+            const laneInstanceSuffix = laneMIFromAttr && instanceId != null ? '_' + instanceId : '';
+
+            // Per-lane DataStore flags: only look at DataStores referenced by THIS lane's activities.
+            // A lane with no DataStore connections gets coupledDataStore=false → no inline struct and
+            // no separate DS contract generated for it.
+            const laneDsRefs = findDataStoresForLane(lane, process);
+            const firstLaneDs = laneDsRefs[0] || null;
+            const coupledDataStore = firstLaneDs
+              ? !(firstLaneDs.bccoupled === true || firstLaneDs.bccoupled === 'true')
+              : false;
+            const dsMultiInstance = firstLaneDs
+              ? (firstLaneDs.bcmultiinstance !== false && firstLaneDs.bcmultiinstance !== 'false')
+              : true;
+
+            // ── Per-lane inline DS ownership sets ──────────────────────────────
+            // Split this lane's inline DSes into owned (embed storage here) vs foreign
+            // (call the owner lane's interface instead).
+            const laneCanonicalName = lane.id.replace(/\s+/g, '') + '_Contract_' + collaboration.id;
+            const ownedInlineDsKeys = new Set();
+            const foreignInlineDsMap = {};
+            const laneDsForOwnership = deduplicateDataStoresByKey(findDataStoresForLane(lane, process));
+            for (const ds of laneDsForOwnership) {
+              const isInline = ds.bccoupled === true || ds.bccoupled === 'true';
+              if (!isInline) continue;
+              const dsKeyOwn = getDsKey(ds);
+              const owner = sharedInlineDsOwnerMap[dsKeyOwn];
+              if (owner === laneCanonicalName) {
+                ownedInlineDsKeys.add(dsKeyOwn);
+              } else {
+                foreignInlineDsMap[dsKeyOwn] = owner;
+              }
+            }
+
             const contractParams = {
-              contractName: lane.id.replace(/\s+/g, '') + '_Contract_' + collaboration.id + effectiveInstanceSuffix,
+              contractName: lane.id.replace(/\s+/g, '') + '_Contract_' + collaboration.id + laneInstanceSuffix,
               networkId,
               activities: findActivitiesForLane(lane),
               gateways: findGatewaysForLane(lane),
@@ -548,19 +776,44 @@ async function generateContracts(definitions, instanceId) {
               collaborationId: collaboration.id,
               instanceId,
               participantMultiplicities,
-              contractText: lane.name,
-              multiInstance,
+              contractText: lane.name ? `Logic: ${lane.name}` : null,
+              multiInstance: laneMIFromAttr,
               coupledDataStore,
               dsMultiInstance,
+              ownedInlineDsKeys,
+              foreignInlineDsMap,
+              dataObjectsFileName,
             };
-            const { contractConfig, dsContractConfig } = await generateContract(contractParams);
+            const { contractConfig, dsContractConfigs } = await generateContract(contractParams);
             contracts.push(contractConfig);
-            if (dsContractConfig) contracts.push(dsContractConfig);
+            // Deduplicate: a shared (non-MI) DS referenced by multiple lanes
+            // must only appear once in contracts.json.
+            dsContractConfigs.forEach(c => {
+              if (!contracts.some(existing => existing.contractName === c.contractName)) {
+                contracts.push(c);
+              }
+            });
           }
         }
       }
     }
   }
+  // ── Append the shared DataObjects struct file as a special entry ─────────────
+  // index.js (Deployement) writes this file to its contracts/ directory so Hardhat can
+  // resolve the import. No networkId → deploy and setup tasks skip it automatically.
+  if (doFileResult) {
+    contracts.push({
+      contractName:          doFileResult.fileName,
+      canonicalContractName: doFileResult.fileName,
+      contractCode:          doFileResult.fileContent,
+      contractInterface:     null,  // pure struct definitions — no interface needed
+      contractRoles:         [],
+      receiveTasks:          [],
+      dataStore:             [],
+      isSharedFile:          true,
+    });
+  }
+
   const outputPath = path.resolve('./output/contracts.json');
   fs.writeFileSync(outputPath, JSON.stringify(contracts, null, 2), 'utf8');
   console.log(`Contracts have been saved to ${outputPath}`);

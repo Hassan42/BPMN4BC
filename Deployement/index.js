@@ -449,18 +449,23 @@ app.post('/validate', async (req, res) => {
     const compileRes = await axios.post(`${COM_API_BASE_URL}/compile`, { xml, instanceId: 0 });
     contracts = compileRes.data;
 
-    // Stage 2: write temp .sol files
+    // Stage 2: write temp .sol files (canonical filenames, same as deploy flow)
     await fs.ensureDir(contractsDir);
     contracts.forEach(c => {
-      const p  = path.join(contractsDir, `${c.contractName}.sol`);
-      const pi = path.join(contractsDir, `I${c.contractName}.sol`);
-      fs.writeFileSync(p,  c.contractCode,      'utf8');
-      fs.writeFileSync(pi, c.contractInterface, 'utf8');
-      tempFiles.push(p, pi);
+      const canonicalName = c.canonicalContractName || c.contractName;
+      const p  = path.join(contractsDir, `${canonicalName}.sol`);
+      const pi = path.join(contractsDir, `I${canonicalName}.sol`);
+      fs.writeFileSync(p, c.contractCode, 'utf8');
+      tempFiles.push(p);
+      // isSharedFile entries (e.g. DataObjects_X.sol) have no interface — skip writing it
+      if (c.contractInterface) {
+        fs.writeFileSync(pi, c.contractInterface, 'utf8');
+        tempFiles.push(pi);
+      }
     });
 
-    // Stage 3: Hardhat compile only
-    const networks = [...new Set(contracts.map(c => c.networkId))];
+    // Stage 3: Hardhat compile only — filter out null networkIds (shared struct files have none)
+    const networks = [...new Set(contracts.map(c => c.networkId).filter(Boolean))];
     for (const network of networks) {
       await executeHardhatTask('compile', network);
     }
@@ -504,9 +509,17 @@ app.post('/deploy_instance', async (req, res) => {
     await fs.ensureDir(contractsDir);
 
     // Step 4: Write .sol + interface files to disk for Hardhat
+    // Both the contract and interface use the CANONICAL (no-instance-suffix) filename
+    // so all instances of the same model share a single .sol file.  The Solidity class
+    // name inside the file is also canonical (changed in the compiler), which means
+    // Hardhat compiles it once and reuses the implementation binary across instances.
+    // isSharedFile entries (e.g. DataObjects_X.sol) have no interface — skip writing it.
     contracts.forEach(contract => {
-      fs.writeFileSync(path.join(contractsDir, `${contract.contractName}.sol`), contract.contractCode, 'utf8');
-      fs.writeFileSync(path.join(contractsDir, `I${contract.contractName}.sol`), contract.contractInterface, 'utf8');
+      const canonicalName = contract.canonicalContractName || contract.contractName;
+      fs.writeFileSync(path.join(contractsDir, `${canonicalName}.sol`), contract.contractCode, 'utf8');
+      if (contract.contractInterface) {
+        fs.writeFileSync(path.join(contractsDir, `I${canonicalName}.sol`), contract.contractInterface, 'utf8');
+      }
     });
 
     // Step 4b: Pre-populate addresses for already-deployed shared contracts so the
@@ -525,21 +538,25 @@ app.post('/deploy_instance', async (req, res) => {
     });
 
     // Step 5: Initialize instance in instances.json BEFORE Hardhat tasks
-    // contractsManager reads from here during deploy/setup tasks
+    // contractsManager reads from here during deploy/setup tasks.
+    // Filter out isSharedFile entries (DataObjects_X.sol) — they have no address, no tasks,
+    // and no roles; storing them would clutter the UI and confuse the contract manager.
     const instance = {
       id: instanceId,
       modelId: modelId || null,
       name: name || `Instance #${instanceId}`,
       createdAt: new Date().toISOString(),
       bpmn: xml,
-      contracts
+      contracts: contracts.filter(c => !c.isSharedFile)
     };
     instances.push(instance);
     writeInstances(instances);
 
     // Step 6: Run Hardhat tasks — they update instances.json via contractsManager(instanceId)
-    const contractNames = contracts.map(c => c.contractName);
-    const networks = [...new Set(contracts.map(c => c.networkId))];
+    // Exclude isSharedFile entries (e.g. DataObjects_X.sol) from deploy/setup — they have no
+    // networkId and no deployable bytecode; they're pure struct-definition files for Hardhat.
+    const contractNames = contracts.filter(c => !c.isSharedFile).map(c => c.contractName);
+    const networks = [...new Set(contracts.map(c => c.networkId).filter(Boolean))];
 
     for (const network of networks) {
       await executeHardhatTask('compile', network);
@@ -553,16 +570,21 @@ app.post('/deploy_instance', async (req, res) => {
     if (afterInstance) {
       afterInstance.contracts.forEach(contract => {
         if (contract.multiInstance === false && contract.address) {
-          const alreadyRegistered = sharedRegistry.some(
+          const existingIdx = sharedRegistry.findIndex(
             e => e.contractName === contract.contractName && e.networkId === contract.networkId
           );
-          if (!alreadyRegistered) {
+          if (existingIdx === -1) {
+            // First time this shared contract is deployed — record it
             sharedRegistry.push({
-              modelId:      modelId || null,
-              contractName: contract.contractName,
-              networkId:    contract.networkId,
-              address:      contract.address
+              modelId:               modelId || null,
+              contractName:          contract.contractName,
+              networkId:             contract.networkId,
+              address:               contract.address,
+              implementationAddress: contract.implementationAddress || null
             });
+          } else if (!sharedRegistry[existingIdx].implementationAddress && contract.implementationAddress) {
+            // Backfill implementationAddress if it was missing from an older entry
+            sharedRegistry[existingIdx].implementationAddress = contract.implementationAddress;
           }
         }
       });
@@ -634,8 +656,26 @@ app.delete('/instances/:id', (req, res) => {
   if (idx === -1) {
     return res.status(404).json({ message: `Instance ${req.params.id} not found.` });
   }
+
+  const deletedInstance = instances[idx];
   instances.splice(idx, 1);
   writeInstances(instances);
+
+  // When no instances remain for this model, purge the shared-contracts registry
+  // so the next deployment deploys a fresh shared contract rather than reusing a
+  // stale on-chain address whose state (initInstance, task states) is already set.
+  if (deletedInstance.modelId !== null && deletedInstance.modelId !== undefined) {
+    const remaining = instances.filter(i => i.modelId === deletedInstance.modelId);
+    if (remaining.length === 0) {
+      const sharedRegistry = readSharedContracts();
+      const pruned = sharedRegistry.filter(e => e.modelId !== deletedInstance.modelId);
+      if (pruned.length !== sharedRegistry.length) {
+        writeSharedContracts(pruned);
+        console.log(`Purged shared-contracts registry for model ${deletedInstance.modelId} (no instances remain)`);
+      }
+    }
+  }
+
   res.status(200).json({ message: `Instance ${req.params.id} deleted.` });
 });
 

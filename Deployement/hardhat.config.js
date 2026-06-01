@@ -1,5 +1,6 @@
 
   require("@nomicfoundation/hardhat-toolbox");
+  require("@openzeppelin/hardhat-upgrades");
   require('./tasks/deployContractsTask');
   require('./tasks/queryContractsTask');
   require('./tasks/queryMappingTask');
@@ -28,6 +29,15 @@
       "url": "http://localhost:8547"
     }
   },
-  "solidity": "0.8.24"
+  "solidity": {
+    "version": "0.8.24",
+    "settings": {
+      "viaIR": true,
+      "optimizer": {
+        "enabled": true,
+        "runs": 200
+      }
+    }
+  }
 };
   

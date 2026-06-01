@@ -16,13 +16,15 @@ task('query-mapping', 'Queries a single mapping variable by key and prints the r
     const { ethers } = hre;
 
     const contractManager = createContractManager(parseInt(instanceId));
-    const address = contractManager.getContractAddressByName(contractName);
+    const contractInfo = contractManager.getContractByName(contractName);
+    const address = contractInfo ? contractInfo.address : null;
     if (!address) {
       console.error(`Contract "${contractName}" has no address.`);
       process.exit(1);
     }
 
-    const contractFactory = await ethers.getContractFactory(contractName);
+    const factoryName = contractInfo.canonicalContractName || contractName;
+    const contractFactory = await ethers.getContractFactory(factoryName);
     const contractInstance = contractFactory.attach(address);
 
     if (typeof contractInstance[varName] !== 'function') {
