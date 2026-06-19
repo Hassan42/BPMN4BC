@@ -231,8 +231,9 @@ function showError(title, message) {
 );
 
 // ── Module-level state (set once on init, used by export / totals) ───────────
-let _ethChfRate = null;
-let _instances  = [];
+let _ethChfRate       = null;
+let _instances        = [];
+let _lastAutoRunTrace = null;  // populated after each Auto-Run; null = never run
 
 // ── Experiment totals ─────────────────────────────────────────────────────────
 function renderTotals(instances) {
@@ -628,7 +629,8 @@ function generateParamValue(type, config, rand = Math.random) {
  * infinite loops when a task always reverts (e.g. wrong gateway condition or missing
  * DataStore setup).
  */
-async function runInstance(instanceId, config, instanceIndex, totalInstances, rand = Math.random) {
+// traceEntries: optional array — if provided, each executed step is pushed into it.
+async function runInstance(instanceId, config, instanceIndex, totalInstances, rand = Math.random, traceEntries = null) {
   const baseUrl = getBaseUrl();
   const MAX_ROUNDS = 200;       // hard cap on query-execute cycles
   const MAX_TASK_FAILURES = 3;  // consecutive on-chain failures before aborting
@@ -673,14 +675,17 @@ async function runInstance(instanceId, config, instanceIndex, totalInstances, ra
       }
 
       // Generate random inputs from config ranges (using the shared seeded PRNG)
-      const inputs = (task.externalParams || []).map(p => generateParamValue(p.type, config, rand));
+      const paramDefs = task.externalParams || [];
+      const inputs    = paramDefs.map(p => generateParamValue(p.type, config, rand));
 
       deployProgressLabel.textContent =
         `Auto-running ${instanceIndex}/${totalInstances} · ${task.name || task.id}…`;
 
       // ── Execute and inspect result ─────────────────────────────────────────
       let txSucceeded = false;
-      let txError = 'Unknown error';
+      let txError     = 'Unknown error';
+      let txHash      = null;
+      let gasUsed     = null;
 
       try {
         const execRes = await fetch(`${baseUrl}/api/executeTask`, {
@@ -702,6 +707,8 @@ async function runInstance(instanceId, config, instanceIndex, totalInstances, ra
           // The server returns ALL transactions; the last one is the just-executed tx.
           const lastTx = (resData.transactions || []).slice(-1)[0];
           txSucceeded = lastTx?.status === 'success';
+          txHash      = lastTx?.txHash  || null;
+          gasUsed     = lastTx?.gasUsed != null ? Number(lastTx.gasUsed) : null;
           if (!txSucceeded && lastTx) {
             txError = lastTx.error || 'Transaction reverted';
           }
@@ -710,6 +717,26 @@ async function runInstance(instanceId, config, instanceIndex, totalInstances, ra
         }
       } catch (_) {
         txError = 'Network error';
+      }
+
+      // ── Record trace entry ─────────────────────────────────────────────────
+      if (traceEntries) {
+        const entry = {
+          round:      round + 1,
+          task:       task.id,
+          taskName:   task.name || task.id,
+          contract:   contractKey,
+          network:    networkKey,
+          sender,
+          inputs:     paramDefs.map((p, i) => ({ name: p.name || `param${i}`, type: p.type, value: inputs[i] })),
+          payableEth: task.payable ? String(config.ethValue) : null,
+          result:     txSucceeded ? 'success' : 'failed',
+          txHash,
+          gasUsed,
+          error:      txSucceeded ? null : txError,
+          timestamp:  new Date().toISOString()
+        };
+        traceEntries.push(entry);
       }
 
       // ── Consecutive failure tracking ────────────────────────────────────────
@@ -769,10 +796,30 @@ arConfirmBtn.addEventListener('click', async () => {
     return;
   }
 
+  // Build the trace skeleton — populated during runInstance
+  const traceDoc = {
+    model:     { id: modelId, name: currentModel?.name || '' },
+    exportedAt: new Date().toISOString(),
+    runConfig: {
+      seed:                   seed,
+      uintMin:                config.uintMin,
+      uintMax:                config.uintMax,
+      boolProbabilityPercent: config.boolProb,
+      stringValues:           config.stringValues,
+      ethValuePerPayableTask: config.ethValue
+    },
+    instances: instances.map(inst => ({
+      instanceId:     inst.id,
+      instanceName:   inst.name || `Instance #${inst.id}`,
+      executionTrace: []
+    }))
+  };
+
   let anyError = false;
   for (let i = 0; i < instances.length; i++) {
+    const traceEntries = traceDoc.instances[i].executionTrace;
     try {
-      await runInstance(instances[i].id, config, i + 1, instances.length, rand);
+      await runInstance(instances[i].id, config, i + 1, instances.length, rand, traceEntries);
     } catch (err) {
       deployProgress.classList.add('hidden');
       showError(`Auto-Run Failed (instance ${i + 1} of ${instances.length})`, err.message);
@@ -780,6 +827,8 @@ arConfirmBtn.addEventListener('click', async () => {
       break;
     }
   }
+
+  _lastAutoRunTrace = traceDoc; // always persist even on partial runs
 
   deployProgress.classList.add('hidden');
   if (!anyError) window.location.reload();
@@ -1173,6 +1222,79 @@ exportBtn.addEventListener('click', async () => {
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = `${slug}-proof.html`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(a.href);
+});
+
+// ── Export TX Log button ──────────────────────────────────────────────────────
+const exportTxLogBtn = document.getElementById('export-txlog-btn');
+
+exportTxLogBtn.addEventListener('click', () => {
+  if (!currentModel) { showError('Export TX Log', 'Model not loaded yet.'); return; }
+  if (_instances.length === 0) { showError('Export TX Log', 'No deployed instances found.'); return; }
+
+  // Build taskId → name lookup from all instances
+  const taskNameMap = new Map();
+  _instances.forEach(inst =>
+    (inst.contracts || []).forEach(c =>
+      (c.receiveTasks || []).forEach(t => {
+        if (t.id && t.name && !taskNameMap.has(t.id)) taskNameMap.set(t.id, t.name);
+      })
+    )
+  );
+
+  const log = {
+    model:      { id: modelId, name: currentModel.name || '' },
+    exportedAt: new Date().toISOString(),
+    instances:  _instances.map(inst => ({
+      instanceId:   inst.id,
+      instanceName: inst.name || `Instance #${inst.id}`,
+      createdAt:    inst.createdAt || null,
+      transactions: (inst.transactions || []).map(tx => ({
+        timestamp:    tx.timestamp   || null,
+        task:         tx.task        || null,
+        taskName:     taskNameMap.get(tx.task) || tx.task || null,
+        contract:     tx.contractName || null,
+        network:      tx.network      || null,
+        txHash:       tx.txHash       || null,
+        gasUsed:      tx.gasUsed != null ? Number(tx.gasUsed) : null,
+        status:       tx.status       || null,
+        inputs:       tx.inputs       ?? null,
+        value:        tx.value        ?? null,
+        events:       tx.events       ?? null,
+        error:        tx.error        ?? null
+      }))
+    }))
+  };
+
+  const slug = (currentModel.name || 'log').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const blob = new Blob([JSON.stringify(log, null, 2)], { type: 'application/json' });
+  const a    = document.createElement('a');
+  a.href     = URL.createObjectURL(blob);
+  a.download = `${slug}-tx-log.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(a.href);
+});
+
+// ── Export Trace Log button ───────────────────────────────────────────────────
+const exportTraceBtn = document.getElementById('export-trace-btn');
+
+exportTraceBtn.addEventListener('click', () => {
+  if (!currentModel) { showError('Export Trace', 'Model not loaded yet.'); return; }
+  if (!_lastAutoRunTrace) {
+    showError('Export Trace', 'No trace available yet.\nRun "Auto-Run All" first to generate a trace.');
+    return;
+  }
+
+  const slug = (currentModel.name || 'trace').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const blob = new Blob([JSON.stringify(_lastAutoRunTrace, null, 2)], { type: 'application/json' });
+  const a    = document.createElement('a');
+  a.href     = URL.createObjectURL(blob);
+  a.download = `${slug}-trace.json`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
