@@ -289,16 +289,26 @@ export default class CustomPalette {
         },
         className: 'custom-palette',
       },
-      // 'BCTimer': {
-      //   group: 'BC',
-      //   imageUrl: BCSTIMER,
-      //   title: translate('Create blockchain timer event'),
-      //   action: {
-      //     dragstart: createElement("true", "IntermediateCatchEvent", "timerEvent"),
-      //     click: createElement("true", "IntermediateCatchEvent", "timerEvent")
-      //   },
-      //   className: 'custom-palette',
-      // }
+      'BCTimer': {
+        group: 'BC',
+        imageUrl: BCSTIMER,
+        title: translate('Create blockchain timer event'),
+        action: {
+          dragstart: createElement("true", "IntermediateCatchEvent", "timerEvent"),
+          click: createElement("true", "IntermediateCatchEvent", "timerEvent")
+        },
+        className: 'custom-palette',
+      },
+      'BCStartTimer': {
+        group: 'BC',
+        imageUrl: BCSTIMER,
+        title: translate('Create blockchain start timer event'),
+        action: {
+          dragstart: createElement("true", "StartEvent", "timerStartEvent"),
+          click: createElement("true", "StartEvent", "timerStartEvent")
+        },
+        className: 'custom-palette',
+      }
     };
   }
 }

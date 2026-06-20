@@ -168,6 +168,15 @@ export default class CustomRenderer extends BaseRenderer {
             height: element.height / 2,
             href: href
           }); break;
+        case "StartEvent":
+          this.bpmnRenderer.drawShape(parentNode, element);
+          bcSvg = svgCreate("image", {
+            x: 9,
+            y: 8.5,
+            width: element.width / 2,
+            height: element.height / 2,
+            href: BCTIMER
+          }); break;
         case "EndEvent":
           this.bpmnRenderer.drawShape(parentNode, element);
           var href = BCREVTHROW;
