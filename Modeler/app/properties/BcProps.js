@@ -25,15 +25,35 @@ export default function (element) {
         component: Payable
       }
     );
-  } else if (is(element, 'bpmn:IntermediateCatchEvent') && element.businessObject.bc == "true") {
+  } else if (is(element, 'bpmn:StartEvent') && element.businessObject.bc == "true" && element.businessObject.bcevent === 'timerStartEvent') {
     props.push(
       {
-        id: 'event',
+        id: 'blocks',
         element,
-        component: Event,
+        component: Blocks,
         isEdited: isTextFieldEntryEdited
       }
     );
+  } else if (is(element, 'bpmn:IntermediateCatchEvent') && element.businessObject.bc == "true") {
+    if (element.businessObject.bcevent === 'timerEvent') {
+      props.push(
+        {
+          id: 'blocks',
+          element,
+          component: Blocks,
+          isEdited: isTextFieldEntryEdited
+        }
+      );
+    } else {
+      props.push(
+        {
+          id: 'event',
+          element,
+          component: Event,
+          isEdited: isTextFieldEntryEdited
+        }
+      );
+    }
   } else if (is(element, 'bpmn:IntermediateThrowEvent') && element.businessObject.bc == "true") {
     // Event name is taken from the element name — no extra property needed
   } else if (is(element, 'bpmn:ScriptTask') && element.businessObject.bc == "true") {
@@ -375,6 +395,28 @@ function OpenCheckbox(props) {
     description=${translate('Any Ethereum address with the respective role can call the connected Receive Transaction task.')}
     getValue=${getValue}
     setValue=${setValue}
+  />`;
+}
+
+function Blocks(props) {
+  const { element, id } = props;
+
+  const modeling = useService('modeling');
+  const translate = useService('translate');
+  const debounce = useService('debounceInput');
+
+  const getValue = () => element.businessObject.bcblocks || '';
+
+  const setValue = value => modeling.updateProperties(element, { bcblocks: value });
+
+  return html`<${TextFieldEntry}
+    id=${id}
+    element=${element}
+    label=${translate('Blocks')}
+    description=${translate('Number of blocks that must pass before the following Receive Task can be called.')}
+    getValue=${getValue}
+    setValue=${setValue}
+    debounce=${debounce}
   />`;
 }
 

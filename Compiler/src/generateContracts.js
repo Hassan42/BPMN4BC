@@ -31,9 +31,43 @@ async function generateContract(contractParams) {
     contractText
   } = contractParams;
 
+  // Identify activities connected to a start event
+  const startReceiveTaskIds = process.flowElements
+    .filter(element => element.$type === 'bpmn:StartEvent') // Get start events
+    .map(startEvent => startEvent.outgoing
+      .map(flow => findReceiveTask(flow.targetRef)) // Recursively search for ReceiveTasks
+      .flat()
+    )
+    .flat();
+
+  // Build timer requirements: map taskId → { blocks, varName } for ReceiveTasks preceded by a timer event
+  const timerRequirements = {};
+  const timerStateVarDecls = [];
+  const timerConstructorInits = [];
+
+  process.flowElements.forEach(el => {
+    const isTimerStart = el.$type === 'bpmn:StartEvent' && el.bcevent === 'timerStartEvent';
+    const isTimerCatch = el.$type === 'bpmn:IntermediateCatchEvent' && el.bcevent === 'timerEvent';
+    if (!isTimerStart && !isTimerCatch) return;
+
+    const blocks = parseInt(el.bcblocks || '0', 10);
+
+    (el.outgoing || []).forEach(flow => {
+      const target = flow.targetRef;
+      if (!target || target.$type !== 'bpmn:ReceiveTask') return;
+      const taskId = target.id.replace(/\s+/g, '');
+      const varName = `timerBlock_${taskId}`;
+      timerRequirements[taskId] = { blocks, varName };
+      timerStateVarDecls.push(`uint256 public ${varName};`);
+      if (isTimerStart) {
+        timerConstructorInits.push(`${varName} = block.number;`);
+      }
+    });
+  });
+
   const { dataStoreStructs, dataStoreInitCode, dataStoreReadFunctions } = generateDataStoreStructs(process, lane);
   const dataObjectStructs = generateDataObjectStructs(process);
-  const functions = generateFunctions(activities, process, roles, collaborationId, participantMultiplicities).join('\n');
+  const functions = generateFunctions(activities, process, roles, collaborationId, participantMultiplicities, timerRequirements).join('\n');
   const gatewayFunctions = generateGateways(gateways, process, collaborationId);
   const solidityEvents = generateEvents(events);
   const emitFunctions = generateEmitFunctions(events);
@@ -44,15 +78,6 @@ async function generateContract(contractParams) {
   } else{
     customScript = lane.solidityscript || '';
   }
-
-  // Identify activities connected to a start event
-  const startReceiveTaskIds = process.flowElements
-    .filter(element => element.$type === 'bpmn:StartEvent') // Get start events
-    .map(startEvent => startEvent.outgoing
-      .map(flow => findReceiveTask(flow.targetRef)) // Recursively search for ReceiveTasks
-      .flat()
-    )
-    .flat();
 
   const receiveTasks = activities.filter(activity => activity.$type === 'bpmn:ReceiveTask');
   const receiveFunctionNames = receiveTasks.map(activity => activity.id.replace(/\s+/g, ''));
@@ -155,6 +180,8 @@ async function generateContract(contractParams) {
 
       ${multiParticipantVars}
 
+      ${timerStateVarDecls.join('\n      ')}
+
       modifier isAccessible(string memory _activity) {
           require(state[_activity] == State.Open, "Activity is not open");
 
@@ -189,6 +216,7 @@ async function generateContract(contractParams) {
           ${activityToRoleMappings}
           ${dataStoreInitCode}
           ${multiParticipantInits}
+          ${timerConstructorInits.join('\n          ')}
       }
 
       function setContracts(address[] memory addresses) public{

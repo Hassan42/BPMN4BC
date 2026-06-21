@@ -235,7 +235,7 @@ function generateScriptFunction(activity, process, collaborationId) {
  * @param {string} collaborationId - The collaboration ID.
  * @returns {string} The logic for the entry function.
  */
-function generateEntryFunction(activity, process, roles, collaborationId, participantMultiplicities = {}) {
+function generateEntryFunction(activity, process, roles, collaborationId, participantMultiplicities = {}, timerRequirements = {}) {
   const contractName = getContractNameForElement(activity, process, collaborationId);
   const senderRole = activity.bcsender?.replace(/\s+/g, '') || '';
 
@@ -587,6 +587,18 @@ function generateEntryFunction(activity, process, roles, collaborationId, partic
         }
         break;
       }
+      case 'bpmn:IntermediateCatchEvent': {
+        if (element.bcevent === 'timerEvent') {
+          (element.outgoing || []).forEach(flow => {
+            const next = flow.targetRef;
+            if (next && next.$type === 'bpmn:ReceiveTask') {
+              const nextTaskId = next.id.replace(/\s+/g, '');
+              proceedingLogic += `timerBlock_${nextTaskId} = block.number;\n`;
+            }
+          });
+        }
+        break;
+      }
       case 'bpmn:EndEvent': {
         const revertMsg = (element.name || element.id).replace(/[\r\n\t\0]/g, ' ').replace(/"/g, '').trim();
         appendState(`revert("${revertMsg}");`, alreadyGated);
@@ -625,10 +637,16 @@ function generateEntryFunction(activity, process, roles, collaborationId, partic
   const payableModifier = (activity.bcpayable === true || activity.bcpayable === 'true') ? 'payable ' : '';
   const bpmnMarker = `// @bpmn: ${activity.id} "${(activity.name || activity.id).replace(/[\r\n\t\0]/g, ' ').replace(/"/g, '').trim()}"`;
 
+  const timerReq = timerRequirements[taskId];
+  const timerCheck = timerReq
+    ? `require(block.number >= ${timerReq.varName} + ${timerReq.blocks}, "Timer has not elapsed");`
+    : '';
+
   if (isMultiParticipant) {
     return `
     ${bpmnMarker}
     function ${taskId}(${externalParams}) public ${payableModifier}isAccessible("${taskId}") {
+        ${timerCheck}
         require(!hasParticipated["${taskId}"][msg.sender], "Participated already called this activity");
         hasParticipated["${taskId}"][msg.sender] = true;
         participationCount["${taskId}"]++;
@@ -643,6 +661,7 @@ function generateEntryFunction(activity, process, roles, collaborationId, partic
   return `
     ${bpmnMarker}
     function ${taskId}(${externalParams}) public ${payableModifier}isAccessible("${taskId}") {
+        ${timerCheck}
         ${doStructCreationsCode}
         ${dataStoreAssignments}
         ${proceedingLogic}
@@ -656,7 +675,7 @@ function generateEntryFunction(activity, process, roles, collaborationId, partic
  * @param {Array} activities - The list of activities.
  * @returns {Array} The list of generated Solidity functions.
  */
-function generateFunctions(activities, process, roles, collaborationId, participantMultiplicities = {}) {
+function generateFunctions(activities, process, roles, collaborationId, participantMultiplicities = {}, timerRequirements = {}) {
   let functions = [];
 
   activities.forEach(activity => {
@@ -667,7 +686,7 @@ function generateFunctions(activities, process, roles, collaborationId, particip
         functionLogic = generateScriptFunction(activity, process, collaborationId);
         break;
       case 'bpmn:ReceiveTask':
-        functionLogic = generateEntryFunction(activity, process, roles, collaborationId, participantMultiplicities);
+        functionLogic = generateEntryFunction(activity, process, roles, collaborationId, participantMultiplicities, timerRequirements);
         break;
       default:
         throw new Error(`Activity "${activity.name || activity.id}" has an unsupported type: ${activity.$type}`);

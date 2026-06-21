@@ -204,6 +204,15 @@ CustomRules.prototype.init = function () {
       return false;
     }
 
+    // Timer events (catch + start) may only connect to a BC ReceiveTask
+    const sourceIsTimerCatch = is(source.businessObject, 'bpmn:IntermediateCatchEvent') && source.businessObject.bc === 'true' && source.businessObject.bcevent === 'timerEvent';
+    if (sourceIsTimerCatch) {
+      if (!is(target.businessObject, 'bpmn:ReceiveTask') || target.businessObject.bc !== 'true') {
+        setTimeout(() => showErrorToast('Timer events can only connect to a Receive Transaction Task.'), 0);
+        return false;
+      }
+    }
+
     // Block message flows (cross-pool connections) on BC IntermediateThrowEvents —
     // only control flow (sequence flow within the same pool) is allowed
     const sourceIsThrow = is(source.businessObject, 'bpmn:IntermediateThrowEvent') && source.businessObject.bc === 'true';

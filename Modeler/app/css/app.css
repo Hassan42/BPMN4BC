@@ -194,6 +194,14 @@ html, body, #container {
   margin: 0 auto;
 }
 
+/* BC Timer (intermediate) and BC Start Timer */
+.djs-palette .entry.custom-palette[data-action="BCTimer"] img,
+.djs-palette .entry.custom-palette[data-action="BCStartTimer"] img {
+  width: 30px !important;
+  height: 30px !important;
+  margin: 4px auto;
+}
+
 .custom-palette-label {
   font-size: 12px;
   font-weight: bold;
