@@ -961,6 +961,11 @@ $(function () {
     }
   });
 
+  $('#js-reset-view').click((e) => {
+    e.preventDefault();
+    bpmnModeler.get('canvas').zoom('fit-viewport', 'auto');
+  });
+
   $('#js-open-floating-window').click(() => {
     $('#floating-window').remove();
     renderVariablesWindow(collectDiagramData());

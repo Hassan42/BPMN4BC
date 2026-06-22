@@ -204,11 +204,13 @@ CustomRules.prototype.init = function () {
       return false;
     }
 
-    // Timer events (catch + start) may only connect to a BC ReceiveTask
+    // Timer events (catch + start) may only connect to a BC ReceiveTask or a gateway
     const sourceIsTimerCatch = is(source.businessObject, 'bpmn:IntermediateCatchEvent') && source.businessObject.bc === 'true' && source.businessObject.bcevent === 'timerEvent';
     if (sourceIsTimerCatch) {
-      if (!is(target.businessObject, 'bpmn:ReceiveTask') || target.businessObject.bc !== 'true') {
-        setTimeout(() => showErrorToast('Timer events can only connect to a Receive Transaction Task.'), 0);
+      const targetIsReceiveTask = is(target.businessObject, 'bpmn:ReceiveTask') && target.businessObject.bc === 'true';
+      const targetIsGateway = is(target.businessObject, 'bpmn:Gateway');
+      if (!targetIsReceiveTask && !targetIsGateway) {
+        setTimeout(() => showErrorToast('Timer events can only connect to a Receive Transaction Task or a gateway.'), 0);
         return false;
       }
     }

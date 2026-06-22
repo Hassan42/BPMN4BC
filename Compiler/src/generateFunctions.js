@@ -14,7 +14,8 @@ const {
   extractDataObjectVarSelections,
   extractOutputParameters,
   extractInputParameters,
-  parseReturnValues
+  parseReturnValues,
+  findReceiveTask
 } = require('./utils.js');
 
 /**
@@ -590,11 +591,10 @@ function generateEntryFunction(activity, process, roles, collaborationId, partic
       case 'bpmn:IntermediateCatchEvent': {
         if (element.bcevent === 'timerEvent') {
           (element.outgoing || []).forEach(flow => {
-            const next = flow.targetRef;
-            if (next && next.$type === 'bpmn:ReceiveTask') {
-              const nextTaskId = next.id.replace(/\s+/g, '');
+            findReceiveTask(flow.targetRef).forEach(rawId => {
+              const nextTaskId = rawId.replace(/\s+/g, '');
               proceedingLogic += `timerBlock_${nextTaskId} = block.number;\n`;
-            }
+            });
           });
         }
         break;

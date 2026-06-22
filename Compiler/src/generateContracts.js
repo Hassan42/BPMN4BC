@@ -53,15 +53,15 @@ async function generateContract(contractParams) {
     const blocks = parseInt(el.bcblocks || '0', 10);
 
     (el.outgoing || []).forEach(flow => {
-      const target = flow.targetRef;
-      if (!target || target.$type !== 'bpmn:ReceiveTask') return;
-      const taskId = target.id.replace(/\s+/g, '');
-      const varName = `timerBlock_${taskId}`;
-      timerRequirements[taskId] = { blocks, varName };
-      timerStateVarDecls.push(`uint256 public ${varName};`);
-      if (isTimerStart) {
-        timerConstructorInits.push(`${varName} = block.number;`);
-      }
+      findReceiveTask(flow.targetRef).forEach(rawId => {
+        const taskId = rawId.replace(/\s+/g, '');
+        const varName = `timerBlock_${taskId}`;
+        timerRequirements[taskId] = { blocks, varName };
+        timerStateVarDecls.push(`uint256 public ${varName};`);
+        if (isTimerStart) {
+          timerConstructorInits.push(`${varName} = block.number;`);
+        }
+      });
     });
   });
 
