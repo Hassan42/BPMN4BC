@@ -79,7 +79,7 @@ async function generateContract(contractParams) {
   const functions = generateFunctions(activities, process, roles, collaborationId, participantMultiplicities, isMultiInstance, isCoupled, instanceId, effectiveForeignInlineDsMap).join('\n');
   const gatewayFunctions = generateGateways(gateways, process, collaborationId, isMultiInstance, isCoupled, contractName, canonicalBase, effectiveForeignInlineDsMap);
   const solidityEvents = generateEvents(events);
-  const emitFunctions = generateEmitFunctions(events);
+  const emitFunctions = generateEmitFunctions(events, isMultiInstance);
 
   let customScript;
   if (lanes.length == 0){

@@ -68,10 +68,16 @@ function generateEvents(events) {
  * Generates public emit_* wrapper functions for IntermediateThrowEvents.
  * The wrapper accepts the same params and emits the event.
  *
- * @param {Array} events
+ * When isMultiInstance is false (shared/MI=false contract), a leading
+ * `uint256` parameter is prepended so cross-contract callers can forward
+ * the current instanceId.  It is unnamed (commented out) to avoid an
+ * "unused parameter" Solidity warning since the emit body does not use it.
+ *
+ * @param {Array}   events
+ * @param {boolean} isMultiInstance - false for shared (MI=false) contracts
  * @returns {string}
  */
-function generateEmitFunctions(events) {
+function generateEmitFunctions(events, isMultiInstance = true) {
   return events.map(event => {
     if (event.$type !== 'bpmn:IntermediateThrowEvent') return '';
 
@@ -79,7 +85,9 @@ function generateEmitFunctions(events) {
     const params = getThrowEventParams(event);
     // Prefix all parameter names with _ to avoid collision when a param has the
     // same name as the event itself (e.g. event "test" with param "test").
-    const paramList = params.map(p => `${p.type} _${p.name}`).join(', ');
+    const dataParamList = params.map(p => `${p.type} _${p.name}`).join(', ');
+    const instancePrefix = !isMultiInstance ? 'uint256 /* instanceId */' : '';
+    const paramList = [instancePrefix, dataParamList].filter(Boolean).join(', ');
     const argList  = params.map(p => `_${p.name}`).join(', ');
 
     return `// @bpmn: ${event.id} "${sanitizeName(event.name || event.id)}"\nfunction emit_${eventName}(${paramList}) public {\n    emit ${eventName}(${argList});\n}`;

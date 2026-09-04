@@ -125,7 +125,8 @@ function generateDataStoreAssignments(activity, collaborationId, multiInstance =
           const ownerContractName = foreignInlineDsMap[dsKey];
           const instanceKeyed = !dsIsMultiInstance && !dsShared;
           const instArg = instanceKeyed ? (multiInstance ? '$.processInstanceId, ' : 'instanceId, ') : '';
-          lines.push(`I${ownerContractName}($.contracts["${ownerContractName}"]).set${capitalize(sel.varname)}_${dsKey}(${instArg}${keyExpr}, ${valueExpr});`);
+          const ownerAddr128 = !multiInstance ? `$.contracts[instanceId]["${ownerContractName}"]` : `$.contracts["${ownerContractName}"]`;
+          lines.push(`I${ownerContractName}(${ownerAddr128}).set${capitalize(sel.varname)}_${dsKey}(${instArg}${keyExpr}, ${valueExpr});`);
         } else if (!multiInstance) {
           lines.push(`$.${sel.varname}_${dsKey}[instanceId][${keyExpr}] = ${valueExpr};`);
         } else {
@@ -149,7 +150,8 @@ function generateDataStoreAssignments(activity, collaborationId, multiInstance =
           const ownerContractName = foreignInlineDsMap[dsKey];
           const instanceKeyed = !dsIsMultiInstance && !dsShared;
           const instArg = instanceKeyed ? (multiInstance ? '$.processInstanceId, ' : 'instanceId, ') : '';
-          lines.push(`I${ownerContractName}($.contracts["${ownerContractName}"]).set${capitalize(sel.varname)}_${dsKey}(${instArg}${value});`);
+          const ownerAddr152 = !multiInstance ? `$.contracts[instanceId]["${ownerContractName}"]` : `$.contracts["${ownerContractName}"]`;
+          lines.push(`I${ownerContractName}(${ownerAddr152}).set${capitalize(sel.varname)}_${dsKey}(${instArg}${value});`);
         } else if (!multiInstance) {
           lines.push(`$.instanceData_${dsKey}[instanceId].${sel.varname} = ${value};`);
         } else {
@@ -326,7 +328,8 @@ function generateScriptFunction(activity, process, collaborationId, multiInstanc
       // Foreign inline DS: cross-lane getter call
       const instanceKeyed = !dIsMultiInstance && !dShared;
       const instArg = instanceKeyed ? (multiInstance ? '$.processInstanceId, ' : 'instanceId, ') : '';
-      return `I${ownerContractName}($.contracts["${ownerContractName}"]).get${capitalize(varname)}_${dKey}(${instArg}${keyExpr})`;
+      const ownerAddr329 = !multiInstance ? `$.contracts[instanceId]["${ownerContractName}"]` : `$.contracts["${ownerContractName}"]`;
+      return `I${ownerContractName}(${ownerAddr329}).get${capitalize(varname)}_${dKey}(${instArg}${keyExpr})`;
     }
     // Owned inline DS: direct MainStorage access
     if (!multiInstance) return `$.${varname}_${dKey}[instanceId][${keyExpr}]`;
@@ -498,7 +501,8 @@ function generateEntryFunction(activity, process, roles, collaborationId, partic
       // Foreign inline DS: cross-lane getter call on the owning lane's contract
       const instanceKeyed = !dIsMultiInstance && !dShared;
       const instArg = instanceKeyed ? (multiInstance ? '$.processInstanceId, ' : 'instanceId, ') : '';
-      return `I${ownerContractName}($.contracts["${ownerContractName}"]).get${capitalize(varname)}_${dKey}(${instArg}${keyExpr})`;
+      const ownerAddr503 = !multiInstance ? `$.contracts[instanceId]["${ownerContractName}"]` : `$.contracts["${ownerContractName}"]`;
+      return `I${ownerContractName}(${ownerAddr503}).get${capitalize(varname)}_${dKey}(${instArg}${keyExpr})`;
     }
     // Owned inline DS: direct MainStorage access
     if (!multiInstance) return `$.${varname}_${dKey}[instanceId][${keyExpr}]`;
@@ -551,7 +555,8 @@ function generateEntryFunction(activity, process, roles, collaborationId, partic
       // Foreign inline DS: cross-lane getter call on the owning lane's contract
       const instanceKeyed = !dsIsMultiInstance && !dsShared;
       const instArg = instanceKeyed ? (multiInstance ? '$.processInstanceId' : 'instanceId') : '';
-      return `I${ownerContractName}($.contracts["${ownerContractName}"]).get${capitalize(varname)}_${dsKey}(${instArg})`;
+      const ownerAddr554 = !multiInstance ? `$.contracts[instanceId]["${ownerContractName}"]` : `$.contracts["${ownerContractName}"]`;
+      return `I${ownerContractName}(${ownerAddr554}).get${capitalize(varname)}_${dsKey}(${instArg})`;
     }
     // Owned inline DS: direct MainStorage access
     if (!multiInstance) return `$.instanceData_${dsKey}[instanceId].${varname}`;
@@ -727,7 +732,7 @@ function generateEntryFunction(activity, process, roles, collaborationId, partic
           branchProceedingElements.forEach(branchElement => processElement(branchElement, alreadyGated));
         } else {
           const xorFunctionName = isCrossContract
-            ? `I${elementContractName}($.contracts["${elementContractName}"]).checkXOR_${element.id}`
+            ? `I${elementContractName}(${contractsAddr(elementContractName)}).checkXOR_${element.id}`
             : `checkXOR_${element.id}`;
 
           // Build args: DO reads (structs) + selected DS read vars
@@ -854,9 +859,12 @@ function generateEntryFunction(activity, process, roles, collaborationId, partic
           const eventArgs = !targetMI
             ? (args ? `${callerInstanceId}, ${args}` : callerInstanceId)
             : args;
-          proceedingLogic += `I${elementContractName}($.contracts["${elementContractName}"]).emit_${eventName}(${eventArgs});\n`;
+          proceedingLogic += `I${elementContractName}(${contractsAddr(elementContractName)}).emit_${eventName}(${eventArgs});\n`;
         } else {
-          proceedingLogic += `emit_${eventName}(${args});\n`;
+          const localEventArgs = !multiInstance
+            ? (args ? `instanceId, ${args}` : 'instanceId')
+            : args;
+          proceedingLogic += `emit_${eventName}(${localEventArgs});\n`;
         }
         break;
       }
