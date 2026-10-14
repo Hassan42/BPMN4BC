@@ -34,6 +34,7 @@ module.exports = {
     new CopyWebpackPlugin({
       patterns: [
         { from: 'assets/**', to: 'vendor/bpmn-js', context: 'node_modules/bpmn-js/dist/' },
+        { from: 'dist/assets/properties-panel.css', to: 'vendor/properties-panel/properties-panel.css', context: 'node_modules/@bpmn-io/properties-panel/' },
         { from: '**/*.{html,css}', context: 'app/' }  // Ensure HTML/CSS files are copied
       ]
     })
