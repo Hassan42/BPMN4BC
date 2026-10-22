@@ -927,6 +927,16 @@ function generateReport(model, instances, ethChfRate, compiledContracts = null) 
       </tr>`;
     }).join('');
 
+    const instDeployRows = (inst.contracts || [])
+      .filter(c => (Number(c.deployGas) || 0) > 0)
+      .map(c => {
+        const lbl = (c.contractText && c.contractText.trim()) ? c.contractText : c.contractName;
+        return `<tr>
+          <td>${esc(lbl)}</td>
+          <td class="num">${fmt(Number(c.deployGas))}</td>
+        </tr>`;
+      }).join('');
+
     const txRows = (inst.transactions || []).map(tx => {
       const name = taskNameMap.get(tx.task) || tx.task || '–';
       const gas  = tx.gasUsed ? fmt(tx.gasUsed) : '–';
@@ -954,6 +964,12 @@ function generateReport(model, instances, ethChfRate, compiledContracts = null) 
           <div class="sub-lbl">Contract Addresses</div>
           <table><thead><tr><th>Contract</th><th>Proxy Address</th><th>Implementation</th></tr></thead>
           <tbody>${addrRows}</tbody></table>
+        </div>` : ''}
+        ${instDeployRows ? `
+        <div class="sub-sec">
+          <div class="sub-lbl">Deployment Gas</div>
+          <table><thead><tr><th>Contract</th><th style="text-align:right">Gas</th></tr></thead>
+          <tbody>${instDeployRows}</tbody></table>
         </div>` : ''}
         <div class="sub-sec">
           <div class="sub-lbl">Transaction Log</div>

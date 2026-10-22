@@ -127,7 +127,7 @@ function generateDataStoreAssignments(activity, collaborationId, multiInstance =
           const instArg = instanceKeyed ? (multiInstance ? '$.processInstanceId, ' : 'instanceId, ') : '';
           const ownerAddr128 = !multiInstance ? `$.contracts[instanceId]["${ownerContractName}"]` : `$.contracts["${ownerContractName}"]`;
           lines.push(`I${ownerContractName}(${ownerAddr128}).set${capitalize(sel.varname)}_${dsKey}(${instArg}${keyExpr}, ${valueExpr});`);
-        } else if (!multiInstance) {
+        } else if (!multiInstance && !dsShared) {
           lines.push(`$.${sel.varname}_${dsKey}[instanceId][${keyExpr}] = ${valueExpr};`);
         } else {
           lines.push(`$.${sel.varname}_${dsKey}[${keyExpr}] = ${valueExpr};`);
@@ -152,7 +152,7 @@ function generateDataStoreAssignments(activity, collaborationId, multiInstance =
           const instArg = instanceKeyed ? (multiInstance ? '$.processInstanceId, ' : 'instanceId, ') : '';
           const ownerAddr152 = !multiInstance ? `$.contracts[instanceId]["${ownerContractName}"]` : `$.contracts["${ownerContractName}"]`;
           lines.push(`I${ownerContractName}(${ownerAddr152}).set${capitalize(sel.varname)}_${dsKey}(${instArg}${value});`);
-        } else if (!multiInstance) {
+        } else if (!multiInstance && !dsShared) {
           lines.push(`$.instanceData_${dsKey}[instanceId].${sel.varname} = ${value};`);
         } else {
           lines.push(`$.dataStore_${dsKey}.${sel.varname} = ${value};`);
@@ -332,7 +332,7 @@ function generateScriptFunction(activity, process, collaborationId, multiInstanc
       return `I${ownerContractName}(${ownerAddr329}).get${capitalize(varname)}_${dKey}(${instArg}${keyExpr})`;
     }
     // Owned inline DS: direct MainStorage access
-    if (!multiInstance) return `$.${varname}_${dKey}[instanceId][${keyExpr}]`;
+    if (!multiInstance && !dShared) return `$.${varname}_${dKey}[instanceId][${keyExpr}]`;
     return `$.${varname}_${dKey}[${keyExpr}]`;
   };
 
@@ -505,7 +505,7 @@ function generateEntryFunction(activity, process, roles, collaborationId, partic
       return `I${ownerContractName}(${ownerAddr503}).get${capitalize(varname)}_${dKey}(${instArg}${keyExpr})`;
     }
     // Owned inline DS: direct MainStorage access
-    if (!multiInstance) return `$.${varname}_${dKey}[instanceId][${keyExpr}]`;
+    if (!multiInstance && !dShared) return `$.${varname}_${dKey}[instanceId][${keyExpr}]`;
     return `$.${varname}_${dKey}[${keyExpr}]`;
   };
 
@@ -559,7 +559,7 @@ function generateEntryFunction(activity, process, roles, collaborationId, partic
       return `I${ownerContractName}(${ownerAddr554}).get${capitalize(varname)}_${dsKey}(${instArg})`;
     }
     // Owned inline DS: direct MainStorage access
-    if (!multiInstance) return `$.instanceData_${dsKey}[instanceId].${varname}`;
+    if (!multiInstance && !dsShared) return `$.instanceData_${dsKey}[instanceId].${varname}`;
     return `$.dataStore_${dsKey}.${varname}`;
   };
 

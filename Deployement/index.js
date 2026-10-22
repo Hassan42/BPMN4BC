@@ -580,11 +580,17 @@ app.post('/deploy_instance', async (req, res) => {
               contractName:          contract.contractName,
               networkId:             contract.networkId,
               address:               contract.address,
-              implementationAddress: contract.implementationAddress || null
+              implementationAddress: contract.implementationAddress || null,
+              deployGas:             contract.deployGas || 0
             });
-          } else if (!sharedRegistry[existingIdx].implementationAddress && contract.implementationAddress) {
-            // Backfill implementationAddress if it was missing from an older entry
-            sharedRegistry[existingIdx].implementationAddress = contract.implementationAddress;
+          } else {
+            // Upsert: update address and deployGas in case this was a re-deploy after stale detection
+            sharedRegistry[existingIdx].address = contract.address;
+            sharedRegistry[existingIdx].implementationAddress =
+              contract.implementationAddress || sharedRegistry[existingIdx].implementationAddress;
+            if (contract.deployGas > 0) {
+              sharedRegistry[existingIdx].deployGas = contract.deployGas;
+            }
           }
         }
       });

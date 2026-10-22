@@ -137,7 +137,7 @@ function generateXORGateway(gateway, process, collaborationId, multiInstance = t
             return `I${ownerContractName}(${gatewayContractsAddr}).get${capitalize(varname)}_${dKey}(${instArg}${keyExpr})`;
         }
         // Owned inline DS: direct MainStorage access
-        if (!multiInstance) return `$.${varname}_${dKey}[instanceId][${keyExpr}]`;
+        if (!multiInstance && !dShared) return `$.${varname}_${dKey}[instanceId][${keyExpr}]`;
         return `$.${varname}_${dKey}[${keyExpr}]`;
     };
 

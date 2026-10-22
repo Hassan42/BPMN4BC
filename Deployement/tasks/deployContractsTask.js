@@ -62,16 +62,20 @@ task('deploy-contracts', 'Deploys all contracts and updates contracts.json')
 
             let existingAddress = contractInfo.address || null;
             let existingImplAddress = contractInfo.implementationAddress || null;
+            let existingDeployGas = 0;
 
-            if (!existingAddress && contractInfo.multiInstance === false) {
-                // Tier 2: sharedContracts.json registry
+            if (contractInfo.multiInstance === false) {
+                // Always look up registry to get stored deployGas and fill address gap (Tier 2)
                 const regEntry = sharedRegistry.find(
                     e => e.contractName === contractName && e.networkId === contractNetworkId
                 );
                 if (regEntry) {
-                    existingAddress = regEntry.address;
-                    existingImplAddress = regEntry.implementationAddress || null;
-                    console.log(`[Tier 2] Found shared proxy for ${contractName} in sharedContracts.json: ${existingAddress}`);
+                    existingDeployGas = regEntry.deployGas || 0;
+                    if (!existingAddress) {
+                        existingAddress = regEntry.address;
+                        existingImplAddress = regEntry.implementationAddress || null;
+                        console.log(`[Tier 2] Found shared proxy for ${contractName} in sharedContracts.json: ${existingAddress}`);
+                    }
                 }
 
                 // Tier 3: scan instances.json for any other instance that already deployed this contract
@@ -87,6 +91,7 @@ task('deploy-contracts', 'Deploys all contracts and updates contracts.json')
                             if (found) {
                                 existingAddress = found.address;
                                 existingImplAddress = found.implementationAddress || null;
+                                if (!existingDeployGas && found.deployGas) existingDeployGas = found.deployGas;
                                 console.log(`[Tier 3] Found shared proxy for ${contractName} in instance ${inst.id}: ${existingAddress}`);
                                 break;
                             }
@@ -96,12 +101,45 @@ task('deploy-contracts', 'Deploys all contracts and updates contracts.json')
             }
 
             if (existingAddress) {
-                console.log(`Reusing existing proxy for ${contractName} at ${existingAddress}. Skipping deployment.`);
-                contractManager.updateContractAddress(contractName, existingAddress, contractNetworkId);
-                if (existingImplAddress) {
-                    contractManager.updateImplementationAddress(contractName, existingImplAddress, contractNetworkId);
+                // On-chain existence check — guards against stale entries after Ganache reset
+                const code = await ethers.provider.getCode(existingAddress);
+                if (code === '0x') {
+                    // Stale address (contract no longer on-chain) — fall through to fresh deploy
+                    console.log(`Stale address for ${contractName} (no bytecode on-chain) — deploying fresh.`);
+                    existingAddress = null;
+                    existingImplAddress = null;
+                    existingDeployGas = 0;
+                } else {
+                    // Valid on-chain — reuse
+                    console.log(`Reusing existing proxy for ${contractName} at ${existingAddress}. Skipping deployment.`);
+                    contractManager.updateContractAddress(contractName, existingAddress, contractNetworkId);
+                    if (existingImplAddress) {
+                        contractManager.updateImplementationAddress(contractName, existingImplAddress, contractNetworkId);
+                    }
+                    // Attribution: give stored deployGas to the first instance of this model
+                    // that hasn't had it attributed yet, so the proof report shows costs correctly
+                    // even when shared contracts are reused from a prior deployment session.
+                    if (existingDeployGas > 0) {
+                        const instancesPath = path.resolve(__dirname, '../instances.json');
+                        const allInst = JSON.parse(fs.readFileSync(instancesPath, 'utf8'));
+                        const currentInst = allInst.find(i => i.id === parseInt(instanceId));
+                        const currentModelId = currentInst ? currentInst.modelId : null;
+                        const alreadyAttributed = allInst.some(inst =>
+                            inst.id !== parseInt(instanceId) &&
+                            inst.modelId === currentModelId &&
+                            (inst.contracts || []).some(c =>
+                                c.contractName === contractName &&
+                                c.networkId === contractNetworkId &&
+                                (c.deployGas || 0) > 0
+                            )
+                        );
+                        if (!alreadyAttributed) {
+                            contractManager.updateDeployGas(contractName, existingDeployGas, contractNetworkId);
+                            console.log(`[Attribution] Deploy gas ${existingDeployGas} for ${contractName} → instance ${instanceId}`);
+                        }
+                    }
+                    continue;
                 }
-                continue;
             }
 
             // The Solidity class name (and .sol filename) is the canonical name — no instance suffix.
@@ -135,12 +173,10 @@ task('deploy-contracts', 'Deploys all contracts and updates contracts.json')
             try {
                 contractManager.updateContractAddress(contractName, proxyAddress, contractNetworkId);
 
-                // Store implementation address so the UI can display it alongside the proxy
-                const implAddress = await upgrades.erc1967.getImplementationAddress(proxyAddress);
-                contractManager.updateImplementationAddress(contractName, implAddress, contractNetworkId);
-
                 // ── Capture ALL deployment gas (proxy tx + implementation tx if newly deployed) ──
-                // Start with the proxy transaction gas (always present)
+                // Do this BEFORE the implementation-address lookup so a lookup failure
+                // doesn't silently zero out deployGas (some contract types don't expose
+                // the ERC1967 impl slot and cause getImplementationAddress to throw).
                 let totalDeployGas = 0;
                 const deployTx = proxy.deploymentTransaction();
                 if (deployTx) {
@@ -148,14 +184,24 @@ task('deploy-contracts', 'Deploys all contracts and updates contracts.json')
                     totalDeployGas += Number(receipt.gasUsed);
                 }
 
+                // Try to resolve the implementation address for display purposes.
+                // Isolated in its own try-catch so a failure here never blocks gas recording.
+                let implAddress = null;
+                try {
+                    implAddress = await upgrades.erc1967.getImplementationAddress(proxyAddress);
+                    contractManager.updateImplementationAddress(contractName, implAddress, contractNetworkId);
+                } catch (implErr) {
+                    console.warn(`  Could not get implementation address for ${contractName}: ${implErr.message}`);
+                }
+
                 // Scan blocks mined during deployProxy for a contract-creation tx that
                 // produced the implementation address.  This only fires on the first instance
                 // (subsequent instances reuse the cached impl → no creation tx in those blocks).
                 //
                 // NOTE: on Ganache, getBlock(n, true) returns block.transactions as string[]
-                // (tx hashes), not TransactionResponse[].  We must handle both forms and
-                // must NOT rely on tx.to === null for creation detection — use
-                // receipt.contractAddress === implAddress as the sole discriminator.
+                // (tx hashes), not TransactionResponse[].  We must handle both forms.
+                // If implAddress is known, match by contractAddress === implAddress.
+                // If not (lookup failed), match any contract-creation tx that isn't the proxy itself.
                 const blockAfter = await ethers.provider.getBlockNumber();
                 const proxyTxHash = deployTx ? deployTx.hash : null;
                 for (let b = blockBefore + 1; b <= blockAfter; b++) {
@@ -168,13 +214,14 @@ task('deploy-contracts', 'Deploys all contracts and updates contracts.json')
                         if (txHash === proxyTxHash) continue; // already counted above
                         try {
                             const txReceipt = await ethers.provider.getTransactionReceipt(txHash);
-                            if (
-                                txReceipt &&
-                                txReceipt.contractAddress &&
-                                txReceipt.contractAddress.toLowerCase() === implAddress.toLowerCase()
-                            ) {
-                                totalDeployGas += Number(txReceipt.gasUsed);
-                                console.log(`  + Implementation deployment gas: ${txReceipt.gasUsed} (tx ${txHash})`);
+                            if (txReceipt && txReceipt.contractAddress) {
+                                const isImplTx = implAddress
+                                    ? txReceipt.contractAddress.toLowerCase() === implAddress.toLowerCase()
+                                    : txReceipt.contractAddress.toLowerCase() !== proxyAddress.toLowerCase();
+                                if (isImplTx) {
+                                    totalDeployGas += Number(txReceipt.gasUsed);
+                                    console.log(`  + Implementation deployment gas: ${txReceipt.gasUsed} (tx ${txHash})`);
+                                }
                             }
                         } catch (_) { /* skip unreadable txs */ }
                     }
@@ -183,7 +230,7 @@ task('deploy-contracts', 'Deploys all contracts and updates contracts.json')
                 const currentDeployGas = contractInfo.deployGas || 0;
                 contractManager.updateDeployGas(contractName, currentDeployGas + totalDeployGas, contractNetworkId);
 
-                console.log(`Added ${contractName} to contracts.json (proxy: ${proxyAddress}, impl: ${implAddress}, deployGas: ${totalDeployGas})`);
+                console.log(`Added ${contractName} to contracts.json (proxy: ${proxyAddress}, impl: ${implAddress || 'unknown'}, deployGas: ${totalDeployGas})`);
             } catch (error) {
                 console.error(`Error adding ${contractName} to contracts.json:`, error.message);
             }
