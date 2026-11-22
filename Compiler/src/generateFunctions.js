@@ -18,7 +18,11 @@ const {
   extractInputParameters,
   parseReturnValues,
   getDsKey,
-  dsCallParts
+  dsCallParts,
+  isSequentialMI,
+  isStandardLoop,
+  isOpenTask,
+  requiredParticipantCount
 } = require('./utils.js');
 
 /**
@@ -380,7 +384,9 @@ function generateEntryFunction(activity, process, roles, collaborationId, partic
   const canonicalBase = contractName; // canonical = no suffix
   const senderRole = activity.bcsender?.replace(/\s+/g, '') || '';
 
-  if (!senderRole) {
+  // An open receive transaction task has no sender: any address may call it
+  const openTask = isOpenTask(activity);
+  if (!senderRole && !openTask) {
     throw new Error(`Sender is not defined in activity "${activity.name || activity.id}".`);
   }
 
@@ -481,8 +487,23 @@ function generateEntryFunction(activity, process, roles, collaborationId, partic
 
   // Compute multiplicity before processElement is defined so it is available as a closure variable
   const taskId = activity.id.replace(/\s+/g, '');
-  const senderKey = (senderRole || '').replace(/\s+/g, '');
-  const isMultiParticipant = (participantMultiplicities[senderKey] || 0) > 1;
+  // Sequential multi-instance marker: every connected participant (each instance of a
+  // multi-instance participant) must call the task once before it completes.
+  // Without the marker, any one connected participant finishes it with a single call.
+  const isMultiParticipant = !openTask && isSequentialMI(activity)
+    && requiredParticipantCount(activity, participantMultiplicities) > 1;
+
+  // Loop marker: the task stays open and is called again (each call a new transaction)
+  // as long as its loop condition holds; the rest of the transaction boundary runs once,
+  // on the call where the condition no longer holds.
+  let loopGuard = '';
+  if (isStandardLoop(activity)) {
+    const loopCondition = (activity.bcloopcondition || '').trim();
+    if (!loopCondition) {
+      throw new Error(`Receive task "${activity.name || activity.id}" has a loop marker but no loop condition.`);
+    }
+    loopGuard = `if (${generateExpression(loopCondition, collaborationId)}) { return; }`;
+  }
 
   // Reads a specific mapping key from a DS (inline local var or interface call).
   const dsReadExprMapping = (varname, ds, keyExpr) => {
@@ -925,6 +946,7 @@ function generateEntryFunction(activity, process, roles, collaborationId, partic
         ${doStructCreationsCode}
         ${mappingReadDecls}
         ${dataStoreAssignments}
+        ${loopGuard}
         ${proceedingLogic}
         ${!hasNextReceiveTask && !hasLoop ? `${participationGate} { ${stateRef(taskId)} = State.Completed; }` : ''}
     }
@@ -938,6 +960,7 @@ function generateEntryFunction(activity, process, roles, collaborationId, partic
         ${doStructCreationsCode}
         ${mappingReadDecls}
         ${dataStoreAssignments}
+        ${loopGuard}
         ${proceedingLogic}
         ${!hasNextReceiveTask && !hasLoop ? `${stateRef(taskId)} = State.Completed;` : ''}
     }

@@ -393,7 +393,8 @@ const getContractNameForElement = (element, process, collaborationId, instanceId
 
 const extractRolesFromCollaboration = (collaboration) => {
     if (!collaboration || !collaboration.participants) return [];
-    return collaboration.participants.filter(participant => participant.bc !== "true").map(participant => {
+    // Pools with Blockchain Access "None" are off-chain entities: they never send transactions, so they get no role
+    return collaboration.participants.filter(participant => participant.bc !== "true" && participant.bcaccess !== 'none').map(participant => {
         return {
             role: participant.name || participant.id,
             address: '',
@@ -419,6 +420,41 @@ const extractParticipantMultiplicities = (collaboration) => {
         });
     return map;
 };
+
+// ── Receive-task markers and senders ─────────────────────────────────────────
+
+/** True when the task carries the sequential multi-instance marker. */
+const isSequentialMI = (task) => {
+    const lc = task && task.loopCharacteristics;
+    return !!lc && lc.$type === 'bpmn:MultiInstanceLoopCharacteristics' && (lc.isSequential === true || lc.isSequential === 'true');
+};
+
+/** True when the task carries the standard loop marker. */
+const isStandardLoop = (task) => {
+    const lc = task && task.loopCharacteristics;
+    return !!lc && lc.$type === 'bpmn:StandardLoopCharacteristics';
+};
+
+/** True for an open receive transaction task (anyone may call it). */
+const isOpenTask = (task) => !!task && (task.bcopen === true || task.bcopen === 'true');
+
+/** Sender roles of a receive task (bcsender is a single name or a JSON array). */
+const getSenderRoles = (task) => {
+    const raw = task && task.bcsender;
+    if (!raw) return [];
+    if (typeof raw === 'string' && raw.startsWith('[') && raw.endsWith(']')) return JSON.parse(raw);
+    return [raw];
+};
+
+/**
+ * Number of distinct addresses that must call a sequential multi-instance receive task:
+ * every connected participant, counting each instance of a multi-instance participant.
+ */
+const requiredParticipantCount = (task, participantMultiplicities = {}) =>
+    getSenderRoles(task).reduce((sum, role) => {
+        const key = (role || '').replace(/\s+/g, '');
+        return sum + Math.max(participantMultiplicities[key] || 1, 1);
+    }, 0);
 
 const generateContractConfig = ({
     contractName,
@@ -1020,6 +1056,11 @@ module.exports = {
     getTaskDataObjectWrites,
     extractDataObjectVarSelections,
     extractParticipantMultiplicities,
+    isSequentialMI,
+    isStandardLoop,
+    isOpenTask,
+    getSenderRoles,
+    requiredParticipantCount,
     isElementMultiInstance,
     dsCallParts,
     deduplicateDataStoresByKey,

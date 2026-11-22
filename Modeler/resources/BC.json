@@ -93,6 +93,11 @@
             "type": "String"
           },
           {
+            "name": "bcloopcondition",
+            "isAttr": true,
+            "type": "String"
+          },
+          {
             "name": "bcmultiinstance",
             "isAttr": true,
             "type": "Boolean"

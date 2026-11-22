@@ -34,6 +34,16 @@ export default function (element) {
         component: Payable
       }
     );
+    // Loop marker: the task repeats while its loop condition holds
+    const loop = element.businessObject.loopCharacteristics;
+    if (loop && loop.$type === 'bpmn:StandardLoopCharacteristics') {
+      props.push({
+        id: 'loopCondition',
+        element,
+        component: LoopCondition,
+        isEdited: isTextFieldEntryEdited
+      });
+    }
   } else if (is(element, 'bpmn:IntermediateCatchEvent') && element.businessObject.bc == "true") {
     props.push(
       {
@@ -155,6 +165,30 @@ function Sender(props) {
     element=${element}
     description=${translate('Particiapant responsible to send this transaction.')}
     label=${translate('Sender')}
+    getValue=${getValue}
+    setValue=${setValue}
+    debounce=${debounce}
+  />`;
+}
+
+function LoopCondition(props) {
+  const { element, id } = props;
+
+  const modeling = useService('modeling');
+  const translate = useService('translate');
+  const debounce = useService('debounceInput');
+
+  const getValue = () => element.businessObject.bcloopcondition || '';
+
+  const setValue = value => modeling.updateProperties(element, {
+    bcloopcondition: value || undefined
+  });
+
+  return html`<${TextFieldEntry}
+    id=${id}
+    element=${element}
+    description=${translate('Solidity condition checked after each call. While it holds, the task stays open for another call; once it is false, the process continues.')}
+    label=${translate('Loop Condition')}
     getValue=${getValue}
     setValue=${setValue}
     debounce=${debounce}

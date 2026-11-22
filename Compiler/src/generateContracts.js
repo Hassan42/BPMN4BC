@@ -1,4 +1,4 @@
-const { getParentLaneOrPool, generateContractConfig, findCollaboration, findProcessForParticipant, findLanesForProcess, findActivitiesForLane, findActivitiesForProcess, findGatewaysForProcess, findGatewaysForLane, formatSolidityCode, findEventsForProcess, findEventsForLane, extractRolesFromCollaboration, extractParticipantMultiplicities, findReceiveTask, findDataStoreReferencesForProcess, findDataStoresForLane, getDsKey, deduplicateDataStoresByKey, extractDataStoreVariables, erc7201Slot } = require('./utils.js');
+const { getParentLaneOrPool, generateContractConfig, findCollaboration, findProcessForParticipant, findLanesForProcess, findActivitiesForLane, findActivitiesForProcess, findGatewaysForProcess, findGatewaysForLane, formatSolidityCode, findEventsForProcess, findEventsForLane, extractRolesFromCollaboration, extractParticipantMultiplicities, isSequentialMI, isOpenTask, getSenderRoles, requiredParticipantCount, findReceiveTask, findDataStoreReferencesForProcess, findDataStoresForLane, getDsKey, deduplicateDataStoresByKey, extractDataStoreVariables, erc7201Slot } = require('./utils.js');
 const { generateFunctions, generateFunctionSignatures } = require('./generateFunctions.js');
 const { generateDataStoreStructs, generateDataObjectStructs, generateDataStoreContract, generateDataObjectsFile } = require('./generateStorage.js');
 const { generateGateways } = require('./generateGateways.js');
@@ -120,16 +120,14 @@ async function generateContract(contractParams) {
       // Return the mapping string for non-ScriptTask activities
       if (activity.$type === "bpmn:ScriptTask") { return '';}
 
+      // Open receive task → no role assignment (empty activitytoRole array grants access to all)
+      if (isOpenTask(activity)) return '';
+
       // Open participant → skip role assignment (empty activitytoRole array grants access to all)
       const senderKey = (activity.bcsender || '').replace(/\s+/g, '');
       if (openParticipantNames.has(senderKey)) return '';
 
-      let participantsArray;
-      if (typeof activity.bcsender === 'string' && activity.bcsender.startsWith('[') && activity.bcsender.endsWith(']')) {
-        participantsArray = JSON.parse(activity.bcsender);
-      } else {
-        participantsArray = [activity.bcsender];
-      }
+      const participantsArray = getSenderRoles(activity);
 
       // Expand multi-participant roles: "Customer" with N=3 → ["Customer_1","Customer_2","Customer_3"]
       const expandedParticipants = participantsArray.flatMap(p => {
@@ -159,22 +157,20 @@ async function generateContract(contractParams) {
   }).join('\n');
 
   // ── Multi-participant: requiredParticipants init + state variable block ────
+  // Only receive tasks with the sequential multi-instance marker require every connected
+  // participant (each instance of a multi-instance participant) to call them.
+  const isMultiParticipantTask = (task) => !isOpenTask(task) && isSequentialMI(task)
+    && requiredParticipantCount(task, participantMultiplicities || {}) > 1;
+
   const multiParticipantInits = receiveTasks
-    .filter(task => {
-      const key = (task.bcsender || '').replace(/\s+/g, '');
-      return ((participantMultiplicities || {})[key] || 0) > 1;
-    })
+    .filter(isMultiParticipantTask)
     .map(task => {
-      const key = (task.bcsender || '').replace(/\s+/g, '');
-      const count = participantMultiplicities[key];
+      const count = requiredParticipantCount(task, participantMultiplicities || {});
       return `$.requiredParticipants["${task.id.replace(/\s+/g, '')}"] = ${count};`;
     })
     .join('\n');
 
-  const hasMultiParticipant = receiveTasks.some(task => {
-    const key = (task.bcsender || '').replace(/\s+/g, '');
-    return ((participantMultiplicities || {})[key] || 0) > 1;
-  });
+  const hasMultiParticipant = receiveTasks.some(isMultiParticipantTask);
 
   // ── Per-instance-mode specific blocks ───────────────────────────────────────
   // Each sibling lane may have its own multi-instance setting, so compute the
