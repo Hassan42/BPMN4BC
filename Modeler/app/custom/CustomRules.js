@@ -5,6 +5,21 @@ import { showErrorToast } from '../util/toast';
 
 const HIGH_PRIORITY = 2500;
 
+// Returns the BC pool (Participant) an element lives in, walking up through
+// lanes and sub-processes, or null if it is not inside a BC pool
+function getBcPool(element) {
+  let el = element;
+  while (el && !is(el.businessObject, 'bpmn:Participant')) {
+    el = el.parent;
+  }
+  return (el && el.businessObject.bc === 'true') ? el : null;
+}
+
+// The BC timer is hybrid: allowed on- and off-chain, and as a boundary event on tasks
+function isBcTimer(bo) {
+  return !!bo && bo.bc === 'true' && bo.bcevent === 'timerEvent';
+}
+
 /**
  * A custom rule provider that decides what elements can be
  * dropped where based on a `vendor:allowDrop` BPMN extension.
@@ -29,23 +44,18 @@ CustomRules.prototype.init = function () {
   this.addRule('shape.create', HIGH_PRIORITY, (context) => {
     const { shape, target } = context;
     const shapeBo = shape.businessObject;
-    const targetBo = target.businessObject;
 
-    // Enforce maximum of 2 blockchain pools
-    if (is(shapeBo, 'bpmn:Participant') && shapeBo.bc === 'true') {
-      const existingBcPools = this._elementRegistry.filter(
-        el => el.businessObject &&
-              el.businessObject.$type === 'bpmn:Participant' &&
-              el.businessObject.bc === 'true'
-      );
-      if (existingBcPools.length >= 2) {
-        setTimeout(() => showErrorToast('Maximum of 2 blockchain pools allowed.'), 0);
-        return false;
-      }
-    }
+    // Elements inside a sub-process in a BC pool follow the same rules as the pool itself
+    const bcPool = getBcPool(target);
+    const targetBo = (bcPool && is(target.businessObject, 'bpmn:SubProcess'))
+      ? bcPool.businessObject
+      : target.businessObject;
 
     // Helper function to check if an element is allowed in the blockchain environment
     function isAllowedInBlockchain(shapeBo) {
+      if (isBcTimer(shapeBo)) {
+        return true;
+      }
       return (shapeBo.bc === 'true' ||
         is(shapeBo, "bpmn:ParallelGateway") ||
         is(shapeBo, "bpmn:EventBasedGateway") ||
@@ -53,7 +63,8 @@ CustomRules.prototype.init = function () {
         is(shapeBo, "bpmn:StartEvent") ||
         is(shapeBo, "bpmn:EndEvent") ||
         is(shapeBo, "bpmn:DataObjectReference") ||
-        is(shapeBo, "bpmn:DataStoreReference")) &&
+        is(shapeBo, "bpmn:DataStoreReference") ||
+        is(shapeBo, "bpmn:SubProcess")) &&
         (!is(shapeBo, "bpmn:SendTask")) &&
         (!is(shapeBo, "bpmn:IntermediateCatchEvent")) &&
         (!is(shapeBo, "bpmn:BoundaryEvent")) &&
@@ -96,6 +107,30 @@ CustomRules.prototype.init = function () {
 
     // Allow the creation of the shape if none of the above rules apply
     return true;
+  });
+
+  // Inside a BC pool, boundary events may only be attached to BC Script Tasks
+  // (modeled as error boundary events; ignored by the compiler).
+  // The BC timer may be attached to any task, on- or off-chain.
+  this.addRule('shape.attach', HIGH_PRIORITY, (context) => {
+    const { shape, target } = context;
+    if (!shape || !target || !target.businessObject) {
+      return;
+    }
+
+    if (isBcTimer(shape.businessObject)) {
+      return is(target.businessObject, 'bpmn:Task') ? undefined : false;
+    }
+
+    if (!getBcPool(target)) {
+      return;
+    }
+
+    const targetBo = target.businessObject;
+    if (is(targetBo, 'bpmn:ScriptTask') && targetBo.bc === 'true' && shape.businessObject.bc !== 'true') {
+      return; // fall through to the default BPMN attach rules
+    }
+    return false;
   });
 
   this.addRule('connection.create', HIGH_PRIORITY, (context) => {
@@ -206,14 +241,28 @@ CustomRules.prototype.init = function () {
       }
     }
 
-    // BC Script Tasks cannot be part of any message flow (cross-pool connection)
+    // BC Script Tasks: the only cross-pool connection is an outgoing money flow to a participant
     const sourceIsScriptTask = is(source.businessObject, 'bpmn:ScriptTask') && source.businessObject.bc === 'true';
     const targetIsScriptTask = is(target.businessObject, 'bpmn:ScriptTask') && target.businessObject.bc === 'true';
 
     if (sourceIsScriptTask || targetIsScriptTask) {
       if (!sourcePool || !targetPool || sourcePool !== targetPool) {
-        setTimeout(() => showErrorToast(
-          'Blockchain Script Tasks cannot be connected via message flow.'
+        // Money flow: a BC script task may transfer money to an off-chain participant pool.
+        // Money always flows script -> participant, never into a script task.
+        const targetIsOffChainParticipant =
+          is(target.businessObject, 'bpmn:Participant') && target.businessObject.bc !== 'true';
+        if (sourceIsScriptTask && targetIsOffChainParticipant) {
+          if (target.businessObject.bcaccess === 'none') {
+            setTimeout(() => showErrorToast(
+              'This participant is not on the blockchain (Blockchain Access: None) and cannot receive money.'
+            ), 0);
+            return false;
+          }
+          return; // allowed: default rules create the message flow
+        }
+        setTimeout(() => showErrorToast(sourceIsScriptTask
+          ? 'A money flow from a Script Task must target an off-chain participant pool.'
+          : 'Blockchain Script Tasks cannot receive message flows.'
         ), 0);
         return false;
       }
@@ -257,6 +306,18 @@ CustomRules.prototype.init = function () {
     }
 
     if (is(target.businessObject, 'bpmn:ReceiveTask') && target.businessObject.bc === 'true') {
+      // A participant with blockchain access "none" never sends transactions
+      if (sourcePool && sourcePool !== targetPool && sourcePool.businessObject.bcaccess === 'none') {
+        setTimeout(() => showErrorToast('This participant is not on the blockchain (Blockchain Access: None) and cannot send transactions.'), 0);
+        return false;
+      }
+      // Open (permissionless) receive task: anyone may call it, so no message flow is allowed
+      if (target.businessObject.bcopen && targetPool && sourcePool !== targetPool) {
+        if (isNonBcParticipantOrSendTask(source)) {
+          setTimeout(() => showErrorToast('An open Receive Transaction Task can be called by anyone and cannot have a message flow.'), 0);
+        }
+        return false;
+      }
       if (isNonBcParticipantOrSendTask(source)) {
         // Valid sender type — enforce one-sender limit
         const allConns = [...(target.incoming || []), ...(target.outgoing || [])];
@@ -464,7 +525,7 @@ CustomRules.prototype.init = function () {
             setTimeout(() => showErrorToast(
               'A task cannot connect to multiple shapes of the same DataObject.'
             ), 0);
-            return false;
+            // return false; //turned off for use case only (gas)
           }
         }
 
@@ -483,7 +544,7 @@ CustomRules.prototype.init = function () {
             setTimeout(() => showErrorToast(
               'A task cannot connect to multiple shapes of the same DataObject.'
             ), 0);
-            return false;
+            // return false; //turned off for use case only (gas)
           }
         }
       }
