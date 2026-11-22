@@ -13,12 +13,20 @@ export default function (element) {
   ];
 
   if (is(element, 'bpmn:ReceiveTask') && element.businessObject.bc == "true") {
-    props.push(
-      {
+    // Open (permissionless) receive tasks accept any caller, so they have no sender
+    if (!element.businessObject.bcopen) {
+      props.push({
         id: 'sender',
         element,
         component: Sender,
         isEdited: isTextFieldEntryEdited
+      });
+    }
+    props.push(
+      {
+        id: 'receiveOpen',
+        element,
+        component: ReceiveOpenCheckbox
       },
       {
         id: 'payable',
@@ -110,9 +118,10 @@ export default function (element) {
       props.push({ id: 'dsshared', element, component: DataStoreSharedCheckbox });
     }
   } else if (is(element, 'bpmn:Participant') && element.businessObject.bc !== 'true') {
-    // Non-BC participant: always show Open checkbox; show instance count only when not open
-    props.push({ id: 'open', element, component: OpenCheckbox });
-    if (!element.businessObject.bcopen) {
+    // Non-BC participant: choose permissioned / permissionless / none;
+    // instance count only applies to permissioned participants
+    props.push({ id: 'bcAccess', element, component: BlockchainAccessSelect, isEdited: isSelectEntryEdited });
+    if (!element.businessObject.bcopen && element.businessObject.bcaccess !== 'none') {
       props.push({
         id: 'multiplicityCount',
         element,
@@ -398,7 +407,70 @@ function MultiplicityCount(props) {
   />`;
 }
 
-function OpenCheckbox(props) {
+function BlockchainAccessSelect(props) {
+  const { element, id } = props;
+
+  const modeling = useService('modeling');
+  const translate = useService('translate');
+  const elementRegistry = useService('elementRegistry');
+
+  // permissioned is the default (no attribute) so existing models keep their meaning
+  const getValue = () => {
+    const bo = element.businessObject;
+    if (bo.bcaccess === 'none') return 'none';
+    return bo.bcopen ? 'permissionless' : 'permissioned';
+  };
+
+  const setValue = value => {
+    if (value === 'permissionless') {
+      // Mutual exclusivity: clear multiplicity when open is enabled
+      modeling.updateProperties(element, {
+        bcopen: true, bcaccess: undefined, bcmultiplicity: undefined, participantMultiplicity: undefined
+      });
+    } else if (value === 'none') {
+      // Not a blockchain participant: it cannot send transactions, so drop its
+      // message flows into BC receive transaction tasks
+      const flows = elementRegistry.filter(el =>
+        is(el, 'bpmn:MessageFlow') &&
+        getParticipant(el.source) === element &&
+        is(el.target, 'bpmn:ReceiveTask') && el.target.businessObject.bc === 'true'
+      );
+      if (flows.length) {
+        modeling.removeElements(flows);
+      }
+      modeling.updateProperties(element, {
+        bcaccess: 'none', bcopen: undefined, bcmultiplicity: undefined, participantMultiplicity: undefined
+      });
+    } else {
+      modeling.updateProperties(element, { bcopen: undefined, bcaccess: undefined });
+    }
+  };
+
+  const getOptions = () => [
+    { value: 'permissioned', label: translate('Permissioned (known addresses)') },
+    { value: 'permissionless', label: translate('Permissionless (any address)') },
+    { value: 'none', label: translate('None (not on the blockchain)') }
+  ];
+
+  return html`<${SelectEntry}
+    id=${id}
+    element=${element}
+    label=${translate('Blockchain Access')}
+    description=${translate('Who may act in this role on the blockchain. "None" is for entities that never send blockchain transactions.')}
+    getValue=${getValue}
+    setValue=${setValue}
+    getOptions=${getOptions}
+  />`;
+}
+
+function getParticipant(element) {
+  for (let el = element; el; el = el.parent) {
+    if (is(el, 'bpmn:Participant')) return el;
+  }
+  return null;
+}
+
+function ReceiveOpenCheckbox(props) {
   const { element, id } = props;
 
   const modeling = useService('modeling');
@@ -407,20 +479,23 @@ function OpenCheckbox(props) {
   const getValue = () => element.businessObject.bcopen || false;
 
   const setValue = value => {
-    const update = { bcopen: value };
     if (value) {
-      // Mutual exclusivity: clear multiplicity when open is enabled
-      update.bcmultiplicity = undefined;
-      update.participantMultiplicity = undefined;
+      // An open task has no designated sender: drop incoming message flows and the sender role
+      const messageFlows = (element.incoming || []).filter(conn => is(conn, 'bpmn:MessageFlow'));
+      if (messageFlows.length) {
+        modeling.removeElements(messageFlows);
+      }
+      modeling.updateProperties(element, { bcopen: true, bcsender: undefined });
+    } else {
+      modeling.updateProperties(element, { bcopen: undefined });
     }
-    modeling.updateProperties(element, update);
   };
 
   return html`<${CheckboxEntry}
     id=${id}
     element=${element}
     label=${translate('Open')}
-    description=${translate('Any Ethereum address with the respective role can call the connected Receive Transaction task.')}
+    description=${translate('Any address can call this Receive Transaction task. Open tasks cannot have an incoming message flow.')}
     getValue=${getValue}
     setValue=${setValue}
   />`;

@@ -88,6 +88,11 @@
             "type": "Boolean"
           },
           {
+            "name": "bcaccess",
+            "isAttr": true,
+            "type": "String"
+          },
+          {
             "name": "bcmultiinstance",
             "isAttr": true,
             "type": "Boolean"
