@@ -28,6 +28,8 @@ import BCREVTHROW from '../assets/THROW-REV.svg';
 import BCREVCATCH from '../assets/CATCH-REV.svg';
 import BCTIMER from '../assets/BC-TIMER.svg';
 import PAYABLE from '../assets/payable.svg';
+import PERMISSIONED from '../assets/PERMISSIONED.svg';
+import PERMISSIONLESS from '../assets/PERMISSIONLESS.svg';
 
 const HIGH_PRIORITY = 1500;
 
@@ -45,7 +47,38 @@ export default class CustomRenderer extends BaseRenderer {
     const { bc, bctype } = businessObject;
 
     // ignore labels
-    return is(element, `bpmn:${bctype}`) && !element.labelTarget;
+    // (the BC timer keeps its look when attached as a boundary event, where bctype no longer matches)
+    const isBcTimer = bc === 'true' && businessObject.bcevent === 'timerEvent';
+    // Only pools without any bc property carry the permissioned/permissionless lock icon
+    const isParticipantPool = is(element, 'bpmn:Participant') && isNil(bc);
+    return (is(element, `bpmn:${bctype}`) || isBcTimer || isParticipantPool || isMoneyFlow(element)) && !element.labelTarget;
+  }
+
+  getConnectionPath(connection) {
+    return this.bpmnRenderer.getConnectionPath(connection);
+  }
+
+  // Money flow (BC script task -> participant), drawn as a message flow with a coin token at its middle
+  drawConnection(parentNode, element) {
+    const connection = this.bpmnRenderer.drawConnection(parentNode, element);
+    const mid = getMidpoint(element.waypoints || []);
+    if (mid) {
+      const size = 20;
+      svgAppend(parentNode, svgCreate("image", {
+        x: mid.x - size / 2,
+        y: mid.y - size / 2,
+        width: size,
+        height: size,
+        href: PAYABLE
+      }));
+    }
+    return connection;
+  }
+
+  getShapePath(shape) {
+    // Every custom-drawn element keeps its standard BPMN outline,
+    // which is used to dock and crop connections (e.g. message flows)
+    return this.bpmnRenderer.getShapePath(shape);
   }
 
   drawShape(parentNode, element) {
@@ -53,13 +86,35 @@ export default class CustomRenderer extends BaseRenderer {
 
     const businessObject = getBusinessObject(element);
 
-    const { bc, bctype, bcevent, bcpayable } = businessObject;
+    const { bc, bctype, bcevent, bcpayable, bcopen } = businessObject;
+
+    // Off-chain participant: closed lock = permissioned (fixed set of addresses),
+    // open lock = permissionless ("Open" checked, any address may take the role).
+    if (isNil(bc) && is(element, 'bpmn:Participant')) {
+      const shape = this.bpmnRenderer.drawShape(parentNode, element);
+      // Entity outside the blockchain: plain pool, no lock
+      if (businessObject.bcaccess === 'none') {
+        return shape;
+      }
+      const lockSvg = svgCreate("image", {
+        x: 4,
+        y: 5,
+        width: 22,
+        height: 27.5,
+        href: bcopen ? PERMISSIONLESS : PERMISSIONED
+      });
+      svgAppend(parentNode, lockSvg);
+      return shape;
+    }
 
     if (bc == "true") {
 
       let bcSvg = "";
 
-      switch (bctype) {
+      // Hybrid BC timer: same look as an intermediate catch event or as a boundary event
+      const type = bcevent === "timerEvent" ? "IntermediateCatchEvent" : bctype;
+
+      switch (type) {
         case "SendTask":
           this.bpmnRenderer.drawShape(parentNode, element);
           bcSvg = svgCreate("image", {
@@ -88,6 +143,23 @@ export default class CustomRenderer extends BaseRenderer {
             height: element.height / 3.5,
             href: RECEIVE
           });
+          // Open (permissionless) receive task: open padlock at the top-right corner,
+          // left of the payable icon when both are set. Locked is the default and is not drawn.
+          if (bcopen) {
+            const lockHeight = element.height / 3.5;
+            const lockWidth = lockHeight * 0.8;
+            const rightEdge = bcpayable
+              ? element.width - element.width / 3.5 - 4 - 1
+              : element.width - 4;
+            const openLockSvg = svgCreate("image", {
+              x: rightEdge - lockWidth,
+              y: 3,
+              width: lockWidth,
+              height: lockHeight,
+              href: PERMISSIONLESS
+            });
+            svgAppend(parentNode, openLockSvg);
+          }
           if (bcpayable) {
             const payableSvg = svgCreate("image", {
               x: element.width - element.width / 3.5 - 4,
@@ -192,6 +264,37 @@ export default class CustomRenderer extends BaseRenderer {
 CustomRenderer.$inject = ['eventBus', 'bpmnRenderer'];
 
 // helpers //////////
+
+// A money flow is a message flow from a BC script task to an off-chain participant:
+// the contract pays that participant. (Inbound payments are marked by the payable
+// receive task instead, so open receive tasks without a message flow can be payable too.)
+function isMoneyFlow(element) {
+  if (!is(element, 'bpmn:MessageFlow')) return false;
+  const source = getBusinessObject(element).sourceRef;
+  return !!source && source.bc === 'true' && is(source, 'bpmn:ScriptTask');
+}
+
+// Point halfway along a polyline
+function getMidpoint(waypoints) {
+  if (waypoints.length < 2) return null;
+  const segments = [];
+  let total = 0;
+  for (let i = 1; i < waypoints.length; i++) {
+    const a = waypoints[i - 1], b = waypoints[i];
+    const length = Math.hypot(b.x - a.x, b.y - a.y);
+    segments.push({ a, b, length });
+    total += length;
+  }
+  let remaining = total / 2;
+  for (const { a, b, length } of segments) {
+    if (remaining <= length && length > 0) {
+      const t = remaining / length;
+      return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
+    }
+    remaining -= length;
+  }
+  return waypoints[waypoints.length - 1];
+}
 
 // copied from https://github.com/bpmn-io/bpmn-js/blob/master/lib/draw/BpmnRenderer.js
 function drawRect(parentNode, width, height, borderRadius, color) {
