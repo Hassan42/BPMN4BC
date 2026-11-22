@@ -111,7 +111,7 @@ async function generateContract(contractParams) {
 
   const receiveFunctionCount = receiveFunctionNames.length || 0;
 
-  // Compute open participant names once (no activitytoRole entry → modifier grants access to all)
+  // Permissionless participant names: their tasks get the "*" role (any non-permissioned address)
   const openParticipantNames = new Set(
     roles.filter(r => r.open).map(r => (r.role || '').replace(/\s+/g, ''))
   );
@@ -123,15 +123,13 @@ async function generateContract(contractParams) {
       // Open receive task → no role assignment (empty activitytoRole array grants access to all)
       if (isOpenTask(activity)) return '';
 
-      // Open participant → skip role assignment (empty activitytoRole array grants access to all)
-      const senderKey = (activity.bcsender || '').replace(/\s+/g, '');
-      if (openParticipantNames.has(senderKey)) return '';
-
       const participantsArray = getSenderRoles(activity);
 
-      // Expand multi-participant roles: "Customer" with N=3 → ["Customer_1","Customer_2","Customer_3"]
+      // Permissionless participant → "*": any address that holds no permissioned role.
+      // Multi-participant roles expand: "Customer" with N=3 → ["Customer_1","Customer_2","Customer_3"]
       const expandedParticipants = participantsArray.flatMap(p => {
         const key = (p || '').replace(/\s+/g, '');
+        if (openParticipantNames.has(key)) return ['*'];
         const count = (participantMultiplicities || {})[key];
         if (count > 1) {
           return Array.from({ length: count }, (_, i) => `${key}_${i + 1}`);
@@ -276,6 +274,8 @@ contract ${canonicalBase} is Initializable, UUPSUpgradeable, OwnableUpgradeable 
         ${dsAddrStructVars}
         ${multiParticipantStructVars}
         ${dataStoreStateVars}
+        // Addresses assigned to permissioned roles; permissionless roles ("*") exclude them
+        mapping(address => bool) isPermissionedHolder;
     }
 
     bytes32 private constant MAIN_STORAGE_LOCATION = ${mainStorageSlot};
@@ -294,7 +294,8 @@ contract ${canonicalBase} is Initializable, UUPSUpgradeable, OwnableUpgradeable 
         } else {
             for (uint256 i = 0; i < $.activitytoRole[_activity].length; i++) {
                 string memory allowedRole = $.activitytoRole[_activity][i];
-                if (bytes(allowedRole).length == 0 || $.addressOf[allowedRole] == msg.sender) {
+                if (bytes(allowedRole).length == 0 || $.addressOf[allowedRole] == msg.sender
+                    || (keccak256(bytes(allowedRole)) == keccak256("*") && !$.isPermissionedHolder[msg.sender])) {
                     hasRequiredRole = true;
                     break;
                 }
@@ -338,12 +339,14 @@ contract ${canonicalBase} is Initializable, UUPSUpgradeable, OwnableUpgradeable 
         require(_roles.length == _addresses.length, "Roles and addresses arrays must be of the same length");
         for (uint i = 0; i < _addresses.length; i++) {
             $.addressOf[_roles[i]] = _addresses[i];
+            $.isPermissionedHolder[_addresses[i]] = true;
         }
     }
 
     function setResource(string memory _role, address _address) public {
         MainStorage storage $ = _getMainStorage();
         $.addressOf[_role] = _address;
+        $.isPermissionedHolder[_address] = true;
     }
 
     function setState(string memory _activity, uint8 _state) public {
@@ -402,6 +405,8 @@ contract ${canonicalBase} is Initializable, UUPSUpgradeable, OwnableUpgradeable 
         ${dsAddrStructVars}
         ${sharedMultiParticipantStructVars}
         ${dataStoreStateVars}
+        // Addresses assigned to permissioned roles; permissionless roles ("*") exclude them
+        mapping(uint256 => mapping(address => bool)) isPermissionedHolder;
     }
 
     bytes32 private constant MAIN_STORAGE_LOCATION = ${mainStorageSlot};
@@ -421,7 +426,8 @@ contract ${canonicalBase} is Initializable, UUPSUpgradeable, OwnableUpgradeable 
         } else {
             for (uint256 i = 0; i < $.activitytoRole[_activity].length; i++) {
                 string memory allowedRole = $.activitytoRole[_activity][i];
-                if (bytes(allowedRole).length == 0 || $.addressOf[instanceId][allowedRole] == msg.sender) {
+                if (bytes(allowedRole).length == 0 || $.addressOf[instanceId][allowedRole] == msg.sender
+                    || (keccak256(bytes(allowedRole)) == keccak256("*") && !$.isPermissionedHolder[instanceId][msg.sender])) {
                     hasRequiredRole = true;
                     break;
                 }
@@ -470,12 +476,14 @@ contract ${canonicalBase} is Initializable, UUPSUpgradeable, OwnableUpgradeable 
         require(_roles.length == _addresses.length, "Roles and addresses arrays must be of the same length");
         for (uint i = 0; i < _addresses.length; i++) {
             $.addressOf[instanceId][_roles[i]] = _addresses[i];
+            $.isPermissionedHolder[instanceId][_addresses[i]] = true;
         }
     }
 
     function setResource(uint256 instanceId, string memory _role, address _address) public {
         MainStorage storage $ = _getMainStorage();
         $.addressOf[instanceId][_role] = _address;
+        $.isPermissionedHolder[instanceId][_address] = true;
     }
 
     function setState(uint256 instanceId, string memory _activity, uint8 _state) public {
