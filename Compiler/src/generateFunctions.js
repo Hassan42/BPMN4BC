@@ -22,7 +22,8 @@ const {
   isSequentialMI,
   isStandardLoop,
   isOpenTask,
-  requiredParticipantCount
+  requiredParticipantCount,
+  findReceiveTask
 } = require('./utils.js');
 
 /**
@@ -376,7 +377,7 @@ function generateScriptFunction(activity, process, collaborationId, multiInstanc
  * @param {string} collaborationId - The collaboration ID.
  * @returns {string} The logic for the entry function.
  */
-function generateEntryFunction(activity, process, roles, collaborationId, participantMultiplicities = {}, multiInstance = true, coupledDataStore = false, instanceId = null, foreignInlineDsMap = {}) {
+function generateEntryFunction(activity, process, roles, collaborationId, participantMultiplicities = {}, multiInstance = true, coupledDataStore = false, instanceId = null, foreignInlineDsMap = {}, timerRequirements = {}) {
   // Canonical name (no suffix) — used for same/different-contract comparisons and mapping keys
   const contractName = getContractNameForElement(activity, process, collaborationId);
   // Full contract name (with instance suffix if MI lane) — used for DS contract naming
@@ -542,6 +543,9 @@ function generateEntryFunction(activity, process, roles, collaborationId, partic
 
   // Helper: build a state reference appropriate for the pool mode.
   // All function bodies start with: MainStorage storage $ = _getMainStorage();
+  const timerBlockRef = (id) => multiInstance
+    ? `$.timerBlock["${id}"]`
+    : `$.timerBlock[instanceId]["${id}"]`;
   const stateRef = (id) => multiInstance
     ? `$.state["${id}"]`
     : `$.state[instanceId]["${id}"]`;
@@ -889,6 +893,23 @@ function generateEntryFunction(activity, process, roles, collaborationId, partic
         }
         break;
       }
+      case 'bpmn:IntermediateCatchEvent': {
+        // Block timer: start counting blocks for the receive task(s) right after it
+        if (element.bc === 'true' && element.bcevent === 'timerEvent') {
+          (element.outgoing || []).forEach(flow => {
+            findReceiveTask(flow.targetRef).forEach(rawId => {
+              const nextTask = process.flowElements.find(el => el.id === rawId);
+              if (nextTask && getContractNameForElement(nextTask, process, collaborationId) !== contractName) {
+                throw new Error(`Timer event "${element.name || element.id}" is followed by "${nextTask.name || rawId}" in another contract; a block timer and its receive task must be in the same contract.`);
+              }
+              proceedingLogic += `${timerBlockRef(rawId.replace(/\s+/g, ''))} = block.number;\n`;
+            });
+          });
+        } else {
+          proceedingLogic += `// Logic for ${(element.name || element.id).replace(/[\r\n\t\0]/g, ' ').trim()}\n`;
+        }
+        break;
+      }
       case 'bpmn:EndEvent': {
         const revertMsg = (element.name || element.id).replace(/[\r\n\t\0]/g, ' ').replace(/"/g, '').trim();
         appendState(`revert("${revertMsg}");`, alreadyGated);
@@ -935,11 +956,16 @@ function generateEntryFunction(activity, process, roles, collaborationId, partic
     ? `isAccessible(instanceId, "${taskId}")`
     : `isAccessible("${taskId}")`;
 
+  const timerCheck = timerRequirements[taskId]
+    ? `require(block.number >= ${timerBlockRef(taskId)} + ${timerRequirements[taskId].blocks}, "Timer has not elapsed");`
+    : '';
+
   if (isMultiParticipant) {
     return `
     ${bpmnMarker}
     function ${taskId}(${signatureParams}) public ${payableModifier}${accessibleModifier} {
         MainStorage storage $ = _getMainStorage();
+        ${timerCheck}
         require(!${hasParticipatedRef(taskId)}, "Participated already called this activity");
         ${hasParticipatedRef(taskId)} = true;
         ${participationCountRef(taskId)}++;
@@ -957,6 +983,7 @@ function generateEntryFunction(activity, process, roles, collaborationId, partic
     ${bpmnMarker}
     function ${taskId}(${signatureParams}) public ${payableModifier}${accessibleModifier} {
         MainStorage storage $ = _getMainStorage();
+        ${timerCheck}
         ${doStructCreationsCode}
         ${mappingReadDecls}
         ${dataStoreAssignments}
@@ -972,7 +999,7 @@ function generateEntryFunction(activity, process, roles, collaborationId, partic
  * @param {Array} activities - The list of activities.
  * @returns {Array} The list of generated Solidity functions.
  */
-function generateFunctions(activities, process, roles, collaborationId, participantMultiplicities = {}, multiInstance = true, coupledDataStore = false, instanceId = null, foreignInlineDsMap = {}) {
+function generateFunctions(activities, process, roles, collaborationId, participantMultiplicities = {}, multiInstance = true, coupledDataStore = false, instanceId = null, foreignInlineDsMap = {}, timerRequirements = {}) {
   let functions = [];
 
   activities.forEach(activity => {
@@ -983,7 +1010,7 @@ function generateFunctions(activities, process, roles, collaborationId, particip
         functionLogic = generateScriptFunction(activity, process, collaborationId, multiInstance, coupledDataStore, instanceId, foreignInlineDsMap);
         break;
       case 'bpmn:ReceiveTask':
-        functionLogic = generateEntryFunction(activity, process, roles, collaborationId, participantMultiplicities, multiInstance, coupledDataStore, instanceId, foreignInlineDsMap);
+        functionLogic = generateEntryFunction(activity, process, roles, collaborationId, participantMultiplicities, multiInstance, coupledDataStore, instanceId, foreignInlineDsMap, timerRequirements);
         break;
       default:
         throw new Error(`Activity "${activity.name || activity.id}" has an unsupported type: ${activity.$type}`);

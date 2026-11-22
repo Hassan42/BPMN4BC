@@ -147,6 +147,11 @@
           "name": "bcshared",
           "isAttr": true,
           "type": "Boolean"
+        },
+        {
+          "name": "bcblocks",
+          "isAttr": true,
+          "type": "String"
         }
       ]
     },

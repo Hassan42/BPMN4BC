@@ -66,7 +66,7 @@ CustomRules.prototype.init = function () {
         is(shapeBo, "bpmn:DataStoreReference") ||
         is(shapeBo, "bpmn:SubProcess")) &&
         (!is(shapeBo, "bpmn:SendTask")) &&
-        (!is(shapeBo, "bpmn:IntermediateCatchEvent")) &&
+        (!is(shapeBo, "bpmn:IntermediateCatchEvent") || (shapeBo.bc === 'true' && shapeBo.bcevent === 'timerEvent')) &&
         (!is(shapeBo, "bpmn:BoundaryEvent")) &&
         (!is(shapeBo, "bpmn:Participant"));
     }
@@ -225,6 +225,17 @@ CustomRules.prototype.init = function () {
         'Elements in different blockchain pools cannot be connected.'
       ), 0);
       return false;
+    }
+
+    // Timer events (catch + start) may only connect to a BC ReceiveTask or a gateway
+    const sourceIsTimerCatch = is(source.businessObject, 'bpmn:IntermediateCatchEvent') && source.businessObject.bc === 'true' && source.businessObject.bcevent === 'timerEvent';
+    if (sourceIsTimerCatch) {
+      const targetIsReceiveTask = is(target.businessObject, 'bpmn:ReceiveTask') && target.businessObject.bc === 'true';
+      const targetIsGateway = is(target.businessObject, 'bpmn:Gateway');
+      if (!targetIsReceiveTask && !targetIsGateway) {
+        setTimeout(() => showErrorToast('Timer events can only connect to a Receive Transaction Task or a gateway.'), 0);
+        return false;
+      }
     }
 
     // Block message flows (cross-pool connections) on BC IntermediateThrowEvents —

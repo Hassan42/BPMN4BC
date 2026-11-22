@@ -7,6 +7,7 @@ import BCREVTHROW from '../assets/THROW-REV-ICON.svg';
 import BCREVCATCH from '../assets/CATCH-REV-ICON.svg';
 import BCSCRIPT from '../assets/BC-SCRIPT-icon.svg';
 import BCSTIMER from '../assets/BC-TIMER-ICON.svg';
+import BCSTIMERSTART from '../assets/BC-TIMER-ICON-START.svg';
 
 // Must be < 1000 (the default bpmn-js PaletteProvider priority) so our
 // provider fires AFTER the default, letting us overwrite same-key entries.
@@ -93,8 +94,8 @@ export default class CustomPalette {
             const takenIds = new Set(
               elementRegistry
                 .filter(el => el.businessObject &&
-                              el.businessObject.$type === 'bpmn:Participant' &&
-                              el.businessObject.bcid)
+                  el.businessObject.$type === 'bpmn:Participant' &&
+                  el.businessObject.bcid)
                 .map(el => el.businessObject.bcid)
             );
             businessObject.bcid = takenIds.has('network-1') ? 'network-2' : 'network-1';
@@ -113,16 +114,16 @@ export default class CustomPalette {
 
     return {
       // ── Suppress default palette positions so we can re-add at correct spots.
-      'create.start-event':         { group: '_hidden' },
-      'create.end-event':           { group: '_hidden' },
-      'create.exclusive-gateway':   { group: '_hidden' },
-      'create.data-object':         { group: '_hidden' },
-      'create.data-store':          { group: '_hidden' },
-      'create.group':               { group: '_hidden' },
-      'create.task':                { group: '_hidden' },
+      'create.start-event': { group: '_hidden' },
+      'create.end-event': { group: '_hidden' },
+      'create.exclusive-gateway': { group: '_hidden' },
+      'create.data-object': { group: '_hidden' },
+      'create.data-store': { group: '_hidden' },
+      'create.group': { group: '_hidden' },
+      'create.task': { group: '_hidden' },
       'create.subprocess-expanded': { group: '_hidden' },
-      'create.intermediate-event':  { group: '_hidden' },
-      'create.participant-expanded':{ group: '_hidden' },
+      'create.intermediate-event': { group: '_hidden' },
+      'create.participant-expanded': { group: '_hidden' },
 
       // ── Common subgroup ───────────────────────────────────────────────────
       'CommonLabel': {
@@ -160,8 +161,28 @@ export default class CustomPalette {
         title: translate('Create gateway'),
         action: {
           dragstart: (event) => create.start(event, elementFactory.createShape({ type: 'bpmn:ExclusiveGateway' })),
-          click:     (event) => create.start(event, elementFactory.createShape({ type: 'bpmn:ExclusiveGateway' }))
+          click: (event) => create.start(event, elementFactory.createShape({ type: 'bpmn:ExclusiveGateway' }))
         }
+      },
+      'BCTimer': {
+        group: 'BC',
+        imageUrl: BCSTIMER,
+        title: translate('Create blockchain timer event'),
+        action: {
+          dragstart: createElement("true", "IntermediateCatchEvent", "timerEvent"),
+          click: createElement("true", "IntermediateCatchEvent", "timerEvent")
+        },
+        className: 'custom-palette',
+      },
+      'BCStartTimer': {
+        group: 'BC',
+        imageUrl: BCSTIMERSTART,
+        title: translate('Create blockchain start timer event'),
+        action: {
+          dragstart: createElement("true", "StartEvent", "timerStartEvent"),
+          click: createElement("true", "StartEvent", "timerStartEvent")
+        },
+        className: 'custom-palette',
       },
 
       // ── Off-Chain subgroup ────────────────────────────────────────────────
@@ -288,17 +309,7 @@ export default class CustomPalette {
           click: createElement("true", "ScriptTask")
         },
         className: 'custom-palette',
-      },
-      // 'BCTimer': {
-      //   group: 'BC',
-      //   imageUrl: BCSTIMER,
-      //   title: translate('Create blockchain timer event'),
-      //   action: {
-      //     dragstart: createElement("true", "IntermediateCatchEvent", "timerEvent"),
-      //     click: createElement("true", "IntermediateCatchEvent", "timerEvent")
-      //   },
-      //   className: 'custom-palette',
-      // }
+      }
     };
   }
 }

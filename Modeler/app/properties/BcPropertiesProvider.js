@@ -66,8 +66,13 @@ export default function BcPropertiesProvider(propertiesPanel, injector, translat
       const isLane = is(businessObject, "bpmn:Lane");
       const elementParent = element.parent?.businessObject ?? undefined;
 
+      // BC timer start event: show Blockchain Properties group
+      if (is(businessObject, 'bpmn:StartEvent') && businessObject.bc === 'true') {
+        groups.push(createBcGroup(element, translate));
+      }
+
       //if element is bc or lane in a bc pool
-      if (businessObject.bc === "true") {
+      if (businessObject.bc === "true" && !is(businessObject, 'bpmn:StartEvent')) {
         groups.push(createBcGroup(element, translate));
 
         if (isScriptTask) {

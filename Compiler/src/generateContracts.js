@@ -76,7 +76,37 @@ async function generateContract(contractParams) {
   // DataObject structs live in a shared file (DataObjects_${collaborationId}.sol) imported by
   // both contracts and interfaces — this ensures cross-lane parameters resolve to the same type.
   const doImport = dataObjectsFileName ? `import './${dataObjectsFileName}.sol';` : '';
-  const functions = generateFunctions(activities, process, roles, collaborationId, participantMultiplicities, isMultiInstance, isCoupled, instanceId, effectiveForeignInlineDsMap).join('\n');
+  // Block timers (hybrid timer start / catch events): taskId → { blocks } for every ReceiveTask
+  // of THIS contract that directly follows a BC timer event.  The receive function then requires
+  // block.number >= timerBlock[task] + blocks.  timerBlock[task] is set to block.number in
+  // initialize()/initInstance() for a timer start event (in this lane) and when the flow passes
+  // a timer catch event.
+  const ownReceiveTaskIds = new Set(activities.filter(a => a.$type === 'bpmn:ReceiveTask').map(a => a.id.replace(/\s+/g, '')));
+  const laneNodeIds = lane ? new Set((lane.flowNodeRef || []).map(n => n.id)) : null;
+  const timerRequirements = {};
+  const timerStartTaskIds = [];
+  process.flowElements.forEach(el => {
+    const isTimerStart = el.$type === 'bpmn:StartEvent' && el.bc === 'true' && el.bcevent === 'timerStartEvent';
+    const isTimerCatch = el.$type === 'bpmn:IntermediateCatchEvent' && el.bc === 'true' && el.bcevent === 'timerEvent';
+    if (!isTimerStart && !isTimerCatch) return;
+    const blocks = parseInt(el.bcblocks || '0', 10);
+    if (!Number.isInteger(blocks) || blocks < 0) {
+      throw new Error(`Timer event "${el.name || el.id}" has an invalid Blocks value: "${el.bcblocks}".`);
+    }
+    (el.outgoing || []).forEach(flow => {
+      findReceiveTask(flow.targetRef).forEach(rawId => {
+        const taskId = rawId.replace(/\s+/g, '');
+        if (!ownReceiveTaskIds.has(taskId)) return;
+        timerRequirements[taskId] = { blocks };
+        if (isTimerStart && (!laneNodeIds || laneNodeIds.has(el.id))) timerStartTaskIds.push(taskId);
+      });
+    });
+  });
+  const hasTimers = Object.keys(timerRequirements).length > 0;
+  const timerInitsPerInstance = timerStartTaskIds.map(t => `$.timerBlock["${t}"] = block.number;`).join('\n        ');
+  const timerInitsShared = timerStartTaskIds.map(t => `$.timerBlock[instanceId]["${t}"] = block.number;`).join('\n        ');
+
+  const functions = generateFunctions(activities, process, roles, collaborationId, participantMultiplicities, isMultiInstance, isCoupled, instanceId, effectiveForeignInlineDsMap, timerRequirements).join('\n');
   const gatewayFunctions = generateGateways(gateways, process, collaborationId, isMultiInstance, isCoupled, contractName, canonicalBase, effectiveForeignInlineDsMap);
   const solidityEvents = generateEvents(events);
   const emitFunctions = generateEmitFunctions(events, isMultiInstance);
@@ -276,6 +306,7 @@ contract ${canonicalBase} is Initializable, UUPSUpgradeable, OwnableUpgradeable 
         ${dataStoreStateVars}
         // Addresses assigned to permissioned roles; permissionless roles ("*") exclude them
         mapping(address => bool) isPermissionedHolder;
+        ${hasTimers ? '// Block number from which each timer-guarded receive task counts its blocks\n        mapping(string => uint256) timerBlock;' : ''}
     }
 
     bytes32 private constant MAIN_STORAGE_LOCATION = ${mainStorageSlot};
@@ -319,6 +350,7 @@ contract ${canonicalBase} is Initializable, UUPSUpgradeable, OwnableUpgradeable 
         ${activityToRoleMappings}
         ${dataStoreInitCode}
         ${multiParticipantInits}
+        ${timerInitsPerInstance}
     }
 
     // solhint-disable-next-line no-empty-blocks
@@ -407,6 +439,7 @@ contract ${canonicalBase} is Initializable, UUPSUpgradeable, OwnableUpgradeable 
         ${dataStoreStateVars}
         // Addresses assigned to permissioned roles; permissionless roles ("*") exclude them
         mapping(uint256 => mapping(address => bool)) isPermissionedHolder;
+        ${hasTimers ? '// Block number from which each timer-guarded receive task counts its blocks\n        mapping(uint256 => mapping(string => uint256)) timerBlock;' : ''}
     }
 
     bytes32 private constant MAIN_STORAGE_LOCATION = ${mainStorageSlot};
@@ -459,6 +492,7 @@ contract ${canonicalBase} is Initializable, UUPSUpgradeable, OwnableUpgradeable 
         require(!$.initialized[instanceId], "Already initialized");
         ${stateMappingsPerInstance}
         ${dataStoreInitCode}
+        ${timerInitsShared}
         $.initialized[instanceId] = true;
     }
 
