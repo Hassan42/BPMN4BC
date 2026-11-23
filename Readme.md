@@ -23,27 +23,38 @@ models and instances it created.
 
 ## Run locally
 
-Requirements: Node.js 20, Docker (for the chains).
+Requirement: [Docker Desktop](https://www.docker.com/products/docker-desktop/) (running).
 
 ```bash
-# chains
+./run.sh
+```
+
+This builds and starts all five services and prints the address (http://localhost:5000).
+The first build takes a few minutes; later starts take seconds.
+
+| Command | What it does |
+|---|---|
+| `./run.sh` | build (if needed) and start everything |
+| `./run.sh stop` | stop all containers (saved models are kept) |
+| `./run.sh logs` | follow the logs of all services |
+| `./run.sh status` | list the containers |
+| `./run.sh reset` | delete containers and all saved models/instances |
+
+Use another port with `MODELER_PORT=8080 ./run.sh`. Without the script: `docker compose up -d --build`.
+
+<details>
+<summary>Running the services without Docker (for development)</summary>
+
+Requires Node.js 20; the chains still run in Docker.
+
+```bash
 docker build -t bpmn4bc-ganache ./Ganache
 docker run -d --name network-1 -p 8545:8545 -e PORT=8545 bpmn4bc-ganache
 docker run -d --name network-2 -p 8546:8546 -e PORT=8546 bpmn4bc-ganache
 
-# services (one terminal each)
 cd Compiler && npm install && PORT=8000 npm start
 cd Deployement && npm install && PORT=3000 COM_API_BASE_URL=http://localhost:8000 \
   NETWORK_1_URL=http://127.0.0.1:8545 NETWORK_2_URL=http://127.0.0.1:8546 npm start
 cd Modeler && npm install && npm run build && PORT=5000 node server.js
 ```
-
-Then open http://localhost:5000.
-
-## Hosting
-
-See [RAILWAY.md](RAILWAY.md) for deploying all services on Railway.
-
-## Postman
-
-`Postman/` contains example API collections for the Deployment service.
+</details>

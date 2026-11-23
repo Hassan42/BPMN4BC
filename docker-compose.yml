@@ -1,0 +1,61 @@
+# Runs the whole BPMN4BC stack locally:  ./run.sh   (or: docker compose up -d --build)
+# Then open http://localhost:5000  (change the port with MODELER_PORT=8080 ./run.sh)
+
+name: bpmn4bc-showcase
+
+services:
+  modeler:
+    build: ./Modeler
+    ports:
+      - "${MODELER_PORT:-5000}:5000"
+    environment:
+      PORT: 5000
+      DEP_API_BASE_URL: http://deployment:3000
+      COM_API_BASE_URL: http://compiler:8000
+      ATTEMPTS_DIR: /data/attempts
+    volumes:
+      - modeler_data:/data
+    depends_on:
+      - deployment
+      - compiler
+    restart: unless-stopped
+
+  compiler:
+    build: ./Compiler
+    environment:
+      PORT: 8000
+    restart: unless-stopped
+
+  deployment:
+    build: ./Deployement
+    environment:
+      PORT: 3000
+      COM_API_BASE_URL: http://compiler:8000
+      NETWORK_1_URL: http://network-1:8545
+      NETWORK_2_URL: http://network-2:8546
+      DATA_DIR: /data
+    volumes:
+      - deployment_data:/data   # saved models and deployed instances survive restarts
+    depends_on:
+      - compiler
+      - network-1
+      - network-2
+    restart: unless-stopped
+
+  network-1:
+    build: ./Ganache
+    environment:
+      PORT: 8545
+      HOST: 0.0.0.0
+    restart: unless-stopped
+
+  network-2:
+    build: ./Ganache
+    environment:
+      PORT: 8546
+      HOST: 0.0.0.0
+    restart: unless-stopped
+
+volumes:
+  modeler_data:
+  deployment_data:
