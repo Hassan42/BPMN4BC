@@ -1,11 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <bpmn2:definitions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:bpmn2="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:bpmnbc="http://some-company/schema/bpmn/qa" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" id="sample-diagram" targetNamespace="http://bpmn.io/schema/bpmn" xsi:schemaLocation="http://www.omg.org/spec/BPMN/20100524/MODEL BPMN20.xsd">
-  <bpmn2:collaboration id="Collaboration_78153468">
+  <bpmn2:collaboration id="Collaboration_42027522">
     <bpmn2:participant id="Participant_0d2x6av" bpmnbc:bc="true" bpmnbc:bctype="Participant" bpmnbc:bcid="network-1" name="Payment Exchange" processRef="Process_04fr5z0" />
     <bpmn2:participant id="Participant_1fcw28x" name="Payee" />
     <bpmn2:participant id="Participant_189rjlk" name="Payer" processRef="Process_0ll4no0" />
     <bpmn2:messageFlow id="Flow_1x00l26" sourceRef="Participant_1fcw28x" targetRef="Activity_1rjv6q2" />
     <bpmn2:messageFlow id="Flow_0ikh4h4" sourceRef="Activity_1ncaabe" targetRef="Activity_112z7ip" />
+    <bpmn2:messageFlow id="Flow_0xhxgwr" sourceRef="Activity_18ly042" targetRef="Participant_1fcw28x" />
   </bpmn2:collaboration>
   <bpmn2:process id="Process_04fr5z0" isExecutable="false">
     <bpmn2:startEvent id="Event_025qwak">
@@ -108,7 +109,7 @@
     <bpmn2:sequenceFlow id="Flow_09s0pbo" sourceRef="Event_1jo10fe" targetRef="Activity_1ncaabe" />
   </bpmn2:process>
   <bpmndi:BPMNDiagram id="BPMNDiagram_1">
-    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Collaboration_78153468">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Collaboration_42027522">
       <bpmndi:BPMNShape id="Participant_0d2x6av_di" bpmnElement="Participant_0d2x6av" isHorizontal="true">
         <dc:Bounds x="450" y="350" width="800" height="255" />
         <bpmndi:BPMNLabel />
@@ -245,6 +246,10 @@
       <bpmndi:BPMNEdge id="Flow_0ikh4h4_di" bpmnElement="Flow_0ikh4h4">
         <di:waypoint x="870" y="650" />
         <di:waypoint x="870" y="500" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_0xhxgwr_di" bpmnElement="Flow_0xhxgwr">
+        <di:waypoint x="1090" y="420" />
+        <di:waypoint x="1090" y="320" />
       </bpmndi:BPMNEdge>
     </bpmndi:BPMNPlane>
   </bpmndi:BPMNDiagram>
