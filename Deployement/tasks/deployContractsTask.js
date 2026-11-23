@@ -27,7 +27,7 @@ task('deploy-contracts', 'Deploys all contracts and updates contracts.json')
         // but reading the registry here provides a direct fallback: if the pre-population was
         // somehow lost (e.g. a timing edge-case or server restart between instances), this
         // check still prevents re-deploying the same shared proxy.
-        const sharedContractsPath = path.resolve(__dirname, '../sharedContracts.json');
+        const sharedContractsPath = require('../paths').sharedContractsPath;
         const sharedRegistry = fs.existsSync(sharedContractsPath)
             ? JSON.parse(fs.readFileSync(sharedContractsPath, 'utf8'))
             : [];
@@ -80,7 +80,7 @@ task('deploy-contracts', 'Deploys all contracts and updates contracts.json')
 
                 // Tier 3: scan instances.json for any other instance that already deployed this contract
                 if (!existingAddress) {
-                    const instancesPath = path.resolve(__dirname, '../instances.json');
+                    const instancesPath = require('../paths').instancesPath;
                     if (fs.existsSync(instancesPath)) {
                         const allInstances = JSON.parse(fs.readFileSync(instancesPath, 'utf8'));
                         for (const inst of allInstances) {
@@ -120,7 +120,7 @@ task('deploy-contracts', 'Deploys all contracts and updates contracts.json')
                     // that hasn't had it attributed yet, so the proof report shows costs correctly
                     // even when shared contracts are reused from a prior deployment session.
                     if (existingDeployGas > 0) {
-                        const instancesPath = path.resolve(__dirname, '../instances.json');
+                        const instancesPath = require('../paths').instancesPath;
                         const allInst = JSON.parse(fs.readFileSync(instancesPath, 'utf8'));
                         const currentInst = allInst.find(i => i.id === parseInt(instanceId));
                         const currentModelId = currentInst ? currentInst.modelId : null;

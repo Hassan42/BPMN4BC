@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node index.js",
     "start:local": "COM_API_BASE_URL=http://localhost:8000 node index.js",
-    "start:docker": "COM_API_BASE_URL=http://compiler:8000 node index.js",
+    "start:docker": "node index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",
@@ -17,9 +17,9 @@
     "hardhat": "^2.22.6"
   },
   "dependencies": {
+    "@ethersproject/providers": "^5.7.2",
     "@openzeppelin/contracts": "^5.0.0",
     "@openzeppelin/contracts-upgradeable": "^5.0.0",
-    "@ethersproject/providers": "^5.7.2",
     "axios": "^1.7.3",
     "cors": "^2.8.5",
     "dockerode": "^4.0.2",

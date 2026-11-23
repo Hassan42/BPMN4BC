@@ -1,11 +1,11 @@
 const fs = require('fs');
 const path = require('path');
 
-const instancesPath = path.join(__dirname, 'instances.json');
+const { instancesPath, writeJsonAtomic } = require('./paths');
 
 const ensureInstancesFile = () => {
     if (!fs.existsSync(instancesPath)) {
-        fs.writeFileSync(instancesPath, JSON.stringify([], null, 2), 'utf8');
+        writeJsonAtomic(instancesPath, []);
     }
 };
 
@@ -28,7 +28,7 @@ const createContractManager = (instanceId) => {
         const idx = instances.findIndex(i => i.id === instanceId);
         if (idx === -1) throw new Error(`Instance ${instanceId} not found in instances.json`);
         instances[idx].contracts = contracts;
-        fs.writeFileSync(instancesPath, JSON.stringify(instances, null, 2), 'utf8');
+        writeJsonAtomic(instancesPath, instances);
     };
 
     const updateContractAddress = (contractName, newAddress, networkId) => {
@@ -230,7 +230,7 @@ const createContractManager = (instanceId) => {
         const idx = instances.findIndex(i => i.id === instanceId);
         if (idx === -1) throw new Error(`Instance ${instanceId} not found in instances.json`);
         instances[idx].openCallers = openCallers;
-        fs.writeFileSync(instancesPath, JSON.stringify(instances, null, 2), 'utf8');
+        writeJsonAtomic(instancesPath, instances);
     };
 
     const addInstanceCaller = (address, privateKey) => {
@@ -364,7 +364,7 @@ const createContractManager = (instanceId) => {
         if (idx === -1) throw new Error(`Instance ${instanceId} not found in instances.json`);
         if (!Array.isArray(instances[idx].transactions)) instances[idx].transactions = [];
         instances[idx].transactions.push(logEntry);
-        fs.writeFileSync(instancesPath, JSON.stringify(instances, null, 2), 'utf8');
+        writeJsonAtomic(instancesPath, instances);
     };
 
     return {
