@@ -284,4 +284,9 @@ html, body, #container {
   #js-toolbar > .w-px { display: none; }
   #js-toolbar > div { padding: 3px 2px !important; flex-wrap: wrap; justify-content: center; }
   #js-toolbar a, #js-toolbar button { padding: 5px 8px !important; font-size: 11px !important; }
+
+  /* Only Reset View and My Models on a phone */
+  #js-toolbar a, #js-toolbar button, #w3t-wrapper { display: none; }
+  #js-toolbar #js-reset-view, #js-toolbar #js-my-models { display: inline-block; }
+  #js-toolbar > div:not(:has(#js-reset-view)):not(:has(#js-my-models)) { display: none; }
 }

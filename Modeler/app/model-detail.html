@@ -4,6 +4,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script>
+    // phones only view diagrams: send them to the editor
+    if (window.matchMedia('(max-width: 768px)').matches) {
+      var q = new URLSearchParams(location.search).get('modelId');
+      location.replace(q ? '/editor?modelId=' + encodeURIComponent(q) : '/');
+    }
+  </script>
   <title>Model Detail – BPMN4BC</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="./model-detail.js" defer></script>

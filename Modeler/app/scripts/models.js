@@ -19,6 +19,7 @@ const backLink = document.getElementById('back-to-modeler-link');
 if (backLink) backLink.href = `${getBaseUrl()}/editor`;
 
 const editorUrl = (query = '') => `${getBaseUrl()}/editor${query}`;
+const isPhone = () => window.matchMedia('(max-width: 768px)').matches;
 
 // ── Start cards: create, import, fixed example ──────────────────────────────
 const EXAMPLES = [
@@ -210,7 +211,10 @@ function buildCard(model, instanceCount) {
   openBtn.className = 'flex-1 px-3 py-2 text-sm rounded border border-blue-400 text-blue-600 bg-white hover:bg-blue-50 font-medium';
   openBtn.textContent = 'Open';
   openBtn.onclick = () => {
-    window.location.href = `${getBaseUrl()}/model-detail.html?modelId=${model.id}`;
+    // phones only view diagrams: open the editor instead of the instance page
+    window.location.href = isPhone()
+      ? editorUrl(`?modelId=${model.id}`)
+      : `${getBaseUrl()}/model-detail.html?modelId=${model.id}`;
   };
 
   const editBtn = document.createElement('button');
