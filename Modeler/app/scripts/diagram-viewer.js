@@ -3,11 +3,11 @@ import CustomRenderer from '../custom/CustomRenderer';
 import bcExtension from '../../resources/BC';
 
 function getBaseUrl() {
+  // Behind traefik the modeler is served under /{hash}/modeler/ (on any host, including
+  // localhost); run directly (e.g. localhost:5000) it is served from the root.
   const origin = window.location.origin;
-  const hostname = window.location.hostname;
-  if (hostname === 'localhost') return origin;
   const parts = window.location.pathname.split('/').filter(Boolean);
-  if (parts.length >= 2) return `${origin}/${parts[0]}/${parts[1]}`;
+  if (parts.length >= 2 && parts[1] === 'modeler') return `${origin}/${parts[0]}/${parts[1]}`;
   return origin;
 }
 
