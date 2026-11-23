@@ -102,7 +102,21 @@ async function syncChains() {
 }
 
 // ── Health ──────────────────────────────────────────────────────────────────
-app.get('/health', (req, res) => res.status(200).json({ ok: true }));
+app.get('/health', async (req, res) => {
+  // Current block number of each chain: if it does not grow while nobody uses the app,
+  // the chains are not producing empty blocks.
+  const chains = {};
+  await Promise.all([...KNOWN_NETWORKS].map(async (network) => {
+    try {
+      const { data } = await axios.post(NETWORKS[network].url,
+        { jsonrpc: '2.0', id: 1, method: 'eth_blockNumber', params: [] }, { timeout: 3000 });
+      chains[network] = parseInt(data.result, 16);
+    } catch (e) {
+      chains[network] = `unreachable (${e.code || e.message})`;
+    }
+  }));
+  res.status(200).json({ ok: true, blocks: chains });
+});
 
 // ── Queries and task execution on deployed instances ────────────────────────
 
