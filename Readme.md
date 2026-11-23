@@ -2,7 +2,7 @@
 
 A modeling and execution environment for **blockchain-based business processes**. Processes are
 modeled in BPMN with blockchain extensions (on-chain pools and tasks, permissioned and
-permissionless participants, payable tasks, block timers, multi-instance and shared pools,
+permissionless participants, payable tasks, timer events, multi-instance and shared pools,
 data stores), compiled to upgradeable Solidity contracts, deployed to local test chains and
 executed step by step from the browser.
 
@@ -30,9 +30,9 @@ In *Service-Oriented Computing – ICSOC 2025*, Lecture Notes in Computer Scienc
 | Service | Folder | What it does |
 |---|---|---|
 | Modeler | `Modeler/` | bpmn-js web app (modeling, validation, deployment, execution panel) and the API gateway |
-| Compiler | `Compiler/` | BPMN XML → Solidity (ERC-7201 storage, UUPS proxies, role checks, timers) |
+| Compiler | `Compiler/` | BPMN XML → Solidity (ERC-7201 storage, UUPS proxies, role checks); timer events are for modeling only |
 | Deployment | `Deployement/` | Hardhat project: compiles, deploys and runs the generated contracts; stores models and instances |
-| Chains | `Ganache/` | Two local ganache chains (`network-1`, `network-2`) with 1-second blocks |
+| Chains | `Ganache/` | Two local ganache chains (`network-1`, `network-2`) that mine a block when a transaction arrives |
 
 The browser talks only to the Modeler; the Modeler relays to the Compiler and Deployment
 services, and the Deployment service talks to the chains.
