@@ -18,9 +18,6 @@ executed step by step from the browser.
 The browser talks only to the Modeler; the Modeler relays to the Compiler and Deployment
 services, and the Deployment service talks to the chains.
 
-There are no accounts: each browser gets a random id (kept in localStorage) and sees only the
-models and instances it created.
-
 ## Run locally
 
 Requirement: [Docker Desktop](https://www.docker.com/products/docker-desktop/) (running).
