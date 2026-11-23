@@ -20,6 +20,12 @@ function isBcTimer(bo) {
   return !!bo && bo.bc === 'true' && bo.bcevent === 'timerEvent';
 }
 
+// The timer start event is off-chain only
+function isTimerStart(bo) {
+  return !!bo && bo.bcevent === 'timerStartEvent';
+}
+const TIMER_START_MSG = 'Timer start events are off-chain only and cannot be placed inside a blockchain pool.';
+
 /**
  * A custom rule provider that decides what elements can be
  * dropped where based on a `vendor:allowDrop` BPMN extension.
@@ -50,6 +56,11 @@ CustomRules.prototype.init = function () {
     const targetBo = (bcPool && is(target.businessObject, 'bpmn:SubProcess'))
       ? bcPool.businessObject
       : target.businessObject;
+
+    if (isTimerStart(shapeBo) && targetBo.bc === 'true') {
+      setTimeout(() => showErrorToast(TIMER_START_MSG), 0);
+      return false;
+    }
 
     // Helper function to check if an element is allowed in the blockchain environment
     function isAllowedInBlockchain(shapeBo) {
@@ -107,6 +118,16 @@ CustomRules.prototype.init = function () {
 
     // Allow the creation of the shape if none of the above rules apply
     return true;
+  });
+
+  // Moving a timer start event into a blockchain pool is not allowed either
+  this.addRule('elements.move', HIGH_PRIORITY, (context) => {
+    const { shapes, target } = context;
+    if (!target || !getBcPool(target)) return;
+    if ((shapes || []).some(s => isTimerStart(s.businessObject))) {
+      setTimeout(() => showErrorToast(TIMER_START_MSG), 0);
+      return false;
+    }
   });
 
   // Inside a BC pool, boundary events may only be attached to BC Script Tasks

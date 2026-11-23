@@ -44,15 +44,6 @@ export default function (element) {
         isEdited: isTextFieldEntryEdited
       });
     }
-  } else if (is(element, 'bpmn:StartEvent') && element.businessObject.bc == "true" && element.businessObject.bcevent === 'timerStartEvent') {
-    props.push(
-      {
-        id: 'blocks',
-        element,
-        component: Blocks,
-        isEdited: isTextFieldEntryEdited
-      }
-    );
   } else if (is(element, 'bpmn:IntermediateCatchEvent') && element.businessObject.bc == "true") {
     if (element.businessObject.bcevent === 'timerEvent') {
       props.push(
@@ -230,7 +221,7 @@ function Blocks(props) {
     id=${id}
     element=${element}
     label=${translate('Blocks')}
-    description=${translate('Number of blocks that must pass before the following Receive Task can be called.')}
+    description=${translate('Waiting time in blocks. For documentation only: the generated contract does not enforce it.')}
     getValue=${getValue}
     setValue=${setValue}
     debounce=${debounce}

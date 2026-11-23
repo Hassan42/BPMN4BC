@@ -174,22 +174,22 @@ export default class CustomPalette {
         },
         className: 'custom-palette',
       },
-      'BCStartTimer': {
-        group: 'BC',
-        imageUrl: BCSTIMERSTART,
-        title: translate('Create blockchain start timer event'),
-        action: {
-          dragstart: createElement("true", "StartEvent", "timerStartEvent"),
-          click: createElement("true", "StartEvent", "timerStartEvent")
-        },
-        className: 'custom-palette',
-      },
 
       // ── Off-Chain subgroup ────────────────────────────────────────────────
       'OnChainLabel': {
         group: 'BC',
         html: '<div class="custom-palette-sublabel">Off-Chain</div>',
         action: { click: function () { } }
+      },
+      'BCStartTimer': {
+        group: 'BC',
+        imageUrl: BCSTIMERSTART,
+        title: translate('Create timer start event (off-chain)'),
+        action: {
+          dragstart: createElement("true", "StartEvent", "timerStartEvent"),
+          click: createElement("true", "StartEvent", "timerStartEvent")
+        },
+        className: 'custom-palette',
       },
       'SEND': {
         group: 'BC',
