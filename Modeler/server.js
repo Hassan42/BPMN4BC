@@ -9,7 +9,7 @@ const PORT = parseInt(process.env.PORT || '5000', 10);
 const DEP_API_BASE_URL = process.env.DEP_API_BASE_URL || 'http://localhost:3000'; // deployment service
 const COM_API_BASE_URL = process.env.COM_API_BASE_URL || 'http://localhost:8000'; // compiler service
 
-// Behind Railway's / traefik's proxy: take the client IP from X-Forwarded-For (for rate limiting).
+// Behind Railway's (or any) reverse proxy: take the client IP from X-Forwarded-For (for rate limiting).
 app.set('trust proxy', true);
 
 // Request log (method + path only; bodies can be whole BPMN files)

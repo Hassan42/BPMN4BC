@@ -11,7 +11,7 @@ COPY . .
 # Build the webpack bundle once at image-build time (not on every container start)
 RUN npm run build
 
-# Defaults for the docker-compose setup (Docker service names in the student network).
+# Defaults for running the services as containers on one Docker network.
 # On Railway these are overridden by the service variables.
 ENV PORT=5000
 ENV DEP_API_BASE_URL=http://deployment:3000

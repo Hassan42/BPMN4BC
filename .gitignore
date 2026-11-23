@@ -9,5 +9,15 @@ Deployement/contracts
 Deployement/artifacts
 Deployement/cache
 .ipynb_checkpoints
-students
 Modeler/resources/attempts
+
+# never commit personal or analysis data
+students/
+*.csv
+*.xlsx
+*.ipynb
+*.pdf
+# local service data
+Deployement/data/
+Deployement/.openzeppelin/
+.claude/

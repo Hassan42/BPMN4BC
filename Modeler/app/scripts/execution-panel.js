@@ -7,7 +7,7 @@ const loadingSpinner = document.getElementById('loading-spinner');
 const instancesSection = document.getElementById('instancesSection');
 
 function getBaseUrl() {
-  // Behind traefik the modeler is served under /{hash}/modeler/ (on any host, including
+  // Behind a path-based reverse proxy the modeler is served under /{id}/modeler/ (on any host, including
   // localhost); run directly (e.g. localhost:5000) it is served from the root.
   const origin = window.location.origin;
   const parts = window.location.pathname.split('/').filter(Boolean);
