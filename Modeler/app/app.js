@@ -1,4 +1,5 @@
 import './scripts/clientId.js'; // must come first: adds the visitor id to /api/ requests
+import touchNavigation from './touch';
 import BpmnModeler from 'bpmn-js/lib/Modeler';
 
 import {
@@ -51,6 +52,7 @@ const bpmnModeler = new BpmnModeler({
     ZeebeBehaviorsModule,
     bcPropertiesProvider,
     customElements,
+    touchNavigation,
   ],
   moddleExtensions: {
     bc: bcExtension,
