@@ -83,6 +83,7 @@ app.use(express.json({ limit: process.env.BODY_LIMIT || '10mb' }));
 app.use(express.static(path.join(__dirname, 'public'), { index: false }));
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'models.html')));
 app.get('/editor', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+app.get('/constructs', (req, res) => res.sendFile(path.join(__dirname, 'public', 'constructs.html')));
 
 app.get('/health', (req, res) => res.status(200).json({ ok: true }));
 

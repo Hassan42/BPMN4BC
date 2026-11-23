@@ -7,7 +7,8 @@ module.exports = {
     'execution-panel': './app/scripts/execution-panel.js',
     'diagram-viewer': './app/scripts/diagram-viewer.js',
     'models': './app/scripts/models.js',
-    'model-detail': './app/scripts/model-detail.js'
+    'model-detail': './app/scripts/model-detail.js',
+    'constructs': './app/scripts/constructs.js'
   },
   output: {
     path: path.resolve(__dirname, 'public'),
