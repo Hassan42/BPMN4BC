@@ -15,9 +15,13 @@
 
     <!-- Header -->
     <div class="flex items-center justify-between mb-6">
-      <h1 class="text-2xl font-bold text-gray-800">My Models</h1>
-      <a id="back-to-modeler-link" href="#" class="px-4 py-2 text-sm rounded border border-gray-300 bg-white hover:bg-blue-50">
-        ← Back to Modeler
+      <div>
+        <h1 class="text-2xl font-bold text-gray-800">BPMN4BC</h1>
+        <p class="text-sm text-gray-500">Model blockchain-based processes, compile them to Solidity and run them on a test chain.</p>
+      </div>
+      <a id="back-to-modeler-link" href="#" class="px-4 py-2 text-sm rounded border border-gray-300 bg-white hover:bg-blue-50"
+        title="Continue the diagram you were last editing">
+        Open Modeler →
       </a>
     </div>
 
@@ -30,10 +34,15 @@
       </svg>
     </div>
 
+    <!-- Start: create / import / example (always shown) -->
+    <div id="start-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-10"></div>
+    <input type="file" id="import-input" accept=".bpmn,.xml" class="hidden" />
+
+    <h2 class="text-lg font-semibold text-gray-700 mb-4">My Models</h2>
+
     <!-- Empty state -->
-    <div id="empty-state" class="hidden text-center py-16 text-gray-500">
-      <p class="text-lg font-medium mb-2">No models saved yet.</p>
-      <p class="text-sm">Go back to the modeler and click <strong>Save Model</strong> to save your first process.</p>
+    <div id="empty-state" class="hidden text-center py-10 text-gray-500 border border-dashed border-gray-300 rounded-lg">
+      <p class="text-sm">No saved models yet. Create or import one, then click <strong>Save Model</strong> in the modeler.</p>
     </div>
 
     <!-- Models grid -->

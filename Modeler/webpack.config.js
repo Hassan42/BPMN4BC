@@ -35,7 +35,8 @@ module.exports = {
       patterns: [
         { from: 'assets/**', to: 'vendor/bpmn-js', context: 'node_modules/bpmn-js/dist/' },
         { from: 'dist/assets/properties-panel.css', to: 'vendor/properties-panel/properties-panel.css', context: 'node_modules/@bpmn-io/properties-panel/' },
-        { from: '**/*.{html,css}', context: 'app/' }  // Ensure HTML/CSS files are copied
+        { from: '**/*.{html,css}', context: 'app/' },  // Ensure HTML/CSS files are copied
+        { from: 'examples/**', context: 'app/' }        // fixed example diagrams shown on the landing page
       ]
     })
   ],

@@ -14,9 +14,106 @@ const grid    = document.getElementById('models-grid');
 const spinner = document.getElementById('loading-spinner');
 const empty   = document.getElementById('empty-state');
 
-// Fix back-to-modeler link to use correct base URL (handles /{hash}/modeler/ paths)
+// "Open Modeler" continues the autosaved diagram (handles /{hash}/modeler/ paths)
 const backLink = document.getElementById('back-to-modeler-link');
-if (backLink) backLink.href = `${getBaseUrl()}/`;
+if (backLink) backLink.href = `${getBaseUrl()}/editor`;
+
+const editorUrl = (query = '') => `${getBaseUrl()}/editor${query}`;
+
+// ── Start cards: create, import, fixed example ──────────────────────────────
+const EXAMPLES = [
+  {
+    id: 'payment',
+    name: 'Payment',
+    description: 'The payee requests an amount, the payer pays it, and the contract forwards the payment if the amount is right; otherwise it reverts.',
+  },
+];
+
+const ICONS = {
+  plus: '<path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />',
+  upload: '<path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 9l5-5m0 0l5 5m-5-5v12" />',
+};
+
+function actionCard({ icon, title, text, onClick }) {
+  const card = document.createElement('button');
+  card.type = 'button';
+  card.className = 'bg-white rounded-lg shadow border-2 border-dashed border-gray-300 hover:border-blue-400 hover:bg-blue-50 ' +
+    'flex flex-col items-center justify-center text-center p-6 min-h-[260px] transition-colors';
+  card.innerHTML = `
+    <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-blue-500 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">${ICONS[icon]}</svg>
+    <div class="font-bold text-gray-800 mb-1"></div>
+    <div class="text-sm text-gray-500"></div>`;
+  card.children[1].textContent = title;
+  card.children[2].textContent = text;
+  card.addEventListener('click', onClick);
+  return card;
+}
+
+function exampleCard(example) {
+  const card = document.createElement('div');
+  card.className = 'bg-white rounded-lg shadow border border-gray-200 overflow-hidden flex flex-col';
+  card.innerHTML = `
+    <div class="bg-gray-50 border-b border-gray-200 flex items-center justify-center p-2" style="height:180px">
+      <img alt="" class="max-h-full max-w-full object-contain" />
+    </div>
+    <div class="p-4 flex flex-col flex-1">
+      <div class="flex items-center gap-2 mb-1">
+        <span class="font-bold text-gray-800 text-base truncate"></span>
+        <span class="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium">Example</span>
+      </div>
+      <div class="text-xs text-gray-500 mb-3"></div>
+      <button type="button" class="mt-auto px-3 py-2 text-sm rounded border border-blue-400 text-blue-600 bg-white hover:bg-blue-50 font-medium">
+        Open in Modeler
+      </button>
+    </div>`;
+  const img = card.querySelector('img');
+  img.src = `${getBaseUrl()}/examples/${example.id}.svg`;
+  img.onerror = () => { img.replaceWith(Object.assign(document.createElement('span'), { className: 'text-xs text-gray-300', textContent: 'No preview' })); };
+  card.querySelector('span').textContent = example.name;
+  card.querySelector('.text-xs.text-gray-500').textContent = example.description;
+  card.querySelector('button').addEventListener('click', () => {
+    window.location.href = editorUrl(`?example=${encodeURIComponent(example.id)}`);
+  });
+  return card;
+}
+
+const importInput = document.getElementById('import-input');
+importInput.addEventListener('change', () => {
+  const file = importInput.files[0];
+  importInput.value = '';
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    const xml = String(reader.result || '');
+    if (!xml.includes('definitions')) {
+      alert('This file does not look like a BPMN diagram.');
+      return;
+    }
+    try {
+      sessionStorage.setItem('bpmn4bc_import', xml);
+    } catch (_) {
+      alert('The file is too large to import.');
+      return;
+    }
+    window.location.href = editorUrl('?import=1');
+  };
+  reader.readAsText(file);
+});
+
+const startGrid = document.getElementById('start-grid');
+startGrid.appendChild(actionCard({
+  icon: 'plus',
+  title: 'Create Model',
+  text: 'Start from an empty diagram.',
+  onClick: () => { window.location.href = editorUrl('?new=1'); },
+}));
+startGrid.appendChild(actionCard({
+  icon: 'upload',
+  title: 'Import Model',
+  text: 'Open a .bpmn file from your computer.',
+  onClick: () => importInput.click(),
+}));
+EXAMPLES.forEach(example => startGrid.appendChild(exampleCard(example)));
 
 // ── Delete modal helpers ─────────────────────────────────────────────────────
 const deleteModal   = document.getElementById('delete-modal');
@@ -123,7 +220,7 @@ function buildCard(model, instanceCount) {
     <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
   </svg>`;
   editBtn.onclick = () => {
-    window.location.href = `${getBaseUrl()}/?modelId=${model.id}`;
+    window.location.href = editorUrl(`?modelId=${model.id}`);
   };
 
   const dlBtn = document.createElement('button');
