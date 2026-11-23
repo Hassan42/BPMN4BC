@@ -9,8 +9,67 @@ const PORT = parseInt(process.env.PORT || '5000', 10);
 const DEP_API_BASE_URL = process.env.DEP_API_BASE_URL || 'http://localhost:3000'; // deployment service
 const COM_API_BASE_URL = process.env.COM_API_BASE_URL || 'http://localhost:8000'; // compiler service
 
-// Behind Railway's (or any) reverse proxy: take the client IP from X-Forwarded-For (for rate limiting).
-app.set('trust proxy', true);
+// Behind a reverse proxy (Railway, traefik, Caddy): trust only the address added by the proxy itself.
+// "true" would trust the whole X-Forwarded-For header, which a client can fake to dodge the limits.
+app.set('trust proxy', parseInt(process.env.TRUST_PROXY_HOPS || '1', 10));
+
+// ── Rate limiting (in memory, per client IP) ────────────────────────────────
+// Public showcase without accounts. Fixed-window counters, so memory stays small per IP.
+// This protects against one visitor or a small script; a large distributed attack has to be
+// filtered in front of the app (e.g. Cloudflare).
+const env = (name, fallback) => parseInt(process.env[name] || String(fallback), 10);
+const MAX_TRACKED_KEYS = 100000;
+const counters = new Map(); // `${bucket}:${ip}` → { count, start }
+
+function rateLimit(bucket, max, windowMs, message) {
+  return (req, res, next) => {
+    const key = `${bucket}:${req.ip}`;
+    const now = Date.now();
+    let entry = counters.get(key);
+    if (!entry || now - entry.start >= windowMs) {
+      if (counters.size >= MAX_TRACKED_KEYS) counters.clear(); // flood of addresses: start over
+      entry = { count: 0, start: now };
+      counters.set(key, entry);
+    }
+    entry.count++;
+    if (entry.count > max) {
+      res.set('Retry-After', String(Math.ceil((windowMs - (now - entry.start)) / 1000)));
+      return res.status(429).json({ error: message });
+    }
+    next();
+  };
+}
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, entry] of counters) if (now - entry.start > 10 * 60 * 1000) counters.delete(key);
+}, 60 * 1000).unref();
+
+const MINUTE = 60 * 1000;
+// every request, pages and files included
+const globalLimit = rateLimit('all', env('RATE_LIMIT_GLOBAL', 300), MINUTE, 'Too many requests, please slow down.');
+// compile / validate / deploy, per 10 minutes
+const heavyPerIp = rateLimit('heavy', env('RATE_LIMIT_HEAVY', 30), 10 * MINUTE, 'Too many requests, please wait a few minutes and try again.');
+// other API calls, per 10 minutes
+const normal = rateLimit('normal', env('RATE_LIMIT_NORMAL', 600), 10 * MINUTE, 'Too many requests, please wait a few minutes and try again.');
+
+// At most N heavy jobs waiting at once across all visitors; the backend runs them one by one.
+const MAX_PENDING_HEAVY = env('MAX_PENDING_HEAVY', 5);
+let pendingHeavy = 0;
+function heavySlot(req, res, next) {
+  if (pendingHeavy >= MAX_PENDING_HEAVY) {
+    res.set('Retry-After', '30');
+    return res.status(503).json({ error: 'The server is busy with other deployments, please try again in a minute.' });
+  }
+  pendingHeavy++;
+  let released = false;
+  const release = () => { if (!released) { released = true; pendingHeavy--; } };
+  res.on('finish', release);
+  res.on('close', release);
+  next();
+}
+const heavy = [heavyPerIp, heavySlot];
+
+app.use(globalLimit);
 
 // Request log (method + path only; bodies can be whole BPMN files)
 app.use((req, res, next) => {
@@ -19,7 +78,7 @@ app.use((req, res, next) => {
 });
 
 app.use(cors());
-app.use(express.json({ limit: '50mb' }));
+app.use(express.json({ limit: process.env.BODY_LIMIT || '10mb' }));
 // "/" is the models list (landing page); the editor lives at /editor
 app.use(express.static(path.join(__dirname, 'public'), { index: false }));
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'models.html')));
@@ -57,33 +116,6 @@ app.get('/health/backends', async (req, res) => {
   };
   res.json(await Promise.all([check('deployment', DEP_API_BASE_URL), check('compiler', COM_API_BASE_URL)]));
 });
-
-// ── Rate limiting (in memory, per client IP) ────────────────────────────────
-// Public showcase without accounts: cap the expensive actions so one visitor cannot keep the
-// shared compiler / chains busy. Limits are per 10 minutes and can be tuned with env vars.
-const WINDOW_MS = 10 * 60 * 1000;
-const hits = new Map(); // key → [timestamps]
-function rateLimit(bucket, max) {
-  return (req, res, next) => {
-    const key = `${bucket}:${req.ip}`;
-    const now = Date.now();
-    const recent = (hits.get(key) || []).filter(t => now - t < WINDOW_MS);
-    if (recent.length >= max) {
-      res.set('Retry-After', String(Math.ceil((WINDOW_MS - (now - recent[0])) / 1000)));
-      return res.status(429).json({ error: 'Too many requests, please wait a few minutes and try again.' });
-    }
-    recent.push(now);
-    hits.set(key, recent);
-    next();
-  };
-}
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, times] of hits) if (!times.some(t => now - t < WINDOW_MS)) hits.delete(key);
-}, WINDOW_MS).unref();
-
-const heavy = rateLimit('heavy', parseInt(process.env.RATE_LIMIT_HEAVY || '30', 10));   // compile/validate/deploy
-const normal = rateLimit('normal', parseInt(process.env.RATE_LIMIT_NORMAL || '600', 10)); // everything else
 
 // ── Attempt logger — appends all validation attempts to attempts.json ───────
 const attemptsDir = process.env.ATTEMPTS_DIR || path.join(__dirname, 'resources', 'attempts');
