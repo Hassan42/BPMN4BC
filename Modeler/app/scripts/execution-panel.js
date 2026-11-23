@@ -1,3 +1,4 @@
+import './clientId.js'; // must come first: adds the visitor id to /api/ requests
 import { fetchData, fetchInstance, fetchInstances, deleteInstance } from './api.js';
 import { renderTabs, renderTransactionLog } from './ui/tabs.js';
 import { GAS_PRICE_GWEI, getEthChfRate, gasToCHF, formatCHF } from './pricing.js';

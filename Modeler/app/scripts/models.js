@@ -1,3 +1,4 @@
+import './clientId.js'; // must come first: adds the visitor id to /api/ requests
 import { fetchModels, fetchModel, deleteModel, fetchInstances } from './api.js';
 
 function getBaseUrl() {

@@ -1,3 +1,4 @@
+import './clientId.js'; // must come first: adds the visitor id to /api/ requests
 import NavigatedViewer from 'bpmn-js/lib/NavigatedViewer';
 import CustomRenderer from '../custom/CustomRenderer';
 import bcExtension from '../../resources/BC';

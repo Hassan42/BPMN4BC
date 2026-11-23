@@ -4,292 +4,165 @@ const cors = require('cors');
 const fs = require('fs');
 
 const app = express();
-const PORT = 5000;
+const PORT = parseInt(process.env.PORT || '5000', 10);
 
-const DEP_API_BASE_URL = process.env.DEP_API_BASE_URL || 'http://localhost:3000'; //base url for deployer
-const COM_API_BASE_URL = process.env.COM_API_BASE_URL || 'http://localhost:8000'; //base url for compiler
+const DEP_API_BASE_URL = process.env.DEP_API_BASE_URL || 'http://localhost:3000'; // deployment service
+const COM_API_BASE_URL = process.env.COM_API_BASE_URL || 'http://localhost:8000'; // compiler service
 
-// Middleware to log incoming requests
+// Behind Railway's / traefik's proxy: take the client IP from X-Forwarded-For (for rate limiting).
+app.set('trust proxy', true);
+
+// Request log (method + path only; bodies can be whole BPMN files)
 app.use((req, res, next) => {
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
-
-  if (req.body && typeof req.body === 'object' && Object.keys(req.body).length > 0) {
-    console.log('Body:', JSON.stringify(req.body, null, 2));
-  }
-
+  if (req.path.startsWith('/api/')) console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
   next();
 });
 
-// Middleware
-app.use(cors()); // Allow cross-origin requests (optional)
-app.use(express.json({ limit: '50mb' })); // Parse JSON request bodies
+app.use(cors());
+app.use(express.json({ limit: '50mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// **Attempt logger — appends all attempts to a single attempts.json file**
-const attemptsFile = path.join(__dirname, 'resources', 'attempts', 'attempts.json');
+app.get('/health', (req, res) => res.status(200).json({ ok: true }));
+
+// ── Rate limiting (in memory, per client IP) ────────────────────────────────
+// Public showcase without accounts: cap the expensive actions so one visitor cannot keep the
+// shared compiler / chains busy. Limits are per 10 minutes and can be tuned with env vars.
+const WINDOW_MS = 10 * 60 * 1000;
+const hits = new Map(); // key → [timestamps]
+function rateLimit(bucket, max) {
+  return (req, res, next) => {
+    const key = `${bucket}:${req.ip}`;
+    const now = Date.now();
+    const recent = (hits.get(key) || []).filter(t => now - t < WINDOW_MS);
+    if (recent.length >= max) {
+      res.set('Retry-After', String(Math.ceil((WINDOW_MS - (now - recent[0])) / 1000)));
+      return res.status(429).json({ error: 'Too many requests, please wait a few minutes and try again.' });
+    }
+    recent.push(now);
+    hits.set(key, recent);
+    next();
+  };
+}
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, times] of hits) if (!times.some(t => now - t < WINDOW_MS)) hits.delete(key);
+}, WINDOW_MS).unref();
+
+const heavy = rateLimit('heavy', parseInt(process.env.RATE_LIMIT_HEAVY || '30', 10));   // compile/validate/deploy
+const normal = rateLimit('normal', parseInt(process.env.RATE_LIMIT_NORMAL || '600', 10)); // everything else
+
+// ── Attempt logger — appends all validation attempts to attempts.json ───────
+const attemptsDir = process.env.ATTEMPTS_DIR || path.join(__dirname, 'resources', 'attempts');
+const attemptsFile = path.join(attemptsDir, 'attempts.json');
 
 function saveAttempt({ bpmn, errors }) {
   try {
-    const dir = path.dirname(attemptsFile);
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-
+    if (!fs.existsSync(attemptsDir)) fs.mkdirSync(attemptsDir, { recursive: true });
     let attempts = [];
     if (fs.existsSync(attemptsFile)) {
       try { attempts = JSON.parse(fs.readFileSync(attemptsFile, 'utf8')); } catch (_) {}
     }
-
-    attempts.push({
-      timestamp: new Date().toISOString(),
-      bpmn,
-      errors: errors || null
-    });
-
-    fs.writeFileSync(attemptsFile, JSON.stringify(attempts, null, 2), 'utf8');
-    console.log('Attempt logged → attempts.json');
+    attempts.push({ timestamp: new Date().toISOString(), bpmn, errors: errors || null });
+    const tmp = `${attemptsFile}.tmp`;
+    fs.writeFileSync(tmp, JSON.stringify(attempts, null, 2), 'utf8');
+    fs.renameSync(tmp, attemptsFile);
   } catch (err) {
     console.error('Failed to save attempt log:', err.message);
   }
 }
 
-// **Helper function to handle API requests safely**
-async function safeFetch(url, options = {}) {
+// ── Relay helper ────────────────────────────────────────────────────────────
+// Forwards a request to a backend service, passing the visitor id (X-Client-Id) along, and
+// returns the backend's status code. Errors are reported as { error } like before.
+async function relay(req, res, url, { method = req.method, body } = {}) {
   try {
+    const headers = { 'X-Client-Id': req.get('x-client-id') || '' };
+    const options = { method, headers };
+    if (body !== undefined) {
+      headers['Content-Type'] = 'application/json';
+      options.body = JSON.stringify(body);
+    }
     const response = await fetch(url, options);
+    const text = await response.text();
+    let data;
+    try { data = JSON.parse(text); } catch (_) { data = null; }
 
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`Error from ${url}: ${errorText}`);
-      throw new Error(`${errorText}`);
+      console.error(`Error from ${url} (${response.status}): ${text.slice(0, 500)}`);
+      const raw = data ? (data.error !== undefined ? data.error : (data.message || text)) : text;
+      const message = typeof raw === 'string' ? raw : JSON.stringify(raw);
+      res.status(response.status >= 400 ? response.status : 500).json({ ...(data && typeof data === 'object' ? data : {}), error: message });
+      return { ok: false, data, message };
     }
-
-    return await response.json();
+    res.json(data);
+    return { ok: true, data };
   } catch (error) {
     console.error(`Request to ${url} failed:`, error.message);
-    throw error; // Rethrow for the caller to handle
+    res.status(502).json({ error: `Backend unavailable: ${error.message}` });
+    return { ok: false, data: null, message: error.message };
   }
 }
 
-// **Relay GET request to fetch all instances (optionally filtered by ?modelId=)**
-app.get('/api/instances', async (req, res) => {
-  try {
-    const qs = req.query.modelId !== undefined ? `?modelId=${encodeURIComponent(req.query.modelId)}` : '';
-    const data = await safeFetch(`${DEP_API_BASE_URL}/instances${qs}`);
-    res.json(data);
-  } catch (error) {
-    res.status(500).json({ error: `${error.message}` });
-  }
+const dep = (p) => `${DEP_API_BASE_URL}${p}`;
+const id = (req) => encodeURIComponent(req.params.id);
+
+// ── Instances ───────────────────────────────────────────────────────────────
+app.get('/api/instances', normal, (req, res) => {
+  const qs = req.query.modelId !== undefined ? `?modelId=${encodeURIComponent(req.query.modelId)}` : '';
+  relay(req, res, dep(`/instances${qs}`));
+});
+app.get('/api/instances/:id', normal, (req, res) => relay(req, res, dep(`/instances/${id(req)}`)));
+app.delete('/api/instances/:id', normal, (req, res) => relay(req, res, dep(`/instances/${id(req)}`)));
+
+app.get('/api/query', normal, (req, res) => {
+  const { instanceId } = req.query;
+  if (!instanceId) return res.status(400).json({ error: 'Missing instanceId query parameter' });
+  relay(req, res, dep(`/query?instanceId=${encodeURIComponent(instanceId)}`));
 });
 
-// **Relay GET request to fetch a single instance by id**
-app.get('/api/instances/:id', async (req, res) => {
-  try {
-    const data = await safeFetch(`${DEP_API_BASE_URL}/instances/${req.params.id}`);
-    res.json(data);
-  } catch (error) {
-    res.status(500).json({ error: `${error.message}` });
-  }
-});
+// ── Execution ───────────────────────────────────────────────────────────────
+app.post('/api/executeTask', normal, (req, res) => relay(req, res, dep('/executeTask'), { body: req.body }));
+app.post('/api/queryMapping', normal, (req, res) => relay(req, res, dep('/queryMapping'), { body: req.body }));
+app.post('/api/createOpenCaller', normal, (req, res) => relay(req, res, dep('/createOpenCaller'), { body: req.body }));
+app.post('/api/fundAddress', normal, (req, res) => relay(req, res, dep('/fundAddress'), { body: req.body }));
+app.post('/api/queryBalance', normal, (req, res) => relay(req, res, dep('/queryBalance'), { body: req.body }));
 
-// **Relay DELETE request to remove an instance**
-app.delete('/api/instances/:id', async (req, res) => {
-  try {
-    const data = await safeFetch(`${DEP_API_BASE_URL}/instances/${req.params.id}`, {
-      method: 'DELETE'
-    });
-    res.json(data);
-  } catch (error) {
-    res.status(500).json({ error: `${error.message}` });
-  }
-});
-
-// **Relay GET request to fetch data for a specific instance**
-app.get('/api/query', async (req, res) => {
-  try {
-    const { instanceId } = req.query;
-    if (!instanceId) return res.status(400).json({ error: 'Missing instanceId query parameter' });
-    console.log(`Fetching data for instance ${instanceId}...`);
-    const data = await safeFetch(`${DEP_API_BASE_URL}/query?instanceId=${instanceId}`);
-    res.json(data);
-  } catch (error) {
-    res.status(500).json({ error: `${error.message}` });
-  }
-});
-
-// **Relay POST request to execute task**
-app.post('/api/executeTask', async (req, res) => {
-  try {
-    console.log('Executing task via external API...');
-    const data = await safeFetch(`${DEP_API_BASE_URL}/executeTask`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(req.body),
-    });
-    res.json(data);
-  } catch (error) {
-    res.status(500).json({ error: `${error.message}` });
-  }
-});
-
-// **Relay POST request to deploy BPMN diagram as a new instance**
-app.post('/api/deploy', async (req, res) => {
+// ── Deploy / validate / compile ─────────────────────────────────────────────
+app.post('/api/deploy', heavy, (req, res) => {
   const { xml, name, modelId } = req.body;
-
   if (!xml) return res.status(400).json({ error: 'Missing XML in request body' });
-
-  console.log('Deploying BPMN diagram as new instance...');
-  try {
-    const data = await safeFetch(`${DEP_API_BASE_URL}/deploy_instance`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ xml, name, modelId: modelId || null })
-    });
-
-    res.json(data);
-  } catch (error) {
-    console.error('Deployment error:', error);
-    res.status(500).json({ error: `${error.message}` });
-  }
+  relay(req, res, dep('/deploy_instance'), { body: { xml, name, modelId: modelId || null } });
 });
 
-// **Relay POST request to validate BPMN (compile + Hardhat compile, no deploy)**
-app.post('/api/validate', async (req, res) => {
-  const { xml } = req.body;
-  try {
-    const response = await fetch(`${DEP_API_BASE_URL}/validate`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(req.body)
-    });
-    const data = await response.json();
-
-    saveAttempt({ bpmn: xml, errors: response.ok ? null : (data.error || data.message || null) });
-
-    res.status(response.status).json(data);
-  } catch (error) {
-    saveAttempt({ bpmn: xml, errors: error.message });
-    res.status(500).json({ error: error.message });
-  }
+app.post('/api/validate', heavy, async (req, res) => {
+  const { ok, message } = await relay(req, res, dep('/validate'), { body: req.body });
+  saveAttempt({ bpmn: req.body.xml, errors: ok ? null : message || 'Validation request failed' });
 });
 
-// **Model CRUD relay routes**
-app.post('/api/models', async (req, res) => {
-  try {
-    const data = await safeFetch(`${DEP_API_BASE_URL}/models`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(req.body)
-    });
-    res.json(data);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
+app.post('/api/compile', heavy, (req, res) => relay(req, res, `${COM_API_BASE_URL}/compile`, { body: req.body }));
 
-app.get('/api/models', async (req, res) => {
-  try {
-    const data = await safeFetch(`${DEP_API_BASE_URL}/models`);
-    res.json(data);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
+// ── Models ──────────────────────────────────────────────────────────────────
+app.post('/api/models', normal, (req, res) => relay(req, res, dep('/models'), { body: req.body }));
+app.get('/api/models', normal, (req, res) => relay(req, res, dep('/models')));
+app.get('/api/models/:id', normal, (req, res) => relay(req, res, dep(`/models/${id(req)}`)));
+app.delete('/api/models/:id', normal, (req, res) => relay(req, res, dep(`/models/${id(req)}`)));
 
-app.get('/api/models/:id', async (req, res) => {
-  try {
-    const data = await safeFetch(`${DEP_API_BASE_URL}/models/${req.params.id}`);
-    res.json(data);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.delete('/api/models/:id', async (req, res) => {
-  try {
-    const data = await safeFetch(`${DEP_API_BASE_URL}/models/${req.params.id}`, { method: 'DELETE' });
-    res.json(data);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-// **Relay POST request to query a mapping variable by key**
-app.post('/api/queryMapping', async (req, res) => {
-  try {
-    const data = await safeFetch(`${DEP_API_BASE_URL}/queryMapping`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(req.body)
-    });
-    res.json(data);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// **Relay POST request to create a funded open-caller wallet**
-app.post('/api/createOpenCaller', async (req, res) => {
-  try {
-    const data = await safeFetch(`${DEP_API_BASE_URL}/createOpenCaller`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(req.body)
-    });
-    res.json(data);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// **Relay POST request to fund any address from the deployer**
-app.post('/api/fundAddress', async (req, res) => {
-  try {
-    const data = await safeFetch(`${DEP_API_BASE_URL}/fundAddress`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(req.body)
-    });
-    res.json(data);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// **Relay POST request to query a balance by key**
-app.post('/api/queryBalance', async (req, res) => {
-  try {
-    const data = await safeFetch(`${DEP_API_BASE_URL}/queryBalance`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(req.body)
-    });
-    res.json(data);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-
-
-// **Relay POST request to compile BPMN diagram**
-app.post('/api/compile', async (req, res) => {
-  try {
-    console.log('Compiling BPMN diagram...');
-    const data = await safeFetch(`${COM_API_BASE_URL}/compile`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(req.body),
-    });
-    res.json(data);
-  } catch (error) {
-    res.status(500).json({ error: `${error.message}` });
-  }
-});
+// Unknown API routes → 404 JSON (instead of the index.html fallback)
+app.all('/api/*', (req, res) => res.status(404).json({ error: 'Not found' }));
 
 // Catch-all route to serve the frontend
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Start Express server
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server is running on http://localhost:${PORT}`);
+// Listen on IPv6 "::" (dual-stack; needed for Railway), falling back to IPv4.
+const server = app.listen(PORT, process.env.HOST || '::', () => {
+  console.log(`Modeler running on port ${PORT} (deployment: ${DEP_API_BASE_URL}, compiler: ${COM_API_BASE_URL})`);
+});
+server.on('error', (err) => {
+  if (!process.env.HOST && (err.code === 'EAFNOSUPPORT' || err.code === 'EADDRNOTAVAIL')) {
+    app.listen(PORT, '0.0.0.0', () => console.log(`Modeler running on 0.0.0.0:${PORT}`));
+  } else {
+    throw err;
+  }
 });

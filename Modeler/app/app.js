@@ -1,3 +1,4 @@
+import './scripts/clientId.js'; // must come first: adds the visitor id to /api/ requests
 import BpmnModeler from 'bpmn-js/lib/Modeler';
 
 import {

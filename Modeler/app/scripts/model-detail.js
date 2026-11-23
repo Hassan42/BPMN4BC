@@ -1,3 +1,4 @@
+import './clientId.js'; // must come first: adds the visitor id to /api/ requests
 import { fetchModel, fetchInstances, deleteInstance } from './api.js';
 import { gasToCHF, getEthChfRate, formatCHF } from './pricing.js';
 import hljs from 'highlight.js/lib/core';
