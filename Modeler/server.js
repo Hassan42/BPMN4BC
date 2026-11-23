@@ -27,6 +27,37 @@ app.get('/editor', (req, res) => res.sendFile(path.join(__dirname, 'public', 'in
 
 app.get('/health', (req, res) => res.status(200).json({ ok: true }));
 
+// Explain why a backend error happened: Node's fetch only says "fetch failed"; the cause has the code.
+const describeError = (error) => {
+  const cause = error && error.cause;
+  if (!cause) return error.message;
+  const parts = [cause.code, cause.message].filter(Boolean);
+  if (cause.errors) parts.push(cause.errors.map(e => `${e.code || ''} ${e.address || ''}:${e.port || ''}`.trim()).join(', '));
+  return `${error.message} (${parts.join(': ')})`;
+};
+
+// Diagnostics: can the modeler reach the deployment and compiler services?
+app.get('/health/backends', async (req, res) => {
+  const dns = require('dns').promises;
+  const check = async (name, base) => {
+    const result = { name, url: base };
+    try {
+      const host = new URL(base).hostname;
+      result.resolves = (await dns.lookup(host, { all: true })).map(a => a.address);
+    } catch (e) {
+      result.resolves = `DNS failed: ${e.code || e.message}`;
+    }
+    try {
+      const r = await fetch(`${base}/health`, { signal: AbortSignal.timeout(5000) });
+      result.health = `${r.status} ${await r.text()}`;
+    } catch (e) {
+      result.health = `failed: ${describeError(e)}`;
+    }
+    return result;
+  };
+  res.json(await Promise.all([check('deployment', DEP_API_BASE_URL), check('compiler', COM_API_BASE_URL)]));
+});
+
 // ── Rate limiting (in memory, per client IP) ────────────────────────────────
 // Public showcase without accounts: cap the expensive actions so one visitor cannot keep the
 // shared compiler / chains busy. Limits are per 10 minutes and can be tuned with env vars.
@@ -100,9 +131,10 @@ async function relay(req, res, url, { method = req.method, body } = {}) {
     res.json(data);
     return { ok: true, data };
   } catch (error) {
-    console.error(`Request to ${url} failed:`, error.message);
-    res.status(502).json({ error: `Backend unavailable: ${error.message}` });
-    return { ok: false, data: null, message: error.message };
+    const reason = describeError(error);
+    console.error(`Request to ${url} failed: ${reason}`);
+    res.status(502).json({ error: `Backend unavailable: ${reason}` });
+    return { ok: false, data: null, message: reason };
   }
 }
 
