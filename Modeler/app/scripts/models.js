@@ -102,12 +102,20 @@ importInput.addEventListener('change', () => {
 });
 
 const startGrid = document.getElementById('start-grid');
-startGrid.appendChild(actionCard({
-  icon: 'plus',
-  title: 'Create Model',
-  text: 'Start from an empty diagram.',
-  onClick: () => { window.location.href = editorUrl('?new=1'); },
-}));
+if (isPhone()) {
+  // phones only view diagrams: no Create card, and a note about the desktop version
+  const note = document.createElement('div');
+  note.className = 'mb-6 px-4 py-3 rounded-lg bg-blue-50 border border-blue-200 text-sm text-blue-800';
+  note.textContent = 'To deploy and execute a model, open the website on a desktop.';
+  startGrid.before(note);
+} else {
+  startGrid.appendChild(actionCard({
+    icon: 'plus',
+    title: 'Create Model',
+    text: 'Start from an empty diagram.',
+    onClick: () => { window.location.href = editorUrl('?new=1'); },
+  }));
+}
 startGrid.appendChild(actionCard({
   icon: 'upload',
   title: 'Import Model',
