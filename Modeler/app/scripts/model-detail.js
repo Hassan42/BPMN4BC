@@ -78,7 +78,7 @@ const modelId = params.get('modelId');
 
 // Fix "← My Models" link to use correct base URL
 const backToModelsLink = document.getElementById('back-to-models-link');
-if (backToModelsLink) backToModelsLink.href = `${getBaseUrl()}/models.html`;
+if (backToModelsLink) backToModelsLink.href = `${getBaseUrl()}/`;
 
 // ── DOM refs ─────────────────────────────────────────────────────────────────
 const modelNameEl      = document.getElementById('model-name');

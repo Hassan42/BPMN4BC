@@ -437,41 +437,59 @@ eventBus.on('element.changed', (event) => {
 });
 
 
-// Load diagram: ?modelId= (edit from library) → localStorage autosave → default blank diagram
+// Base URL of the app (handles being served under /{id}/modeler/ behind a path-based proxy)
+function getBaseUrl() {
+  const origin = window.location.origin;
+  const parts = window.location.pathname.split('/').filter(Boolean);
+  if (parts.length >= 2 && parts[1] === 'modeler') return `${origin}/${parts[0]}/${parts[1]}`;
+  return origin;
+}
+
+// Load diagram, chosen by the landing page:
+//   ?modelId=N        edit a saved model
+//   ?new=1            blank diagram
+//   ?example=payment  a fixed example from /examples/
+//   ?import=1         a .bpmn file the visitor picked on the landing page (passed via sessionStorage)
+//   (nothing)         continue the autosaved diagram, else blank
 (async () => {
-  const urlParams  = new URLSearchParams(window.location.search);
+  const urlParams = new URLSearchParams(window.location.search);
   const editModelId = urlParams.get('modelId');
+  const example = urlParams.get('example');
+  const isNew = urlParams.has('new');
+  const isImport = urlParams.has('import');
 
-  if (editModelId) {
-    // Strip the param from the URL immediately so autosave works normally afterwards
-    const cleanUrl = window.location.pathname;
-    window.history.replaceState({}, '', cleanUrl);
+  // Strip the params so a reload continues from the autosave instead of reloading the source
+  if (window.location.search) window.history.replaceState({}, '', window.location.pathname);
 
-    try {
-      const baseUrl = `${window.location.origin}${window.location.pathname.replace(/\/$/, '')}`;
-      const res  = await fetch(`${baseUrl}/api/models/${editModelId}`);
+  const autosaved = () => { try { return localStorage.getItem('autosave_bpmn'); } catch (_) { return null; } };
+  const load = (xml) => bpmnModeler.importXML(xml);
+
+  try {
+    if (editModelId) {
+      const res = await fetch(`${getBaseUrl()}/api/models/${encodeURIComponent(editModelId)}`);
       if (!res.ok) throw new Error(`Model not found (${res.status})`);
       const model = await res.json();
-      await bpmnModeler.importXML(model.bpmn);
-    } catch (err) {
-      console.error('Error loading model for editing:', err);
-      // Fall back to autosave or default
-      const savedXML = localStorage.getItem('autosave_bpmn');
-      await bpmnModeler.importXML(savedXML || diagramXML).catch(() => {});
+      await load(model.bpmn);
+    } else if (example) {
+      if (!/^[a-z0-9-]+$/.test(example)) throw new Error('Unknown example');
+      const res = await fetch(`${getBaseUrl()}/examples/${example}.bpmn`);
+      if (!res.ok) throw new Error(`Example not found (${res.status})`);
+      await load(await res.text());
+    } else if (isImport) {
+      let xml = null;
+      try { xml = sessionStorage.getItem('bpmn4bc_import'); sessionStorage.removeItem('bpmn4bc_import'); } catch (_) {}
+      if (!xml) throw new Error('No imported diagram found');
+      await load(xml);
+    } else if (isNew) {
+      try { localStorage.removeItem('autosave_bpmn'); } catch (_) {}
+      await load(diagramXML);
+    } else {
+      await load(autosaved() || diagramXML);
     }
-    return;
-  }
-
-  // No modelId — use autosave or default blank diagram
-  const savedXML = localStorage.getItem('autosave_bpmn');
-  if (savedXML) {
-    bpmnModeler.importXML(savedXML).catch((err) => {
-      console.error('Error loading saved XML from localStorage:', err);
-    });
-  } else {
-    bpmnModeler.importXML(diagramXML).catch((err) => {
-      console.error('Error loading default diagram XML:', err);
-    });
+  } catch (err) {
+    console.error('Error loading diagram:', err);
+    if (isImport) alert(`Could not open the imported file: ${err.message}`);
+    await load(autosaved() || diagramXML).catch(() => load(diagramXML));
   }
 })()
 
@@ -885,7 +903,7 @@ $(function () {
       // Get BPMN XML
       const { xml } = await bpmnModeler.saveXML({ format: true });
 
-      const baseUrl     = `${window.location.origin}${window.location.pathname.replace(/\/$/, '')}`;
+      const baseUrl     = getBaseUrl();
       const validateUrl = `${baseUrl}/api/validate`;
       const modelsUrl   = `${baseUrl}/api/models`;
 
@@ -929,7 +947,7 @@ $(function () {
       }
 
       // Navigate to models list
-      window.location.href = `${baseUrl}/models.html`;
+      window.location.href = `${baseUrl}/`;
     } catch (err) {
       console.error('Unexpected error:', err);
       showDeployError('Unexpected Error', err.message || 'Unknown error', []);
@@ -939,13 +957,13 @@ $(function () {
 
   $('#js-my-models').click(function (e) {
     e.preventDefault();
-    const baseUrl = `${window.location.origin}${window.location.pathname.replace(/\/$/, '')}`;
-    window.location.href = `${baseUrl}/models.html`;
+    const baseUrl = getBaseUrl();
+    window.location.href = `${baseUrl}/`;
   });
 
   $('#js-execute-panel').click(function (e) {
     e.preventDefault();
-    const baseUrl = `${window.location.origin}${window.location.pathname.replace(/\/$/, '')}`;
+    const baseUrl = getBaseUrl();
     window.open(`${baseUrl}/execute-panel.html`, '_blank');
   });
   $('#js-new-diagram').click(async () => {

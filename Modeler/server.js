@@ -20,7 +20,10 @@ app.use((req, res, next) => {
 
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
-app.use(express.static(path.join(__dirname, 'public')));
+// "/" is the models list (landing page); the editor lives at /editor
+app.use(express.static(path.join(__dirname, 'public'), { index: false }));
+app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'models.html')));
+app.get('/editor', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
 app.get('/health', (req, res) => res.status(200).json({ ok: true }));
 
@@ -150,9 +153,9 @@ app.delete('/api/models/:id', normal, (req, res) => relay(req, res, dep(`/models
 // Unknown API routes → 404 JSON (instead of the index.html fallback)
 app.all('/api/*', (req, res) => res.status(404).json({ error: 'Not found' }));
 
-// Catch-all route to serve the frontend
+// Any other page → the landing page
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  res.sendFile(path.join(__dirname, 'public', 'models.html'));
 });
 
 // Listen on IPv6 "::" (dual-stack; needed for Railway), falling back to IPv4.
