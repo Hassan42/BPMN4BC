@@ -274,3 +274,7 @@ html, body, #container {
 /* ── Transaction boundary highlight ──────────────────────────────────────── */
 .bpmn-tx-highlight .djs-visual > :nth-child(1) { stroke: #6366f1 !important; stroke-width: 3px !important; }
 
+/* Phones: viewing only, so the tool palette is hidden to give the diagram the full width */
+@media (max-width: 768px) {
+  .djs-palette { display: none; }
+}

@@ -4,6 +4,7 @@
 <head>
   <title>BPMN4BC</title>
   <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
   <link rel="icon" type="image/svg+xml" href="assets/RECEIVE.svg" />
   <link rel="stylesheet" href="vendor/bpmn-js/assets/diagram-js.css" />
   <link rel="stylesheet" href="vendor/bpmn-js/assets/bpmn-font/css/bpmn-embedded.css" />
@@ -175,6 +176,31 @@
       toolbar.style.display = hidden ? 'flex' : 'none';
       this.textContent = hidden ? '▼' : '▲';
     });
+
+    // On small screens start with the properties panel hidden, so the diagram gets the space,
+    // and tell phone visitors that the editor is meant for a computer
+    if (window.matchMedia('(max-width: 768px)').matches) {
+      document.getElementById('js-properties-panel').style.display = 'none';
+      document.getElementById('js-toggle-properties').textContent = 'Show Properties';
+
+      var dismissed = false;
+      try { dismissed = sessionStorage.getItem('bpmn4bc_mobile_notice') === 'closed'; } catch (e) {}
+      if (!dismissed) {
+        var notice = document.createElement('div');
+        notice.id = 'mobile-notice';
+        notice.setAttribute('role', 'status');
+        notice.style.cssText = 'position:fixed;top:8px;left:8px;right:8px;z-index:1000;display:flex;gap:8px;align-items:flex-start;' +
+          'background:#1e3a8a;color:#fff;padding:10px 12px;border-radius:8px;font:13px/1.4 system-ui,sans-serif;box-shadow:0 4px 12px rgba(0,0,0,.25)';
+        notice.innerHTML = '<span style="flex:1">For the best experience, use BPMN4BC on a computer. ' +
+          'On a phone you can view diagrams: drag with one finger to move, pinch to zoom, tap to select.</span>' +
+          '<button type="button" aria-label="Close" style="background:none;border:0;color:#fff;font-size:18px;line-height:1;cursor:pointer;padding:0 2px">&times;</button>';
+        notice.querySelector('button').addEventListener('click', function () {
+          notice.remove();
+          try { sessionStorage.setItem('bpmn4bc_mobile_notice', 'closed'); } catch (e) {}
+        });
+        document.body.appendChild(notice);
+      }
+    }
 
     // Properties panel hide / show toggle
     document.getElementById('js-toggle-properties').addEventListener('click', function () {
