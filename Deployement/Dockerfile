@@ -1,20 +1,18 @@
-# Dockerfile for app1 using Node.js 20.11.1
 FROM node:20.11.1
 
-# Set the working directory
 WORKDIR /usr/src/app
 
-# Copy package.json and package-lock.json
 COPY package*.json ./
-
-# Install dependencies specific to app1
 RUN npm install
 
-# Copy the rest of the app's code
 COPY . .
 
-# Expose the app's port (if needed)
-# EXPOSE 5000
+# Defaults for the docker-compose setup; on Railway these are overridden by service variables.
+ENV PORT=3000
+ENV COM_API_BASE_URL=http://compiler:8000
+# instances / models / shared-contract registry live here — mount a persistent volume on it
+ENV DATA_DIR=/usr/src/app/data
 
-# Command to run the app
-CMD ["npm", "run", "start:docker"]
+EXPOSE 3000
+
+CMD ["node", "index.js"]

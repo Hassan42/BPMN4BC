@@ -1,1 +1,8 @@
 node_modules/
+.git
+*.log
+data/
+instances.json
+artifacts/
+cache/
+contracts/*.sol
