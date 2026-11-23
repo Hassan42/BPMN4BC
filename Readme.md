@@ -6,6 +6,25 @@ permissionless participants, payable tasks, block timers, multi-instance and sha
 data stores), compiled to upgradeable Solidity contracts, deployed to local test chains and
 executed step by step from the browser.
 
+## Publication
+
+Hassan Atwi and Cesare Pautasso. **BPMN4BC: A Simple BPMN Extension for Blockchain-Enabled Business Process Modeling.**
+In *Service-Oriented Computing – ICSOC 2025*, Lecture Notes in Computer Science, pp. 306–320. Springer, 2026.
+[doi:10.1007/978-981-95-5015-9_22](https://link.springer.com/chapter/10.1007/978-981-95-5015-9_22)
+
+```bibtex
+@inproceedings{atwi2026bpmn4bc,
+  title     = {BPMN4BC: A Simple BPMN Extension for Blockchain-Enabled Business Process Modeling},
+  author    = {Atwi, Hassan and Pautasso, Cesare},
+  booktitle = {Service-Oriented Computing: 23rd International Conference, ICSOC 2025, Shenzhen, China, December 1--4, 2025, Proceedings, Part II},
+  series    = {Lecture Notes in Computer Science},
+  pages     = {306--320},
+  year      = {2026},
+  publisher = {Springer Nature Singapore},
+  doi       = {10.1007/978-981-95-5015-9_22}
+}
+```
+
 ## Architecture
 
 | Service | Folder | What it does |
