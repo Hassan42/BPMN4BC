@@ -102,7 +102,7 @@ html, body, #container {
 
 #js-properties-panel {
   position: absolute;
-  top: 0;
+  top: 56px;
   bottom: 0;
   right: 0;
   width: 260px;
@@ -274,19 +274,115 @@ html, body, #container {
 /* ── Transaction boundary highlight ──────────────────────────────────────── */
 .bpmn-tx-highlight .djs-visual > :nth-child(1) { stroke: #6366f1 !important; stroke-width: 3px !important; }
 
-/* Phones: viewing only, so the tool palette is hidden to give the diagram the full width */
+/* ── Top navigation bar (white, flat buttons) ────────────────────────────── */
+#container {
+  position: absolute;
+  top: 56px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: auto;
+}
+
+.bc-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 12px;
+  background: #ffffff;
+  border-bottom: 1px solid #d1d5db;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  color: #374151;
+  font: 14px/1 system-ui, -apple-system, 'Segoe UI', sans-serif;
+  user-select: none;
+}
+
+.bc-nav-logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: 12px;
+  color: #1f2937;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  text-decoration: none;
+}
+.bc-nav-logo img {
+  width: 28px;
+  height: 28px;
+}
+
+.bc-nav-group {
+  display: flex;
+  align-items: center;
+}
+
+.bc-nav-btn {
+  flex-shrink: 0;
+  white-space: nowrap;
+  padding: 9px 12px;
+  background: none;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  text-decoration: none;
+  cursor: pointer;
+  transition: color 0.15s, background-color 0.15s;
+}
+.bc-nav-btn:hover,
+#w3t-wrapper:has(#w3t-dropdown:not(.hidden)) > .bc-nav-btn {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.bc-nav-divider {
+  width: 1px;
+  height: 24px;
+  margin: 0 6px;
+  background: #e5e7eb;
+}
+
+.bc-nav-spacer {
+  flex: 1;
+}
+
+/* the Web3 Tools card keeps its own light look */
+#w3t-dropdown {
+  color: #374151;
+  font-size: 14px;
+  line-height: 1.4;
+  cursor: default;
+}
+
+/* Narrower screens: tighter buttons */
+@media (max-width: 1280px) {
+  .bc-nav { padding: 0 6px; gap: 0; }
+  .bc-nav-btn { padding: 9px 8px; font-size: 13px; }
+  .bc-nav-logo span { display: none; }
+}
+
+/* Small laptops and tablets: smaller buttons */
+@media (max-width: 1100px) {
+  .bc-nav-btn { padding: 9px 5px; font-size: 12px; }
+  .bc-nav-divider { margin: 0 2px; }
+  .bc-nav-logo { margin-right: 4px; }
+}
+
+/* Phones: viewing only, so only My Models and Reset View; no tool palette */
 @media (max-width: 768px) {
   .djs-palette { display: none; }
-
-  /* Button bar: full width, buttons wrap onto several rows instead of running off-screen */
-  #js-toolbar-dock { left: 6px !important; right: 6px; transform: none !important; }
-  #js-toolbar { flex-wrap: wrap; justify-content: center; max-width: 100%; }
-  #js-toolbar > .w-px { display: none; }
-  #js-toolbar > div { padding: 3px 2px !important; flex-wrap: wrap; justify-content: center; }
-  #js-toolbar a, #js-toolbar button { padding: 5px 8px !important; font-size: 11px !important; }
-
-  /* Only Reset View and My Models on a phone */
-  #js-toolbar a, #js-toolbar button, #w3t-wrapper { display: none; }
-  #js-toolbar #js-reset-view, #js-toolbar #js-my-models { display: inline-block; }
-  #js-toolbar > div:not(:has(#js-reset-view)):not(:has(#js-my-models)) { display: none; }
+  .bc-nav-group > :not(#js-my-models):not(#js-reset-view),
+  .bc-nav-group:not(:has(#js-my-models)):not(:has(#js-reset-view)),
+  .bc-nav-divider { display: none; }
+  .bc-nav-logo span { display: inline; }
+  .bc-nav-spacer { flex: 1; }
 }

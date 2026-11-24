@@ -5,7 +5,7 @@
   <title>BPMN4BC</title>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-  <link rel="icon" type="image/svg+xml" href="assets/RECEIVE.svg" />
+  <link rel="icon" type="image/svg+xml" href="/assets/logo.svg" />
   <link rel="stylesheet" href="vendor/bpmn-js/assets/diagram-js.css" />
   <link rel="stylesheet" href="vendor/bpmn-js/assets/bpmn-font/css/bpmn-embedded.css" />
   <link rel="stylesheet" href="vendor/properties-panel/properties-panel.css">
@@ -19,96 +19,51 @@
   <div id="container"></div>
   <div id="js-properties-panel"></div>
 
-  <!-- Sticky Button Panel -->
-  <div id="js-toolbar-dock" class="fixed bottom-0 left-1/2 -translate-x-1/2 flex flex-col items-center z-50">
+  <!-- Top navigation bar -->
+  <nav id="js-toolbar" class="bc-nav">
+    <a href="/" class="bc-nav-logo" title="Back to My Models">
+      <img src="/assets/logo.svg" alt="" />
+      <span>BPMN4BC</span>
+    </a>
 
-    <!-- Main toolbar -->
-    <div id="js-toolbar"
-      class="flex items-stretch bg-white border border-gray-300 rounded-lg shadow-sm mb-1">
+    <!-- Diagram file operations -->
+    <div class="bc-nav-group">
+      <a id="js-new-diagram" href="#" title="Clear diagram and start fresh" class="bc-nav-btn">New</a>
+      <a id="js-upload-diagram-btn" title="Upload BPMN diagram" class="bc-nav-btn">Upload</a>
+      <input type="file" id="js-upload-diagram" accept=".bpmn" class="hidden" />
+      <a id="js-download-diagram" href="#" title="Download BPMN diagram" class="bc-nav-btn">Download BPMN</a>
+      <a id="js-download-svg" href="#" title="Download diagram as SVG" class="bc-nav-btn">Download SVG</a>
+    </div>
 
-      <!-- Group 1: Diagram file operations -->
-      <div class="flex items-center gap-1 px-2 py-2">
-        <a id="js-new-diagram" href="#" title="Clear diagram and start fresh"
-          class="px-3 py-1.5 text-xs rounded border border-gray-300 bg-white hover:bg-red-50 hover:border-red-300 hover:text-red-600 cursor-pointer whitespace-nowrap">
-          New
-        </a>
-        <a id="js-download-diagram" href="#" title="Download BPMN diagram"
-          class="px-3 py-1.5 text-xs rounded border border-gray-300 bg-white hover:bg-blue-50 cursor-pointer whitespace-nowrap">
-          Download BPMN
-        </a>
-        <a id="js-download-svg" href="#" title="Download diagram as SVG"
-          class="px-3 py-1.5 text-xs rounded border border-gray-300 bg-white hover:bg-blue-50 cursor-pointer whitespace-nowrap">
-          Download SVG
-        </a>
-        <a id="js-upload-diagram-btn" title="Upload BPMN diagram"
-          class="px-3 py-1.5 text-xs rounded border border-gray-300 bg-white hover:bg-blue-50 cursor-pointer whitespace-nowrap">
-          Upload
-        </a>
-        <input type="file" id="js-upload-diagram" accept=".bpmn" class="hidden" />
-      </div>
+    <span class="bc-nav-divider" aria-hidden="true"></span>
 
-      <!-- Divider -->
-      <div class="w-px bg-gray-200 my-2"></div>
+    <!-- Model library -->
+    <div class="bc-nav-group">
+      <a id="js-compile-deploy" href="#" class="bc-nav-btn">Save Model</a>
+      <a id="js-my-models" href="#" class="bc-nav-btn">My Models</a>
+    </div>
 
-      <!-- Group 2: Model library -->
-      <div class="flex items-center gap-1 px-2 py-2">
-        <a id="js-compile-deploy" href="#"
-          class="px-3 py-1.5 text-xs rounded border border-gray-300 bg-white hover:bg-blue-50 cursor-pointer whitespace-nowrap">
-          Save Model
-        </a>
-        <a id="js-my-models" href="#"
-          class="px-3 py-1.5 text-xs rounded border border-gray-300 bg-white hover:bg-blue-50 cursor-pointer whitespace-nowrap">
-          My Models
-        </a>
-        <a id="js-constructs" href="/constructs" target="_blank" title="All BPMN4BC constructs with description and usage"
-          class="px-3 py-1.5 text-xs rounded border border-gray-300 bg-white hover:bg-blue-50 cursor-pointer whitespace-nowrap">
-          Constructs
-        </a>
-      </div>
+    <span class="bc-nav-divider" aria-hidden="true"></span>
 
-      <!-- Divider -->
-      <div class="w-px bg-gray-200 my-2"></div>
+    <!-- Analysis / inspect -->
+    <div class="bc-nav-group">
+      <a id="js-open-floating-window" href="#" class="bc-nav-btn">Variables</a>
+      <a id="js-open-tx-boundary-window" href="#" class="bc-nav-btn">Tx Boundaries</a>
+    </div>
 
-      <!-- Group 3: Analysis / inspect -->
-      <div class="flex items-center gap-1 px-2 py-2">
-        <a id="js-open-floating-window" href="#"
-          class="px-3 py-1.5 text-xs rounded border border-gray-300 bg-white hover:bg-blue-50 cursor-pointer whitespace-nowrap">
-          Variables
-        </a>
-        <a id="js-open-tx-boundary-window" href="#"
-          class="px-3 py-1.5 text-xs rounded border border-gray-300 bg-white hover:bg-blue-50 cursor-pointer whitespace-nowrap">
-          Tx Boundaries
-        </a>
-      </div>
+    <span class="bc-nav-spacer"></span>
 
-      <!-- Divider -->
-      <div class="w-px bg-gray-200 my-2"></div>
+    <!-- View, help, tools -->
+    <div class="bc-nav-group">
+      <a id="js-reset-view" href="#" title="Center diagram and reset zoom" class="bc-nav-btn">⌖ Reset View</a>
+      <a id="js-toggle-properties" href="#" class="bc-nav-btn">Hide Properties</a>
+      <a id="js-constructs" href="/constructs" target="_blank" title="All BPMN4BC constructs with description and usage" class="bc-nav-btn">Constructs</a>
+      <div class="relative" id="w3t-wrapper">
+        <button id="w3t-btn" type="button" class="bc-nav-btn">Web3 Tools ▾</button>
 
-      <!-- Group 4: View toggles -->
-      <div class="flex items-center gap-1 px-2 py-2">
-        <a id="js-reset-view" href="#" title="Center diagram and reset zoom"
-          class="px-3 py-1.5 text-xs rounded border border-gray-300 bg-white hover:bg-blue-50 cursor-pointer whitespace-nowrap">
-          ⌖ Reset View
-        </a>
-        <a id="js-toggle-properties" href="#"
-          class="px-3 py-1.5 text-xs rounded border border-gray-300 bg-white hover:bg-blue-50 cursor-pointer whitespace-nowrap">
-          Hide Properties
-        </a>
-      </div>
-
-      <!-- Divider -->
-      <div class="w-px bg-gray-200 my-2"></div>
-
-      <!-- Group 5: Web3 Tools -->
-      <div class="flex items-center px-2 py-2 relative" id="w3t-wrapper">
-        <button id="w3t-btn"
-          class="px-3 py-1.5 text-xs rounded border border-gray-300 bg-white hover:bg-blue-50 cursor-pointer whitespace-nowrap">
-          Web3 Tools ▾
-        </button>
-
-        <!-- Dropdown — opens upward -->
+        <!-- Dropdown — opens downward -->
         <div id="w3t-dropdown"
-          class="hidden absolute left-0 bottom-full mb-1 z-50 bg-white border border-gray-300 rounded-lg shadow-xl"
+          class="hidden absolute right-0 top-full mt-1 z-50 bg-white border border-gray-300 rounded-lg shadow-xl"
           style="min-width:340px;">
 
           <div class="px-4 py-3 border-b border-gray-200">
@@ -156,29 +111,13 @@
 
         </div><!-- /w3t-dropdown -->
       </div><!-- /w3t-wrapper -->
-
     </div>
-
-    <!-- Toggle tab (always visible) -->
-    <button id="js-toolbar-toggle"
-      class="text-xs text-gray-400 hover:text-gray-700 bg-white border border-gray-300 rounded-b-md px-4 py-0.5 mb-0 leading-tight hover:bg-gray-50 select-none">
-      ▼
-    </button>
-
-  </div>
+  </nav>
 
   <script>
     // Make the Upload button trigger file input
     document.getElementById('js-upload-diagram-btn').addEventListener('click', function () {
       document.getElementById('js-upload-diagram').click();
-    });
-
-    // Toolbar hide / show toggle
-    document.getElementById('js-toolbar-toggle').addEventListener('click', function () {
-      var toolbar = document.getElementById('js-toolbar');
-      var hidden = toolbar.style.display === 'none';
-      toolbar.style.display = hidden ? 'flex' : 'none';
-      this.textContent = hidden ? '▼' : '▲';
     });
 
     // On small screens start with the properties panel hidden, so the diagram gets the space,
@@ -193,7 +132,7 @@
         var notice = document.createElement('div');
         notice.id = 'mobile-notice';
         notice.setAttribute('role', 'status');
-        notice.style.cssText = 'position:fixed;top:8px;left:8px;right:8px;z-index:1000;display:flex;gap:8px;align-items:flex-start;' +
+        notice.style.cssText = 'position:fixed;top:64px;left:8px;right:8px;z-index:1000;display:flex;gap:8px;align-items:flex-start;' +
           'background:#1e3a8a;color:#fff;padding:10px 12px;border-radius:8px;font:13px/1.4 system-ui,sans-serif;box-shadow:0 4px 12px rgba(0,0,0,.25)';
         notice.innerHTML = '<span style="flex:1">On a phone you can only view diagrams.</span>' +
           '<button type="button" aria-label="Close" style="background:none;border:0;color:#fff;font-size:18px;line-height:1;cursor:pointer;padding:0 2px">&times;</button>';
