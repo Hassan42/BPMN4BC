@@ -70,7 +70,6 @@ function exampleCard(example) {
     <div class="p-4 flex flex-col flex-1">
       <div class="flex items-center gap-2 mb-1">
         <span class="font-bold text-gray-800 text-base truncate"></span>
-        <span class="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium">Example</span>
       </div>
       <div class="text-xs text-gray-500 mb-3"></div>
       <button type="button" class="mt-auto px-3 py-2 text-sm rounded border border-blue-400 text-blue-600 bg-white hover:bg-blue-50 font-medium">
