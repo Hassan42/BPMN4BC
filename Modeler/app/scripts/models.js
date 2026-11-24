@@ -21,12 +21,17 @@ if (backLink) backLink.href = `${getBaseUrl()}/editor`;
 const editorUrl = (query = '') => `${getBaseUrl()}/editor${query}`;
 const isPhone = () => window.matchMedia('(max-width: 768px)').matches;
 
-// ── Start cards: create, import, fixed example ──────────────────────────────
+// ── Start cards (create, import) and the fixed examples ──────────────────────────────
 const EXAMPLES = [
   {
     id: 'payment',
     name: 'Payment',
     description: 'The payee requests an amount, the payer pays it, and the contract forwards the payment if the amount is right; otherwise it reverts.',
+  },
+  {
+    id: 'multisig',
+    name: 'Multisig Wallet',
+    description: 'An owner submits a transaction with the funds; every owner must confirm it, and the last confirmation makes the wallet pay the recipient.',
   },
 ];
 
@@ -107,7 +112,7 @@ if (isPhone()) {
   const note = document.createElement('div');
   note.className = 'mb-6 px-4 py-3 rounded-lg bg-blue-50 border border-blue-200 text-sm text-blue-800';
   note.textContent = 'To deploy and execute a model, open the website on a desktop.';
-  startGrid.before(note);
+  document.getElementById('my-models-heading').before(note);
 } else {
   startGrid.appendChild(actionCard({
     icon: 'plus',
@@ -122,7 +127,8 @@ startGrid.appendChild(actionCard({
   text: 'Open a .bpmn file from your computer.',
   onClick: () => importInput.click(),
 }));
-EXAMPLES.forEach(example => startGrid.appendChild(exampleCard(example)));
+const examplesGrid = document.getElementById('examples-grid');
+EXAMPLES.forEach(example => examplesGrid.appendChild(exampleCard(example)));
 
 // ── Delete modal helpers ─────────────────────────────────────────────────────
 const deleteModal   = document.getElementById('delete-modal');
@@ -218,21 +224,18 @@ function buildCard(model, instanceCount) {
   const openBtn = document.createElement('button');
   openBtn.className = 'flex-1 px-3 py-2 text-sm rounded border border-blue-400 text-blue-600 bg-white hover:bg-blue-50 font-medium';
   openBtn.textContent = 'Open';
+  openBtn.title = 'Open in the editor';
   openBtn.onclick = () => {
-    // phones only view diagrams: open the editor instead of the instance page
-    window.location.href = isPhone()
-      ? editorUrl(`?modelId=${model.id}`)
-      : `${getBaseUrl()}/model-detail.html?modelId=${model.id}`;
+    window.location.href = editorUrl(`?modelId=${model.id}`);
   };
 
-  const editBtn = document.createElement('button');
-  editBtn.className = 'px-3 py-2 text-sm rounded border border-gray-300 text-gray-600 bg-white hover:bg-gray-50';
-  editBtn.title = 'Edit in Modeler';
-  editBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-    <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
-  </svg>`;
-  editBtn.onclick = () => {
-    window.location.href = editorUrl(`?modelId=${model.id}`);
+  // Deploy instances and execute them (model detail page); not on phones, which only view diagrams
+  const runBtn = document.createElement('button');
+  runBtn.className = 'flex-1 px-3 py-2 text-sm rounded border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 font-medium whitespace-nowrap';
+  runBtn.textContent = 'Deploy & Run';
+  runBtn.title = 'Deploy instances and execute them';
+  runBtn.onclick = () => {
+    window.location.href = `${getBaseUrl()}/model-detail.html?modelId=${model.id}`;
   };
 
   const dlBtn = document.createElement('button');
@@ -270,7 +273,7 @@ function buildCard(model, instanceCount) {
   };
 
   actions.appendChild(openBtn);
-  actions.appendChild(editBtn);
+  if (!isPhone()) actions.appendChild(runBtn);
   actions.appendChild(dlBtn);
   actions.appendChild(delBtn);
 
@@ -302,7 +305,7 @@ async function init() {
     });
   } catch (err) {
     spinner.classList.add('hidden');
-    grid.innerHTML = `<p class="text-red-500 text-sm col-span-3">Failed to load models: ${err.message}</p>`;
+    grid.innerHTML = `<p class="text-red-500 text-sm col-span-full">Failed to load models: ${err.message}</p>`;
   }
 }
 

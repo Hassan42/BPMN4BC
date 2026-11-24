@@ -1,0 +1,239 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn2:definitions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:bpmn2="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:bpmnbc="http://some-company/schema/bpmn/qa" id="multisig" targetNamespace="http://bpmn.io/schema/bpmn">
+  <bpmn2:collaboration id="Collaboration_11057532">
+    <bpmn2:participant id="Participant_Owner" bpmnbc:bcmultiplicity="3" name="Owner" processRef="Process_Owner">
+      <bpmn2:participantMultiplicity minimum="2" maximum="2" />
+    </bpmn2:participant>
+    <bpmn2:participant id="Participant_Wallet" bpmnbc:bc="true" bpmnbc:bctype="Participant" bpmnbc:bcid="network-1" name="Multisig Wallet" processRef="Process_Wallet" />
+    <bpmn2:participant id="Participant_Recipient" bpmnbc:bcopen="true" name="Recipient" />
+    <bpmn2:messageFlow id="Flow_Msg_Submit" sourceRef="Task_SendSubmit" targetRef="Task_Submit" />
+    <bpmn2:messageFlow id="Flow_Msg_Confirm" sourceRef="Task_SendConfirm" targetRef="Task_Confirm" />
+    <bpmn2:messageFlow id="Flow_Msg_Pay" sourceRef="Task_Execute" targetRef="Participant_Recipient" />
+  </bpmn2:collaboration>
+  <bpmn2:process id="Process_Owner">
+    <bpmn2:startEvent id="Event_OwnerStart">
+      <bpmn2:outgoing>Flow_O1</bpmn2:outgoing>
+    </bpmn2:startEvent>
+    <bpmn2:sendTask id="Task_SendSubmit" bpmnbc:bc="true" bpmnbc:bctype="SendTask" bpmnbc:bcid="network-1" name="Submit Transaction">
+      <bpmn2:incoming>Flow_O1</bpmn2:incoming>
+      <bpmn2:outgoing>Flow_O2</bpmn2:outgoing>
+    </bpmn2:sendTask>
+    <bpmn2:sendTask id="Task_SendConfirm" bpmnbc:bc="true" bpmnbc:bctype="SendTask" bpmnbc:bcid="network-1" name="Confirm Transaction">
+      <bpmn2:incoming>Flow_O2</bpmn2:incoming>
+      <bpmn2:outgoing>Flow_O3</bpmn2:outgoing>
+    </bpmn2:sendTask>
+    <bpmn2:intermediateCatchEvent id="Event_CatchExecuted" bpmnbc:bc="true" bpmnbc:bctype="IntermediateCatchEvent" bpmnbc:bcevent="catchEvent" bpmnbc:bceventname="TransactionExecuted" name="Transaction Executed">
+      <bpmn2:incoming>Flow_O3</bpmn2:incoming>
+      <bpmn2:outgoing>Flow_O4</bpmn2:outgoing>
+    </bpmn2:intermediateCatchEvent>
+    <bpmn2:endEvent id="Event_OwnerEnd">
+      <bpmn2:incoming>Flow_O4</bpmn2:incoming>
+    </bpmn2:endEvent>
+    <bpmn2:sequenceFlow id="Flow_O1" sourceRef="Event_OwnerStart" targetRef="Task_SendSubmit" />
+    <bpmn2:sequenceFlow id="Flow_O2" sourceRef="Task_SendSubmit" targetRef="Task_SendConfirm" />
+    <bpmn2:sequenceFlow id="Flow_O3" sourceRef="Task_SendConfirm" targetRef="Event_CatchExecuted" />
+    <bpmn2:sequenceFlow id="Flow_O4" sourceRef="Event_CatchExecuted" targetRef="Event_OwnerEnd" />
+  </bpmn2:process>
+  <bpmn2:process id="Process_Wallet">
+    <bpmn2:startEvent id="Event_WalletStart">
+      <bpmn2:outgoing>Flow_W1</bpmn2:outgoing>
+    </bpmn2:startEvent>
+    <bpmn2:receiveTask id="Task_Submit" bpmnbc:bc="true" bpmnbc:bctype="ReceiveTask" bpmnbc:bcsender="Owner" bpmnbc:bcid="network-1" bpmnbc:bcpayable="true" name="Submit Transaction">
+      <bpmn2:incoming>Flow_W1</bpmn2:incoming>
+      <bpmn2:outgoing>Flow_W2</bpmn2:outgoing>
+      <bpmn2:dataOutputAssociation id="Assoc_SubmitWrite">
+        <bpmn2:extensionElements>
+          <bpmnbc:dataStoreVarSelections>
+            <bpmnbc:dataStoreVarSelection varname="recipient" external="true" />
+            <bpmnbc:dataStoreVarSelection varname="amount" value="msg.value" external="false" />
+          </bpmnbc:dataStoreVarSelections>
+        </bpmn2:extensionElements>
+        <bpmn2:targetRef>DS_Wallet_1</bpmn2:targetRef>
+      </bpmn2:dataOutputAssociation>
+    </bpmn2:receiveTask>
+    <bpmn2:intermediateThrowEvent id="Event_Submitted" bpmnbc:bc="true" bpmnbc:bctype="IntermediateThrowEvent" bpmnbc:bcevent="throwEvent" bpmnbc:bcid="network-1" name="Transaction Submitted">
+      <bpmn2:incoming>Flow_W2</bpmn2:incoming>
+      <bpmn2:outgoing>Flow_W3</bpmn2:outgoing>
+    </bpmn2:intermediateThrowEvent>
+    <bpmn2:receiveTask id="Task_Confirm" bpmnbc:bc="true" bpmnbc:bctype="ReceiveTask" bpmnbc:bcsender="Owner" bpmnbc:bcid="network-1" name="Confirm Transaction">
+      <bpmn2:incoming>Flow_W3</bpmn2:incoming>
+      <bpmn2:outgoing>Flow_W4</bpmn2:outgoing>
+      <bpmn2:multiInstanceLoopCharacteristics isSequential="true" />
+    </bpmn2:receiveTask>
+    <bpmn2:scriptTask id="Task_Execute" bpmnbc:bc="true" bpmnbc:bctype="ScriptTask" bpmnbc:bcid="network-1" bpmnbc:solidityscript="(bool success, ) = payable(recipient).call{value: amount}(&#34;&#34;);&#10;require(success, &#34;transfer failed&#34;);" name="Transfer Amount">
+      <bpmn2:incoming>Flow_W4</bpmn2:incoming>
+      <bpmn2:outgoing>Flow_W5</bpmn2:outgoing>
+      <bpmn2:property id="Prop_ExecuteIn" name="__targetRef_placeholder" />
+      <bpmn2:dataInputAssociation id="Assoc_ExecuteRead">
+        <bpmn2:extensionElements>
+          <bpmnbc:dataStoreVarSelections>
+            <bpmnbc:dataStoreVarSelection varname="recipient" />
+            <bpmnbc:dataStoreVarSelection varname="amount" />
+          </bpmnbc:dataStoreVarSelections>
+        </bpmn2:extensionElements>
+        <bpmn2:sourceRef>DS_Wallet_3</bpmn2:sourceRef>
+        <bpmn2:targetRef>Prop_ExecuteIn</bpmn2:targetRef>
+      </bpmn2:dataInputAssociation>
+    </bpmn2:scriptTask>
+    <bpmn2:intermediateThrowEvent id="Event_Executed" bpmnbc:bc="true" bpmnbc:bctype="IntermediateThrowEvent" bpmnbc:bcevent="throwEvent" bpmnbc:bcid="network-1" name="Transaction Executed">
+      <bpmn2:incoming>Flow_W5</bpmn2:incoming>
+      <bpmn2:outgoing>Flow_W6</bpmn2:outgoing>
+    </bpmn2:intermediateThrowEvent>
+    <bpmn2:endEvent id="Event_WalletEnd">
+      <bpmn2:incoming>Flow_W6</bpmn2:incoming>
+    </bpmn2:endEvent>
+    <bpmn2:sequenceFlow id="Flow_W1" sourceRef="Event_WalletStart" targetRef="Task_Submit" />
+    <bpmn2:sequenceFlow id="Flow_W2" sourceRef="Task_Submit" targetRef="Event_Submitted" />
+    <bpmn2:sequenceFlow id="Flow_W3" sourceRef="Event_Submitted" targetRef="Task_Confirm" />
+    <bpmn2:sequenceFlow id="Flow_W4" sourceRef="Task_Confirm" targetRef="Task_Execute" />
+    <bpmn2:sequenceFlow id="Flow_W5" sourceRef="Task_Execute" targetRef="Event_Executed" />
+    <bpmn2:sequenceFlow id="Flow_W6" sourceRef="Event_Executed" targetRef="Event_WalletEnd" />
+    <bpmn2:dataStoreReference id="DS_Wallet_3" name="Wallet">
+      <bpmn2:extensionElements>
+        <bpmnbc:dataStoreVariables>
+          <bpmnbc:dataStoreVariable name="recipient" type="address" />
+          <bpmnbc:dataStoreVariable name="amount" type="uint" />
+        </bpmnbc:dataStoreVariables>
+      </bpmn2:extensionElements>
+    </bpmn2:dataStoreReference>
+    <bpmn2:dataStoreReference id="DS_Wallet_1" name="Wallet">
+      <bpmn2:extensionElements>
+        <bpmnbc:dataStoreVariables>
+          <bpmnbc:dataStoreVariable name="recipient" type="address" />
+          <bpmnbc:dataStoreVariable name="amount" type="uint" />
+        </bpmnbc:dataStoreVariables>
+      </bpmn2:extensionElements>
+    </bpmn2:dataStoreReference>
+  </bpmn2:process>
+  <bpmndi:BPMNDiagram id="Diagram_Multisig">
+    <bpmndi:BPMNPlane id="Plane_Multisig" bpmnElement="Collaboration_11057532">
+      <bpmndi:BPMNShape id="Participant_Owner_di" bpmnElement="Participant_Owner" isHorizontal="true">
+        <dc:Bounds x="100" y="130" width="1100" height="160" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_OwnerStart_di" bpmnElement="Event_OwnerStart">
+        <dc:Bounds x="162" y="192" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_SendSubmit_di" bpmnElement="Task_SendSubmit">
+        <dc:Bounds x="240" y="170" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_SendConfirm_di" bpmnElement="Task_SendConfirm">
+        <dc:Bounds x="560" y="170" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_CatchExecuted_di" bpmnElement="Event_CatchExecuted">
+        <dc:Bounds x="1002" y="192" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="990" y="155" width="61" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_OwnerEnd_di" bpmnElement="Event_OwnerEnd">
+        <dc:Bounds x="1112" y="192" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_O1_di" bpmnElement="Flow_O1">
+        <di:waypoint x="198" y="210" />
+        <di:waypoint x="240" y="210" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_O2_di" bpmnElement="Flow_O2">
+        <di:waypoint x="340" y="210" />
+        <di:waypoint x="560" y="210" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_O3_di" bpmnElement="Flow_O3">
+        <di:waypoint x="660" y="210" />
+        <di:waypoint x="1002" y="210" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_O4_di" bpmnElement="Flow_O4">
+        <di:waypoint x="1038" y="210" />
+        <di:waypoint x="1112" y="210" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="Participant_Wallet_di" bpmnElement="Participant_Wallet" isHorizontal="true">
+        <dc:Bounds x="100" y="320" width="1100" height="240" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_WalletStart_di" bpmnElement="Event_WalletStart">
+        <dc:Bounds x="162" y="382" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Submit_di" bpmnElement="Task_Submit">
+        <dc:Bounds x="240" y="360" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_Submitted_di" bpmnElement="Event_Submitted">
+        <dc:Bounds x="392" y="382" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="372" y="345" width="76" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Confirm_di" bpmnElement="Task_Confirm">
+        <dc:Bounds x="560" y="360" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Execute_di" bpmnElement="Task_Execute">
+        <dc:Bounds x="830" y="360" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_Executed_di" bpmnElement="Event_Executed">
+        <dc:Bounds x="1002" y="382" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="983" y="345" width="74" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_WalletEnd_di" bpmnElement="Event_WalletEnd">
+        <dc:Bounds x="1112" y="382" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DS_Wallet_3_di" bpmnElement="DS_Wallet_3">
+        <dc:Bounds x="885" y="485" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="895" y="542" width="31" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DS_Wallet_1_di" bpmnElement="DS_Wallet_1">
+        <dc:Bounds x="265" y="485" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="275" y="542" width="31" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_W1_di" bpmnElement="Flow_W1">
+        <di:waypoint x="198" y="400" />
+        <di:waypoint x="240" y="400" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_W2_di" bpmnElement="Flow_W2">
+        <di:waypoint x="340" y="400" />
+        <di:waypoint x="392" y="400" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_W3_di" bpmnElement="Flow_W3">
+        <di:waypoint x="428" y="400" />
+        <di:waypoint x="560" y="400" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_W4_di" bpmnElement="Flow_W4">
+        <di:waypoint x="660" y="400" />
+        <di:waypoint x="830" y="400" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_W5_di" bpmnElement="Flow_W5">
+        <di:waypoint x="930" y="400" />
+        <di:waypoint x="1002" y="400" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_W6_di" bpmnElement="Flow_W6">
+        <di:waypoint x="1038" y="400" />
+        <di:waypoint x="1112" y="400" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="Participant_Recipient_di" bpmnElement="Participant_Recipient" isHorizontal="true">
+        <dc:Bounds x="100" y="590" width="1100" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Assoc_SubmitWrite_di" bpmnElement="Assoc_SubmitWrite">
+        <di:waypoint x="290" y="440" />
+        <di:waypoint x="290" y="485" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Assoc_ExecuteRead_di" bpmnElement="Assoc_ExecuteRead">
+        <di:waypoint x="910" y="485" />
+        <di:waypoint x="910" y="440" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Msg_Submit_di" bpmnElement="Flow_Msg_Submit">
+        <di:waypoint x="290" y="250" />
+        <di:waypoint x="290" y="360" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Msg_Confirm_di" bpmnElement="Flow_Msg_Confirm">
+        <di:waypoint x="610" y="250" />
+        <di:waypoint x="610" y="360" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Msg_Pay_di" bpmnElement="Flow_Msg_Pay">
+        <di:waypoint x="860" y="440" />
+        <di:waypoint x="860" y="590" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn2:definitions>
