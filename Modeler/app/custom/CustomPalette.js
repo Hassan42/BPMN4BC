@@ -164,6 +164,12 @@ export default class CustomPalette {
           click: (event) => create.start(event, elementFactory.createShape({ type: 'bpmn:ExclusiveGateway' }))
         }
       },
+      'std.subprocess': {
+        group: 'BC',
+        className: 'bpmn-icon-subprocess-expanded',
+        title: translate('Create expanded sub-process'),
+        action: { dragstart: createSubprocess, click: createSubprocess }
+      },
       'BCTimer': {
         group: 'BC',
         imageUrl: BCSTIMER,
@@ -226,12 +232,6 @@ export default class CustomPalette {
         className: 'bpmn-icon-task',
         title: translate('Create task'),
         action: { dragstart: createTask, click: createTask }
-      },
-      'std.subprocess': {
-        group: 'BC',
-        className: 'bpmn-icon-subprocess-expanded',
-        title: translate('Create expanded sub-process'),
-        action: { dragstart: createSubprocess, click: createSubprocess }
       },
       'std.intermediate': {
         group: 'BC',

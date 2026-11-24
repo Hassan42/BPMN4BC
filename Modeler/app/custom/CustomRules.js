@@ -116,8 +116,9 @@ CustomRules.prototype.init = function () {
       return false;
     }
 
-    // Allow the creation of the shape if none of the above rules apply
-    return true;
+    // Otherwise let the standard BPMN rules decide (e.g. no flow elements on an empty
+    // collaboration canvas outside a pool, which would crash the modeler)
+    return;
   });
 
   // Moving a timer start event into a blockchain pool is not allowed either
