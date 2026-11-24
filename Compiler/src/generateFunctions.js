@@ -598,26 +598,32 @@ function generateEntryFunction(activity, process, roles, collaborationId, partic
   };
 
   // Data store variables used by name in this task's expressions (write values, loop
-  // conditions) are read from the data store where they are used: nothing declares them
-  // as locals, and a read at that point also sees this task's own earlier writes.
-  const dsVarSources = new Map();
-  const addDsVars = (ds) => extractDataStoreVariables(ds).forEach(v => {
-    if ((v.type || 'uint') !== 'mapping' && !dsVarSources.has(v.name)) dsVarSources.set(v.name, ds);
-  });
-  (activity.dataInputAssociations || []).forEach(a => [].concat(a.sourceRef || [])
-    .forEach(src => { if (src && src.$type === 'bpmn:DataStoreReference') addDsVars(src); }));
-  (activity.dataOutputAssociations || []).forEach(a => {
-    if (a.targetRef && a.targetRef.$type === 'bpmn:DataStoreReference') addDsVars(a.targetRef);
-  });
-  (process.flowElements || []).filter(el => el.$type === 'bpmn:DataStoreReference').forEach(addDsVars);
+  // conditions) must come from a read association (data store → task) that selects them.
+  // They are read from the data store where they are used, so a condition after a write
+  // sees the new value. A data store variable used without such a read is an error.
+  const readVarSources = new Map();
+  (activity.dataInputAssociations || []).forEach(assoc => [].concat(assoc.sourceRef || []).forEach(src => {
+    if (!src || src.$type !== 'bpmn:DataStoreReference') return;
+    extractDataStoreVarSelections(assoc).forEach(sel => {
+      if (sel.varname && !readVarSources.has(sel.varname)) readVarSources.set(sel.varname, src);
+    });
+  }));
+  const dataStoreVarNames = new Set();
+  (process.flowElements || []).filter(el => el.$type === 'bpmn:DataStoreReference').forEach(ds =>
+    extractDataStoreVariables(ds).forEach(v => { if ((v.type || 'uint') !== 'mapping') dataStoreVarNames.add(v.name); }));
   const paramNames = new Set([...dsExternalParamsList, ...doExternalParamsList]
     .map(p => p.trim().split(/\s+/).pop()));
+  const taskLabel = activity.name || activity.id;
   const resolveDsVars = (expr) => String(expr)
     .split(/("(?:[^"\\]|\\.)*")/) // leave string literals alone
-    .map((part, i) => i % 2 ? part : part.replace(/(^|[^\w.$])([A-Za-z_]\w*)(?![\w(])/g, (match, pre, name) =>
-      dsVarSources.has(name) && !paramNames.has(name) && !definedVariables.has(name)
-        ? pre + dsReadExpr(name, dsVarSources.get(name))
-        : match))
+    .map((part, i) => i % 2 ? part : part.replace(/(^|[^\w.$])([A-Za-z_]\w*)(?![\w(])/g, (match, pre, name) => {
+      if (paramNames.has(name) || definedVariables.has(name)) return match;
+      if (readVarSources.has(name)) return pre + dsReadExpr(name, readVarSources.get(name));
+      if (dataStoreVarNames.has(name)) {
+        throw new Error(`Receive task "${taskLabel}" uses data store variable "${name}" without reading it: connect the data store to the task (read) and select "${name}".`);
+      }
+      return match;
+    }))
     .join('');
   if (loopCondition) {
     loopGuard = `if (${resolveDsVars(generateExpression(loopCondition, collaborationId))}) { return; }`;
