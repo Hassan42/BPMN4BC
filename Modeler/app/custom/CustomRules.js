@@ -261,6 +261,15 @@ CustomRules.prototype.init = function () {
       }
     }
 
+    // A receive transaction task starts the transaction, so there is no data object to read
+    // yet: it may read from data stores only (writing to data objects is fine)
+    if (is(source.businessObject, 'bpmn:DataObjectReference') && isBcReceiveTask(target.businessObject)) {
+      setTimeout(() => showErrorToast(
+        'A receive transaction task can only read from a data store, not from a data object.'
+      ), 0);
+      return false;
+    }
+
     // Block any connection between elements that live in two different BC pools
     const sourcePool = getPool(source);
     const targetPool = getPool(target);
@@ -471,14 +480,6 @@ CustomRules.prototype.init = function () {
     ) {
     // Use name if set, otherwise fall back to participant ID
     targetBo.bcsender = sourceBo.name || sourceBo.id;
-    }
-
-    // ReceiveTask cannot read from a DataStore
-    if (
-      is(sourceBo, 'bpmn:DataStoreReference') &&
-      is(targetBo, 'bpmn:ReceiveTask') && targetBo.bc === 'true'
-    ) {
-      return false;
     }
 
     // Allow DataObject/DataStore → ExclusiveGateway (read only)

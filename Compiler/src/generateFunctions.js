@@ -378,6 +378,12 @@ function generateScriptFunction(activity, process, collaborationId, multiInstanc
  * @returns {string} The logic for the entry function.
  */
 function generateEntryFunction(activity, process, roles, collaborationId, participantMultiplicities = {}, multiInstance = true, coupledDataStore = false, instanceId = null, foreignInlineDsMap = {}) {
+  // A receive transaction task starts the transaction: it may read data stores, not data objects
+  const readsDataObject = (activity.dataInputAssociations || []).some(assoc =>
+    [].concat(assoc.sourceRef || []).some(src => src && src.$type === 'bpmn:DataObjectReference'));
+  if (readsDataObject) {
+    throw new Error(`Receive task "${activity.name || activity.id}" reads from a data object; a receive transaction task can only read from a data store.`);
+  }
   // Canonical name (no suffix) — used for same/different-contract comparisons and mapping keys
   const contractName = getContractNameForElement(activity, process, collaborationId);
   // Full contract name (with instance suffix if MI lane) — used for DS contract naming
