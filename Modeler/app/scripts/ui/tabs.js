@@ -63,6 +63,12 @@ function renderSenderTabs(networkData, networkKey, instanceId, contentContainer,
   // e.g. sender="Customer" with roles Customer_1, Customer_2 → two tabs, each with overrideSender set.
   const bySender = new Map();
   allTaskEntries.forEach(entry => {
+    // Open tasks have no sender: anyone may call them, with a generated wallet
+    if (entry.task.open) {
+      if (!bySender.has('Anybody')) bySender.set('Anybody', []);
+      bySender.get('Anybody').push(entry);
+      return;
+    }
     const sender = (entry.task.sender || 'Unknown').replace(/\s+/g, '');
     const instanceRoles = [...allRoles]
       .filter(r => new RegExp(`^${sender}_\\d+$`).test(r))

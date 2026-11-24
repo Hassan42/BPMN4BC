@@ -594,7 +594,8 @@ const generateContractConfig = ({
             name: task.name || '',
             state: startReceiveTaskIds.includes(task.id.replace(/\s+/g, '')) ? 'Open' : 'Closed',
             payable: task.bcpayable === true || task.bcpayable === 'true',
-            open: openRoleNames.has(task.bcsender || ''),
+            // open: the task itself is open (anyone may call it) or its sender is a permissionless pool
+            open: isOpenTask(task) || openRoleNames.has(task.bcsender || ''),
             externalParams
         };
     });
