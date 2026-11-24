@@ -75,6 +75,17 @@ export default function (element) {
       isEdited: isTextFieldEntryEdited
     }
   );
+  } else if (is(element, 'bpmn:SubProcess')) {
+    // Loop marker on a sub-process in a BC pool: repeats the whole transaction boundary
+    const loop = element.businessObject.loopCharacteristics;
+    if (loop && loop.$type === 'bpmn:StandardLoopCharacteristics') {
+      props.push({
+        id: 'loopCondition',
+        element,
+        component: LoopCondition,
+        isEdited: isTextFieldEntryEdited
+      });
+    }
   } else if (is(element, 'bpmn:Lane')) {
     // Lane inside a BC pool: each lane is its own smart contract
     props.push(
@@ -198,7 +209,9 @@ function LoopCondition(props) {
   return html`<${TextFieldEntry}
     id=${id}
     element=${element}
-    description=${translate('Solidity condition checked after each call. While it holds, the task stays open for another call; once it is false, the process continues.')}
+    description=${is(element, 'bpmn:SubProcess')
+      ? translate('Solidity condition checked at the end of each run of the sub-process. While it holds, its receive transaction task stays open and the whole transaction runs again on the next call; once it is false, the process continues.')
+      : translate('Solidity condition checked after each call. While it holds, the task stays open for another call; once it is false, the process continues.')}
     label=${translate('Loop Condition')}
     getValue=${getValue}
     setValue=${setValue}

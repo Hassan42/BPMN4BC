@@ -15,6 +15,15 @@ import { is } from 'bpmn-js/lib/util/ModelUtil';
 
 const LOW_PRIORITY = 500;
 
+// True when the element sits (possibly inside sub-processes) in a blockchain pool
+function isInBcPool(element) {
+  for (let p = element.parent; p; p = p.parent) {
+    const bo = p.businessObject;
+    if (bo && bo.$type === 'bpmn:Participant') return bo.bc === 'true';
+  }
+  return false;
+}
+
 
 /**
  * A provider with a `#getGroups(element)` method
@@ -53,6 +62,7 @@ export default function BcPropertiesProvider(propertiesPanel, injector, translat
         'Zeebe__ExtensionProperties', // Extension Properties
         'outputs',                    // Output Mapping (Zeebe)
         'scriptImplementation',       // Implementation (ScriptTask)
+        'multiInstance',              // Multi-instance (cardinality etc.): the marker alone is used
       ]);
       groups = groups.filter(g => !REMOVE_GROUPS.has(g.id));
 
@@ -111,6 +121,17 @@ export default function BcPropertiesProvider(propertiesPanel, injector, translat
         groups.push({
           id: 'ParticipantMultiplicity',
           label: translate('Participant Properties'),
+          entries: BcProps(element),
+        });
+      }
+
+      // Sub-process in a BC pool with a loop marker: loop condition
+      if (is(businessObject, 'bpmn:SubProcess') && isInBcPool(element)
+        && businessObject.loopCharacteristics
+        && businessObject.loopCharacteristics.$type === 'bpmn:StandardLoopCharacteristics') {
+        groups.push({
+          id: 'BCSubProcess',
+          label: translate('Blockchain Properties'),
           entries: BcProps(element),
         });
       }

@@ -143,7 +143,9 @@ const SECTIONS = [
         font: 'bpmn-icon-subprocess-expanded', name: 'Sub-process and markers',
         what: 'A sub-process around a whole transaction (from its receive transaction task to its end) repeats the whole transaction when it carries a multi-instance or loop marker.',
         usage: [
-          'A sub-process may contain only one transaction.',
+          'In a blockchain pool a sub-process holds one transaction: start event → receive transaction task → … → end event.',
+          'Loop marker + Loop Condition: the whole transaction runs on every call while the condition holds.',
+          'Sequential multi-instance marker: every member of the sending participant runs the whole transaction once; the last call continues.',
           'A marker on the receive transaction task repeats only the task; on the sub-process it repeats everything.',
         ],
       },

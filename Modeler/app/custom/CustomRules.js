@@ -26,6 +26,19 @@ function isTimerStart(bo) {
 }
 const TIMER_START_MSG = 'Timer start events are off-chain only and cannot be placed inside a blockchain pool.';
 
+// A sub-process in a blockchain pool holds only one transaction boundary,
+// i.e. one receive transaction task
+const isBcReceiveTask = (bo) => !!bo && is(bo, 'bpmn:ReceiveTask') && bo.bc === 'true';
+function bcReceiveTasksIn(subProcess) {
+  const found = [];
+  (subProcess.children || []).forEach(child => {
+    if (isBcReceiveTask(child.businessObject)) found.push(child);
+    if (is(child.businessObject, 'bpmn:SubProcess')) found.push(...bcReceiveTasksIn(child));
+  });
+  return found;
+}
+const ONE_TX_MSG = 'A sub-process in a blockchain pool can hold only one transaction boundary (one receive transaction task).';
+
 /**
  * A custom rule provider that decides what elements can be
  * dropped where based on a `vendor:allowDrop` BPMN extension.
@@ -59,6 +72,12 @@ CustomRules.prototype.init = function () {
 
     if (isTimerStart(shapeBo) && targetBo.bc === 'true') {
       setTimeout(() => showErrorToast(TIMER_START_MSG), 0);
+      return false;
+    }
+
+    if (bcPool && isBcReceiveTask(shapeBo) && is(target.businessObject, 'bpmn:SubProcess')
+      && bcReceiveTasksIn(target).length > 0) {
+      setTimeout(() => showErrorToast(ONE_TX_MSG), 0);
       return false;
     }
 
@@ -128,6 +147,14 @@ CustomRules.prototype.init = function () {
     if ((shapes || []).some(s => isTimerStart(s.businessObject))) {
       setTimeout(() => showErrorToast(TIMER_START_MSG), 0);
       return false;
+    }
+    if (is(target.businessObject, 'bpmn:SubProcess')) {
+      const moving = (shapes || []).filter(s => isBcReceiveTask(s.businessObject));
+      const staying = bcReceiveTasksIn(target).filter(t => !shapes.includes(t));
+      if (moving.length && moving.length + staying.length > 1) {
+        setTimeout(() => showErrorToast(ONE_TX_MSG), 0);
+        return false;
+      }
     }
   });
 

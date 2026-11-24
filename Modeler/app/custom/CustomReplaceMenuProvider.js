@@ -59,9 +59,11 @@ export default function CustomReplaceMenuProvider(
       ));
     }
 
-    // BC Sub-process: no header toggles, only collapse/expand in the entries
+    // BC Sub-process: loop and sequential multi-instance repeat its whole transaction boundary
     if (isBcSubProcess(element)) {
-      return {};
+      return Object.fromEntries(Object.entries(headerEntries).filter(([ id ]) =>
+        id === 'toggle-loop' || id === 'toggle-sequential-mi'
+      ));
     }
 
     return headerEntries;
