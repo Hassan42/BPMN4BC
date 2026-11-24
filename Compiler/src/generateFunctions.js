@@ -964,6 +964,9 @@ function generateEntryFunction(activity, process, roles, collaborationId, partic
         ${doStructCreationsCode}
         ${mappingReadDecls}
         ${dataStoreAssignments}
+        // Sequential multi-instance: every call is recorded (and writes its own data), but only
+        // the last required participant continues with the rest of the transaction boundary
+        if (${participationCountRef(taskId)} < $.requiredParticipants["${taskId}"]) { return; }
         ${loopGuard}
         ${proceedingLogic}
         ${!hasNextReceiveTask && !hasLoop ? `${participationGate} { ${stateRef(taskId)} = State.Completed; }` : ''}
