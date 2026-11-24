@@ -236,7 +236,7 @@ let _ethChfRate       = null;
 let _instances        = [];
 let _lastAutoRunTrace = null;  // populated after each Auto-Run; null = never run
 
-// ── Experiment totals ─────────────────────────────────────────────────────────
+// ── Deployment totals ─────────────────────────────────────────────────────────
 function renderTotals(instances) {
   totalsSectionEl.innerHTML = '';
   if (instances.length === 0) { totalsSectionEl.classList.add('hidden'); return; }
@@ -260,7 +260,7 @@ function renderTotals(instances) {
   const heading = document.createElement('div');
   heading.className = 'flex items-center justify-between mb-2';
   heading.innerHTML = `
-    <span class="text-sm font-bold text-gray-700">Experiment Totals</span>
+    <span class="text-sm font-bold text-gray-700">Deployment Total</span>
     <span class="text-xs text-gray-400">${instances.length} instance${instances.length !== 1 ? 's' : ''}</span>
   `;
   totalsSectionEl.appendChild(heading);
