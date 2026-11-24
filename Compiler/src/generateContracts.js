@@ -158,7 +158,9 @@ async function generateContract(contractParams) {
   // ── Multi-participant: requiredParticipants init + state variable block ────
   // Only receive tasks with the sequential multi-instance marker require every connected
   // participant (each instance of a multi-instance participant) to call them.
-  const isMultiParticipantTask = (task) => !isOpenTask(task) && isSequentialMI(task)
+  // The sequential multi-instance marker can sit on the task or on its enclosing sub-process.
+  const isMultiParticipantTask = (task) => !isOpenTask(task)
+    && (isSequentialMI(task) || (task.$subProcessRepeat && task.$subProcessRepeat.kind === 'mi'))
     && requiredParticipantCount(task, participantMultiplicities || {}) > 1;
 
   const multiParticipantInits = receiveTasks

@@ -5,6 +5,7 @@ const path = require('path');
 const BpmnModdle = require('bpmn-moddle');
 const bpmnbcDescriptor = require('./resources/BC.json');
 const { generateContracts } = require('./src/generateContracts');
+const { flattenSubProcesses } = require('./src/subprocess');
 
 const app = express();
 const port = parseInt(process.env.PORT || '8000', 10);
@@ -32,6 +33,7 @@ app.post('/compile', (req, res) => serialized(async () => {
     await cleanOutputDirectories();
 
     const { rootElement: definitions } = await moddle.fromXML(xml);
+    flattenSubProcesses(definitions);
     const contracts = await generateContracts(definitions, instanceId);
     res.status(200).json(contracts);
   } catch (err) {

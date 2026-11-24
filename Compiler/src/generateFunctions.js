@@ -1,3 +1,4 @@
+const { SUBPROCESS_EXIT } = require('./subprocess.js');
 const {
   getProceedingElementsFromFlow,
   isValueType,
@@ -493,6 +494,12 @@ function generateEntryFunction(activity, process, roles, collaborationId, partic
   const isMultiParticipant = !openTask && isSequentialMI(activity)
     && requiredParticipantCount(activity, participantMultiplicities) > 1;
 
+  // Marker on the enclosing sub-process: the whole transaction boundary runs on every call;
+  // the sub-process exit decides whether the process moves on or the task stays open.
+  const subRepeat = activity.$subProcessRepeat || null;
+  const isSubProcessMI = !!subRepeat && subRepeat.kind === 'mi' && !openTask
+    && requiredParticipantCount(activity, participantMultiplicities) > 1;
+
   // Loop marker: the task stays open and is called again (each call a new transaction)
   // as long as its loop condition holds; the rest of the transaction boundary runs once,
   // on the call where the condition no longer holds.
@@ -600,6 +607,17 @@ function generateEntryFunction(activity, process, roles, collaborationId, partic
   // alreadyGated: true when we are already inside a gate block (e.g. inside an XOR branch
   // that is itself wrapped), so we must not double-wrap.
   function processElement(element, alreadyGated = false) {
+    if (element.$type === SUBPROCESS_EXIT) {
+      // Only the sub-process's own receive task repeats; reaching the exit decides it.
+      if (element.receiveTask === activity && element.marker) {
+        if (element.marker.kind === 'loop') {
+          proceedingLogic += `if (${generateExpression(element.marker.condition, collaborationId)}) { return; }\n`;
+        } else if (isSubProcessMI) {
+          proceedingLogic += `if (${participationCountRef(taskId)} < $.requiredParticipants["${taskId}"]) { return; }\n`;
+        }
+      }
+      return;
+    }
     // Canonical name (no suffix) — used for comparison, contracts[] mapping key,
     // AND interface cast types (interfaces are written once per lane without instance suffix).
     const elementContractName = getContractNameForElement(element, process, collaborationId);
@@ -957,6 +975,9 @@ function generateEntryFunction(activity, process, roles, collaborationId, partic
     ${bpmnMarker}
     function ${taskId}(${signatureParams}) public ${payableModifier}${accessibleModifier} {
         MainStorage storage $ = _getMainStorage();
+        ${isSubProcessMI ? `require(!${hasParticipatedRef(taskId)}, "Participated already called this activity");
+        ${hasParticipatedRef(taskId)} = true;
+        ${participationCountRef(taskId)}++;` : ''}
         ${doStructCreationsCode}
         ${mappingReadDecls}
         ${dataStoreAssignments}
