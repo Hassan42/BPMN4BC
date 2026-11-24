@@ -82,7 +82,7 @@ function generateFunctionSignatures(solidityCode) {
  * @param {string}  canonicalBase    - Canonical lane contract name (no instance suffix).
  * @returns {string} Solidity assignment statements.
  */
-function generateDataStoreAssignments(activity, collaborationId, multiInstance = true, coupledDataStore = false, contractNameFull = '', canonicalBase = '', foreignInlineDsMap = {}) {
+function generateDataStoreAssignments(activity, collaborationId, multiInstance = true, coupledDataStore = false, contractNameFull = '', canonicalBase = '', foreignInlineDsMap = {}, resolveExpr = (e) => e) {
   if (!activity.dataOutputAssociations || activity.dataOutputAssociations.length === 0) return '';
   const lines = [];
   activity.dataOutputAssociations.forEach(conn => {
@@ -106,7 +106,7 @@ function generateDataStoreAssignments(activity, collaborationId, multiInstance =
         // Key: either an external function param or an inline expression
         const keyExpr = sel.externalKey
           ? `${sel.varname}Key`
-          : (sel.key ? generateExpression(sel.key, collaborationId) : null);
+          : (sel.key ? resolveExpr(generateExpression(sel.key, collaborationId)) : null);
 
         // Value: either an external function param or an inline expression
         const valueType = dsVar ? (dsVar.valueType || 'uint') : 'uint';
@@ -114,7 +114,7 @@ function generateDataStoreAssignments(activity, collaborationId, multiInstance =
         if (sel.externalValue) {
           valueExpr = `${sel.varname}Value`;
         } else if (sel.value) {
-          const rawValue = generateExpression(sel.value, collaborationId);
+          const rawValue = resolveExpr(generateExpression(sel.value, collaborationId));
           valueExpr = (valueType === 'string' && !sel.value.includes('${') && !rawValue.startsWith('"'))
             ? `"${rawValue}"` : rawValue;
         }
@@ -141,7 +141,7 @@ function generateDataStoreAssignments(activity, collaborationId, multiInstance =
         // Regular DataStore struct var
         const value = isExternalParam(sel, activity) ? sel.varname : (() => {
           if (!sel.value) return null;
-          const raw = generateExpression(sel.value, collaborationId);
+          const raw = resolveExpr(generateExpression(sel.value, collaborationId));
           return (varType === 'string' && !sel.value.includes('${') && !raw.startsWith('"')) ? `"${raw}"` : raw;
         })();
         if (value === null) return;
@@ -510,12 +510,12 @@ function generateEntryFunction(activity, process, roles, collaborationId, partic
   // as long as its loop condition holds; the rest of the transaction boundary runs once,
   // on the call where the condition no longer holds.
   let loopGuard = '';
+  let loopCondition = null;
   if (isStandardLoop(activity)) {
-    const loopCondition = (activity.bcloopcondition || '').trim();
+    loopCondition = (activity.bcloopcondition || '').trim();
     if (!loopCondition) {
       throw new Error(`Receive task "${activity.name || activity.id}" has a loop marker but no loop condition.`);
     }
-    loopGuard = `if (${generateExpression(loopCondition, collaborationId)}) { return; }`;
   }
 
   // Reads a specific mapping key from a DS (inline local var or interface call).
@@ -597,6 +597,32 @@ function generateEntryFunction(activity, process, roles, collaborationId, partic
     return `$.dataStore_${dsKey}.${varname}`;
   };
 
+  // Data store variables used by name in this task's expressions (write values, loop
+  // conditions) are read from the data store where they are used: nothing declares them
+  // as locals, and a read at that point also sees this task's own earlier writes.
+  const dsVarSources = new Map();
+  const addDsVars = (ds) => extractDataStoreVariables(ds).forEach(v => {
+    if ((v.type || 'uint') !== 'mapping' && !dsVarSources.has(v.name)) dsVarSources.set(v.name, ds);
+  });
+  (activity.dataInputAssociations || []).forEach(a => [].concat(a.sourceRef || [])
+    .forEach(src => { if (src && src.$type === 'bpmn:DataStoreReference') addDsVars(src); }));
+  (activity.dataOutputAssociations || []).forEach(a => {
+    if (a.targetRef && a.targetRef.$type === 'bpmn:DataStoreReference') addDsVars(a.targetRef);
+  });
+  (process.flowElements || []).filter(el => el.$type === 'bpmn:DataStoreReference').forEach(addDsVars);
+  const paramNames = new Set([...dsExternalParamsList, ...doExternalParamsList]
+    .map(p => p.trim().split(/\s+/).pop()));
+  const resolveDsVars = (expr) => String(expr)
+    .split(/("(?:[^"\\]|\\.)*")/) // leave string literals alone
+    .map((part, i) => i % 2 ? part : part.replace(/(^|[^\w.$])([A-Za-z_]\w*)(?![\w(])/g, (match, pre, name) =>
+      dsVarSources.has(name) && !paramNames.has(name) && !definedVariables.has(name)
+        ? pre + dsReadExpr(name, dsVarSources.get(name))
+        : match))
+    .join('');
+  if (loopCondition) {
+    loopGuard = `if (${resolveDsVars(generateExpression(loopCondition, collaborationId))}) { return; }`;
+  }
+
   let proceedingLogic = '';
   let hasLoop = false;
 
@@ -617,7 +643,7 @@ function generateEntryFunction(activity, process, roles, collaborationId, partic
       // Only the sub-process's own receive task repeats; reaching the exit decides it.
       if (element.receiveTask === activity && element.marker) {
         if (element.marker.kind === 'loop') {
-          proceedingLogic += `if (${generateExpression(element.marker.condition, collaborationId)}) { return; }\n`;
+          proceedingLogic += `if (${resolveDsVars(generateExpression(element.marker.condition, collaborationId))}) { return; }\n`;
         } else if (isSubProcessMI) {
           proceedingLogic += `if (${participationCountRef(taskId)} < $.requiredParticipants["${taskId}"]) { return; }\n`;
         }
@@ -945,7 +971,7 @@ function generateEntryFunction(activity, process, roles, collaborationId, partic
   // Determine if the current activity loops back to itself
   const hasNextReceiveTask = proceedingElements.some(element => element.$type === 'bpmn:ReceiveTask' && element.id === activity.id);
 
-  const dataStoreAssignments = generateDataStoreAssignments(activity, collaborationId, multiInstance, coupledDataStore, contractNameFull, canonicalBase, foreignInlineDsMap);
+  const dataStoreAssignments = generateDataStoreAssignments(activity, collaborationId, multiInstance, coupledDataStore, contractNameFull, canonicalBase, foreignInlineDsMap, resolveDsVars);
   const doStructCreationsCode = doStructCreations.join('\n        ');
 
   const payableModifier = (activity.bcpayable === true || activity.bcpayable === 'true') ? 'payable ' : '';
