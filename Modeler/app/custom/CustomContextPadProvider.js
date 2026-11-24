@@ -47,7 +47,9 @@ export default function CustomContextPadProvider(injector, connect, translate) {
             }
 
             forEach(actions, (action, key) => {
-                if (key.startsWith('append.') && key !== 'append.start-event' && key !== 'append.end-event') {
+                // Comments (text annotations) are allowed everywhere: they are not compiled
+                if (key.startsWith('append.') && key !== 'append.start-event' && key !== 'append.end-event'
+                    && key !== 'append.text-annotation') {
                     delete actions[key];
                 }
             });

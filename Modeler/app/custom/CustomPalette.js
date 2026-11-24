@@ -56,6 +56,10 @@ export default class CustomPalette {
       create.start(event, elementFactory.createShape({ type: 'bpmn:Task' }));
     }
 
+    function createTextAnnotation(event) {
+      create.start(event, elementFactory.createShape({ type: 'bpmn:TextAnnotation' }));
+    }
+
     function createSubprocess(event) {
       const subProcess = elementFactory.createShape({ type: 'bpmn:SubProcess', x: 0, y: 0, isExpanded: true });
       const startEvent = elementFactory.createShape({ type: 'bpmn:StartEvent', x: 40, y: 82, parent: subProcess });
@@ -169,6 +173,12 @@ export default class CustomPalette {
         className: 'bpmn-icon-subprocess-expanded',
         title: translate('Create expanded sub-process'),
         action: { dragstart: createSubprocess, click: createSubprocess }
+      },
+      'std.text-annotation': {
+        group: 'BC',
+        className: 'bpmn-icon-text-annotation',
+        title: translate('Create comment (text annotation)'),
+        action: { dragstart: createTextAnnotation, click: createTextAnnotation }
       },
       'BCTimer': {
         group: 'BC',

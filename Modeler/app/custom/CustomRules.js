@@ -64,6 +64,9 @@ CustomRules.prototype.init = function () {
     const { shape, target } = context;
     const shapeBo = shape.businessObject;
 
+    // Comments (text annotations) may go anywhere: the standard BPMN rules decide
+    if (is(shapeBo, 'bpmn:TextAnnotation')) return;
+
     // Elements inside a sub-process in a BC pool follow the same rules as the pool itself
     const bcPool = getBcPool(target);
     const targetBo = (bcPool && is(target.businessObject, 'bpmn:SubProcess'))
@@ -186,6 +189,11 @@ CustomRules.prototype.init = function () {
     const { target, source } = context;
 
     if (!target || !source) {
+      return;
+    }
+
+    // The dotted link of a comment (text annotation): the standard BPMN rules decide
+    if (is(source.businessObject, 'bpmn:TextAnnotation') || is(target.businessObject, 'bpmn:TextAnnotation')) {
       return;
     }
 
