@@ -33,6 +33,11 @@ const EXAMPLES = [
     name: 'Multisig Wallet',
     description: 'An owner submits a transaction with the funds; every owner must confirm it, and the last confirmation makes the wallet pay the recipient.',
   },
+  {
+    id: 'crowdfunding',
+    name: 'Crowdfunding',
+    description: 'The creator sets a goal; anyone can pledge through an open task until the goal is reached, then the creator withdraws the funds.',
+  },
 ];
 
 const ICONS = {

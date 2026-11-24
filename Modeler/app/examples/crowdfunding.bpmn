@@ -1,0 +1,308 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn2:definitions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:bpmn2="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:bpmnbc="http://some-company/schema/bpmn/qa" id="crowdfunding" targetNamespace="http://bpmn.io/schema/bpmn">
+  <bpmn2:collaboration id="Collaboration_43247181">
+    <bpmn2:participant id="Participant_Creator" name="Creator" processRef="Process_Creator" />
+    <bpmn2:participant id="Participant_Campaign" bpmnbc:bc="true" bpmnbc:bctype="Participant" bpmnbc:bcid="network-1" name="Crowdfunding Campaign" processRef="Process_Campaign" />
+    <bpmn2:messageFlow id="Flow_Msg_Launch" sourceRef="Task_SendLaunch" targetRef="Task_Launch" />
+    <bpmn2:messageFlow id="Flow_Msg_Withdraw" sourceRef="Task_SendWithdraw" targetRef="Task_Withdraw" />
+    <bpmn2:messageFlow id="Flow_Msg_Payout" sourceRef="Task_Transfer" targetRef="Participant_Creator" />
+  </bpmn2:collaboration>
+  <bpmn2:process id="Process_Creator">
+    <bpmn2:startEvent id="Event_CreatorStart">
+      <bpmn2:outgoing>Flow_C1</bpmn2:outgoing>
+    </bpmn2:startEvent>
+    <bpmn2:sendTask id="Task_SendLaunch" bpmnbc:bc="true" bpmnbc:bctype="SendTask" bpmnbc:bcid="network-1" name="Launch Campaign">
+      <bpmn2:incoming>Flow_C1</bpmn2:incoming>
+      <bpmn2:outgoing>Flow_C2</bpmn2:outgoing>
+    </bpmn2:sendTask>
+    <bpmn2:intermediateCatchEvent id="Event_CatchGoal" bpmnbc:bc="true" bpmnbc:bctype="IntermediateCatchEvent" bpmnbc:bcevent="catchEvent" bpmnbc:bceventname="GoalReached" name="Goal Reached">
+      <bpmn2:incoming>Flow_C2</bpmn2:incoming>
+      <bpmn2:outgoing>Flow_C3</bpmn2:outgoing>
+    </bpmn2:intermediateCatchEvent>
+    <bpmn2:sendTask id="Task_SendWithdraw" bpmnbc:bc="true" bpmnbc:bctype="SendTask" bpmnbc:bcid="network-1" name="Withdraw Funds">
+      <bpmn2:incoming>Flow_C3</bpmn2:incoming>
+      <bpmn2:outgoing>Flow_C4</bpmn2:outgoing>
+    </bpmn2:sendTask>
+    <bpmn2:endEvent id="Event_CreatorEnd">
+      <bpmn2:incoming>Flow_C4</bpmn2:incoming>
+    </bpmn2:endEvent>
+    <bpmn2:sequenceFlow id="Flow_C1" sourceRef="Event_CreatorStart" targetRef="Task_SendLaunch" />
+    <bpmn2:sequenceFlow id="Flow_C2" sourceRef="Task_SendLaunch" targetRef="Event_CatchGoal" />
+    <bpmn2:sequenceFlow id="Flow_C3" sourceRef="Event_CatchGoal" targetRef="Task_SendWithdraw" />
+    <bpmn2:sequenceFlow id="Flow_C4" sourceRef="Task_SendWithdraw" targetRef="Event_CreatorEnd" />
+  </bpmn2:process>
+  <bpmn2:process id="Process_Campaign">
+    <bpmn2:startEvent id="Event_CampaignStart">
+      <bpmn2:outgoing>Flow_P1</bpmn2:outgoing>
+    </bpmn2:startEvent>
+    <bpmn2:receiveTask id="Task_Launch" bpmnbc:bc="true" bpmnbc:bctype="ReceiveTask" bpmnbc:bcsender="Creator" bpmnbc:bcid="network-1" name="Launch Campaign">
+      <bpmn2:incoming>Flow_P1</bpmn2:incoming>
+      <bpmn2:outgoing>Flow_P2</bpmn2:outgoing>
+      <bpmn2:dataOutputAssociation id="Assoc_LaunchWrite">
+        <bpmn2:extensionElements>
+          <bpmnbc:dataStoreVarSelections>
+            <bpmnbc:dataStoreVarSelection varname="goal_WEI" external="true" />
+          </bpmnbc:dataStoreVarSelections>
+        </bpmn2:extensionElements>
+        <bpmn2:targetRef>DS_Campaign_1</bpmn2:targetRef>
+      </bpmn2:dataOutputAssociation>
+    </bpmn2:receiveTask>
+    <bpmn2:intermediateThrowEvent id="Event_Launched" bpmnbc:bc="true" bpmnbc:bctype="IntermediateThrowEvent" bpmnbc:bcevent="throwEvent" bpmnbc:bcid="network-1" name="Campaign Launched">
+      <bpmn2:incoming>Flow_P2</bpmn2:incoming>
+      <bpmn2:outgoing>Flow_P3</bpmn2:outgoing>
+    </bpmn2:intermediateThrowEvent>
+    <bpmn2:receiveTask id="Task_Pledge" bpmnbc:bc="true" bpmnbc:bctype="ReceiveTask" bpmnbc:bcid="network-1" bpmnbc:bcpayable="true" bpmnbc:bcopen="true" bpmnbc:bcloopcondition="raised &#60; goal_WEI" name="Pledge">
+      <bpmn2:incoming>Flow_P3</bpmn2:incoming>
+      <bpmn2:outgoing>Flow_P4</bpmn2:outgoing>
+      <bpmn2:property id="Prop_PledgeIn" name="__targetRef_placeholder" />
+      <bpmn2:dataInputAssociation id="Assoc_PledgeRead">
+        <bpmn2:extensionElements>
+          <bpmnbc:dataStoreVarSelections>
+            <bpmnbc:dataStoreVarSelection varname="raised" />
+            <bpmnbc:dataStoreVarSelection varname="goal_WEI" />
+          </bpmnbc:dataStoreVarSelections>
+        </bpmn2:extensionElements>
+        <bpmn2:sourceRef>DS_Campaign_4</bpmn2:sourceRef>
+        <bpmn2:targetRef>Prop_PledgeIn</bpmn2:targetRef>
+      </bpmn2:dataInputAssociation>
+      <bpmn2:dataOutputAssociation id="Assoc_PledgeWrite">
+        <bpmn2:extensionElements>
+          <bpmnbc:dataStoreVarSelections>
+            <bpmnbc:dataStoreVarSelection varname="raised" value="raised + msg.value" external="false" />
+          </bpmnbc:dataStoreVarSelections>
+        </bpmn2:extensionElements>
+        <bpmn2:targetRef>DS_Campaign_2</bpmn2:targetRef>
+      </bpmn2:dataOutputAssociation>
+      <bpmn2:standardLoopCharacteristics />
+    </bpmn2:receiveTask>
+    <bpmn2:intermediateThrowEvent id="Event_GoalReached" bpmnbc:bc="true" bpmnbc:bctype="IntermediateThrowEvent" bpmnbc:bcevent="throwEvent" bpmnbc:bcid="network-1" name="Goal Reached">
+      <bpmn2:incoming>Flow_P4</bpmn2:incoming>
+      <bpmn2:outgoing>Flow_P5</bpmn2:outgoing>
+    </bpmn2:intermediateThrowEvent>
+    <bpmn2:receiveTask id="Task_Withdraw" bpmnbc:bc="true" bpmnbc:bctype="ReceiveTask" bpmnbc:bcsender="Creator" bpmnbc:bcid="network-1" name="Withdraw Funds">
+      <bpmn2:incoming>Flow_P5</bpmn2:incoming>
+      <bpmn2:outgoing>Flow_P6</bpmn2:outgoing>
+    </bpmn2:receiveTask>
+    <bpmn2:scriptTask id="Task_Transfer" bpmnbc:bc="true" bpmnbc:bctype="ScriptTask" bpmnbc:bcid="network-1" bpmnbc:solidityscript="(bool success, ) = payable(addressOf[&#34;Creator&#34;]).call{value: raised}(&#34;&#34;);&#10;require(success, &#34;transfer failed&#34;);" name="Transfer Funds">
+      <bpmn2:incoming>Flow_P6</bpmn2:incoming>
+      <bpmn2:outgoing>Flow_P7</bpmn2:outgoing>
+      <bpmn2:property id="Prop_TransferIn" name="__targetRef_placeholder" />
+      <bpmn2:dataInputAssociation id="Assoc_TransferRead">
+        <bpmn2:extensionElements>
+          <bpmnbc:dataStoreVarSelections>
+            <bpmnbc:dataStoreVarSelection varname="raised" />
+          </bpmnbc:dataStoreVarSelections>
+        </bpmn2:extensionElements>
+        <bpmn2:sourceRef>DS_Campaign_3</bpmn2:sourceRef>
+        <bpmn2:targetRef>Prop_TransferIn</bpmn2:targetRef>
+      </bpmn2:dataInputAssociation>
+    </bpmn2:scriptTask>
+    <bpmn2:endEvent id="Event_CampaignEnd">
+      <bpmn2:incoming>Flow_P7</bpmn2:incoming>
+    </bpmn2:endEvent>
+    <bpmn2:sequenceFlow id="Flow_P1" sourceRef="Event_CampaignStart" targetRef="Task_Launch" />
+    <bpmn2:sequenceFlow id="Flow_P2" sourceRef="Task_Launch" targetRef="Event_Launched" />
+    <bpmn2:sequenceFlow id="Flow_P3" sourceRef="Event_Launched" targetRef="Task_Pledge" />
+    <bpmn2:sequenceFlow id="Flow_P4" sourceRef="Task_Pledge" targetRef="Event_GoalReached" />
+    <bpmn2:sequenceFlow id="Flow_P5" sourceRef="Event_GoalReached" targetRef="Task_Withdraw" />
+    <bpmn2:sequenceFlow id="Flow_P6" sourceRef="Task_Withdraw" targetRef="Task_Transfer" />
+    <bpmn2:sequenceFlow id="Flow_P7" sourceRef="Task_Transfer" targetRef="Event_CampaignEnd" />
+    <bpmn2:dataStoreReference id="DS_Campaign_1" name="Campaign">
+      <bpmn2:extensionElements>
+        <bpmnbc:dataStoreVariables>
+          <bpmnbc:dataStoreVariable name="goal_WEI" type="uint" />
+          <bpmnbc:dataStoreVariable name="raised" type="uint" />
+        </bpmnbc:dataStoreVariables>
+      </bpmn2:extensionElements>
+    </bpmn2:dataStoreReference>
+    <bpmn2:dataStoreReference id="DS_Campaign_2" name="Campaign">
+      <bpmn2:extensionElements>
+        <bpmnbc:dataStoreVariables>
+          <bpmnbc:dataStoreVariable name="goal_WEI" type="uint" />
+          <bpmnbc:dataStoreVariable name="raised" type="uint" />
+        </bpmnbc:dataStoreVariables>
+      </bpmn2:extensionElements>
+    </bpmn2:dataStoreReference>
+    <bpmn2:dataStoreReference id="DS_Campaign_3" name="Campaign">
+      <bpmn2:extensionElements>
+        <bpmnbc:dataStoreVariables>
+          <bpmnbc:dataStoreVariable name="goal_WEI" type="uint" />
+          <bpmnbc:dataStoreVariable name="raised" type="uint" />
+        </bpmnbc:dataStoreVariables>
+      </bpmn2:extensionElements>
+    </bpmn2:dataStoreReference>
+    <bpmn2:dataStoreReference id="DS_Campaign_4" name="Campaign">
+      <bpmn2:extensionElements>
+        <bpmnbc:dataStoreVariables>
+          <bpmnbc:dataStoreVariable name="goal_WEI" type="uint" />
+          <bpmnbc:dataStoreVariable name="raised" type="uint" />
+        </bpmnbc:dataStoreVariables>
+      </bpmn2:extensionElements>
+    </bpmn2:dataStoreReference>
+    <bpmn2:textAnnotation id="Note_Pledge">
+      <bpmn2:text>Open task: anyone can pledge, as often as they like, until the goal is reached</bpmn2:text>
+    </bpmn2:textAnnotation>
+    <bpmn2:association id="Assoc_Note_Pledge" associationDirection="None" sourceRef="Task_Pledge" targetRef="Note_Pledge" />
+  </bpmn2:process>
+  <bpmndi:BPMNDiagram id="Diagram_Crowdfunding">
+    <bpmndi:BPMNPlane id="Plane_Crowdfunding" bpmnElement="Collaboration_43247181">
+      <bpmndi:BPMNShape id="Participant_Creator_di" bpmnElement="Participant_Creator" isHorizontal="true">
+        <dc:Bounds x="100" y="60" width="1060" height="150" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_CreatorStart_di" bpmnElement="Event_CreatorStart">
+        <dc:Bounds x="162" y="117" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_SendLaunch_di" bpmnElement="Task_SendLaunch">
+        <dc:Bounds x="240" y="95" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_CatchGoal_di" bpmnElement="Event_CatchGoal">
+        <dc:Bounds x="652" y="117" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="637" y="85" width="66" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_SendWithdraw_di" bpmnElement="Task_SendWithdraw">
+        <dc:Bounds x="740" y="95" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_CreatorEnd_di" bpmnElement="Event_CreatorEnd">
+        <dc:Bounds x="1082" y="117" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_C1_di" bpmnElement="Flow_C1">
+        <di:waypoint x="198" y="135" />
+        <di:waypoint x="240" y="135" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_C2_di" bpmnElement="Flow_C2">
+        <di:waypoint x="340" y="135" />
+        <di:waypoint x="652" y="135" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_C3_di" bpmnElement="Flow_C3">
+        <di:waypoint x="688" y="135" />
+        <di:waypoint x="740" y="135" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_C4_di" bpmnElement="Flow_C4">
+        <di:waypoint x="840" y="135" />
+        <di:waypoint x="1082" y="135" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="Participant_Campaign_di" bpmnElement="Participant_Campaign" isHorizontal="true">
+        <dc:Bounds x="100" y="260" width="1060" height="320" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_CampaignStart_di" bpmnElement="Event_CampaignStart">
+        <dc:Bounds x="162" y="412" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Launch_di" bpmnElement="Task_Launch">
+        <dc:Bounds x="240" y="390" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_Launched_di" bpmnElement="Event_Launched">
+        <dc:Bounds x="392" y="412" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="371" y="375" width="78" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Pledge_di" bpmnElement="Task_Pledge">
+        <dc:Bounds x="480" y="390" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_GoalReached_di" bpmnElement="Event_GoalReached">
+        <dc:Bounds x="652" y="412" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="637" y="375" width="66" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Withdraw_di" bpmnElement="Task_Withdraw">
+        <dc:Bounds x="740" y="390" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Transfer_di" bpmnElement="Task_Transfer">
+        <dc:Bounds x="900" y="390" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_CampaignEnd_di" bpmnElement="Event_CampaignEnd">
+        <dc:Bounds x="1082" y="412" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DS_Campaign_1_di" bpmnElement="DS_Campaign_1">
+        <dc:Bounds x="265" y="500" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="265" y="557" width="51" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DS_Campaign_2_di" bpmnElement="DS_Campaign_2">
+        <dc:Bounds x="545" y="500" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="545" y="557" width="51" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DS_Campaign_3_di" bpmnElement="DS_Campaign_3">
+        <dc:Bounds x="925" y="500" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="925" y="557" width="51" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DS_Campaign_4_di" bpmnElement="DS_Campaign_4">
+        <dc:Bounds x="455" y="500" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="455" y="557" width="51" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Note_Pledge_di" bpmnElement="Note_Pledge">
+        <dc:Bounds x="450" y="285" width="190" height="55" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_P1_di" bpmnElement="Flow_P1">
+        <di:waypoint x="198" y="430" />
+        <di:waypoint x="240" y="430" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_P2_di" bpmnElement="Flow_P2">
+        <di:waypoint x="340" y="430" />
+        <di:waypoint x="392" y="430" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_P3_di" bpmnElement="Flow_P3">
+        <di:waypoint x="428" y="430" />
+        <di:waypoint x="480" y="430" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_P4_di" bpmnElement="Flow_P4">
+        <di:waypoint x="580" y="430" />
+        <di:waypoint x="652" y="430" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_P5_di" bpmnElement="Flow_P5">
+        <di:waypoint x="688" y="430" />
+        <di:waypoint x="740" y="430" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_P6_di" bpmnElement="Flow_P6">
+        <di:waypoint x="840" y="430" />
+        <di:waypoint x="900" y="430" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_P7_di" bpmnElement="Flow_P7">
+        <di:waypoint x="1000" y="430" />
+        <di:waypoint x="1082" y="430" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Assoc_Note_Pledge_di" bpmnElement="Assoc_Note_Pledge">
+        <di:waypoint x="530" y="390" />
+        <di:waypoint x="530" y="340" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Assoc_LaunchWrite_di" bpmnElement="Assoc_LaunchWrite">
+        <di:waypoint x="290" y="470" />
+        <di:waypoint x="290" y="500" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Assoc_PledgeRead_di" bpmnElement="Assoc_PledgeRead">
+        <di:waypoint x="490" y="500" />
+        <di:waypoint x="510" y="470" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Assoc_PledgeWrite_di" bpmnElement="Assoc_PledgeWrite">
+        <di:waypoint x="550" y="470" />
+        <di:waypoint x="565" y="500" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Assoc_TransferRead_di" bpmnElement="Assoc_TransferRead">
+        <di:waypoint x="950" y="500" />
+        <di:waypoint x="950" y="470" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Msg_Launch_di" bpmnElement="Flow_Msg_Launch">
+        <di:waypoint x="290" y="175" />
+        <di:waypoint x="290" y="390" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Msg_Withdraw_di" bpmnElement="Flow_Msg_Withdraw">
+        <di:waypoint x="790" y="175" />
+        <di:waypoint x="790" y="390" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Msg_Payout_di" bpmnElement="Flow_Msg_Payout">
+        <di:waypoint x="950" y="390" />
+        <di:waypoint x="950" y="210" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn2:definitions>
