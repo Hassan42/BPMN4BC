@@ -63,8 +63,9 @@ function renderSenderTabs(networkData, networkKey, instanceId, contentContainer,
   // e.g. sender="Customer" with roles Customer_1, Customer_2 → two tabs, each with overrideSender set.
   const bySender = new Map();
   allTaskEntries.forEach(entry => {
-    // Open tasks have no sender: anyone may call them, with a generated wallet
-    if (entry.task.open) {
+    // Open transaction tasks have no sender role: anyone may call them, with a generated wallet.
+    // Tasks of a permissionless pool stay under that pool's role.
+    if (entry.task.openTask) {
       if (!bySender.has('Anybody')) bySender.set('Anybody', []);
       bySender.get('Anybody').push(entry);
       return;

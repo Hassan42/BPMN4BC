@@ -594,8 +594,10 @@ const generateContractConfig = ({
             name: task.name || '',
             state: startReceiveTaskIds.includes(task.id.replace(/\s+/g, '')) ? 'Open' : 'Closed',
             payable: task.bcpayable === true || task.bcpayable === 'true',
-            // open: the task itself is open (anyone may call it) or its sender is a permissionless pool
+            // open: anyone may call it (open task, or sender is a permissionless pool) → wallet picker
             open: isOpenTask(task) || openRoleNames.has(task.bcsender || ''),
+            // openTask: the task itself is open (no sender role) → "Anybody" tab
+            openTask: isOpenTask(task),
             externalParams
         };
     });
