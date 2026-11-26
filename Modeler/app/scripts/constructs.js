@@ -123,7 +123,7 @@ const SECTIONS = [
         usage: [
           'Add typed variables in the Variables window.',
           'Coupled: embedded in the process contract; unchecked, it becomes its own contract.',
-          'Multi-instance / Shared: one store per instance, or one store for all instances.',
+          'Multi-instance / Flat: one store per instance, or one store for all instances.',
         ],
       },
       {

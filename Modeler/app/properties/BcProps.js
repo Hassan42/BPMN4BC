@@ -676,7 +676,7 @@ function DataStoreSharedCheckbox(props) {
   return html`<${CheckboxEntry}
     id=${id}
     element=${element}
-    label=${translate('Shared')}
+    label=${translate('Flat')}
     description=${translate('When checked, all process instances share the same flat data store storage (no per-instance mapping). Only valid when Multi-instance is unchecked.')}
     getValue=${getValue}
     setValue=${setValue}
