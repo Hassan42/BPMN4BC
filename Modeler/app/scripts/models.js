@@ -38,6 +38,11 @@ const EXAMPLES = [
     name: 'Crowdfunding',
     description: 'The creator sets a goal; anyone can pledge through an open task until the goal is reached, then the creator withdraws the funds.',
   },
+  {
+    id: 'seminar',
+    name: 'Seminar Example',
+    description: 'A proposer submits a proposal with a deposit and three judges vote on it; if approved, anyone can contribute to the campaign until its goal is reached and a judge releases the escrow, otherwise the deposit is refunded.',
+  },
 ];
 
 const ICONS = {
